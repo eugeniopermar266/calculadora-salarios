@@ -1551,7 +1551,7 @@ function DocumentoImprimible({
       {/* ═══ PIE ═══ */}
       <div style={{ marginTop: 22, paddingTop: 10, borderTop: "1px solid #e0ddd8", textAlign: "center" }}>
         <div style={{ fontSize: 8, color: "#888", letterSpacing: "0.15em", textTransform: "uppercase", fontWeight: 700, marginBottom: 4 }}>
-          G & G ENTERPRISES LLC · DESIGNED BY EUGENIO PEREZ MARTIN · ALL RIGHTS RESERVED
+          BD PROD TOOLS · DESIGNED BY EUGENIO PEREZ · ALL RIGHTS RESERVED
         </div>
         <div style={{ fontSize: 7, color: "#aaa", letterSpacing: "0.03em", marginBottom: 3 }}>
           {DISCLAIMER_PDF}
@@ -1918,10 +1918,35 @@ function App45() {
     letter-spacing: 0.05em;
   }
   .autor-box b { color: #1a1a1a; }
+
+  /* === BORDES DE TABLAS EN PDF === */
+  /* Garantiza que todas las tablas tengan bordes visibles al imprimir */
+  table {
+    border-collapse: collapse !important;
+    width: 100%;
+  }
+  table, table th, table td {
+    border: 1px solid #c0bcb5 !important;
+  }
+  table th {
+    border-bottom: 1.5px solid #888 !important;
+  }
+  /* Pequeñas excepciones: tablas dentro de cards (header del documento, etc.)
+     mantienen su look pero con bordes más sutiles */
+  table th, table td {
+    padding: 5px 7px !important;
+  }
+
   @media print {
     .toolbar, .info { display: none !important; }
     body { padding: 0; }
     @page { size: A4 portrait; margin: 8mm 10mm; }
+    /* Forzar que los bordes se impriman aunque el navegador intente optimizarlos */
+    table, table th, table td {
+      border: 1px solid #888 !important;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
   }
 </style>
 </head>
@@ -1973,7 +1998,7 @@ ${docHTML}
       {/* Header */}
       
       {/* Header */}
-      <div style={{ maxWidth:1200, margin:"0 auto 24px" }}>
+      <div style={{ maxWidth:1400, margin:"0 auto 24px" }}>
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center",
                       background:"#1a1a1a", borderRadius:8, padding:"16px 24px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
@@ -2017,7 +2042,7 @@ ${docHTML}
         </div>
       </div>
 
-      <div className="print-grid" style={{ maxWidth:1200, margin:"0 auto", display:"grid", gridTemplateColumns:"300px 1fr", gap:20 }}>
+      <div className="print-grid" style={{ maxWidth:1400, margin:"0 auto", display:"grid", gridTemplateColumns:"340px 1fr", gap:20 }}>
 
         {/* COLUMNA IZQUIERDA */}
         <div className="no-print">
@@ -2328,13 +2353,16 @@ ${docHTML}
           <div style={{ ...P, background:"#fafaf7", border:"1px solid #e8e4de" }}>
             <div style={{ ...ST, color:"#888", marginBottom:10 }}>▸ Aviso Legal</div>
             <div style={{ fontSize:10, fontWeight:700, color:"#1a1a1a", fontFamily:"'Courier New',monospace", marginBottom:8, letterSpacing:"0.05em" }}>
-              G &amp; G ENTERPRISES LLC
+              BD PROD TOOLS
             </div>
             <div style={{ fontSize:9, color:"#666", fontFamily:"'Courier New',monospace", lineHeight:1.5, marginBottom:8 }}>
               {DISCLAIMER_ES}
             </div>
-            <div style={{ fontSize:8, color:"#888", fontFamily:"'Courier New',monospace", lineHeight:1.5, fontStyle:"italic" }}>
+            <div style={{ fontSize:8, color:"#888", fontFamily:"'Courier New',monospace", lineHeight:1.5, fontStyle:"italic", marginBottom:8 }}>
               {DISCLAIMER_EN}
+            </div>
+            <div style={{ fontSize:8, color:"#888", fontFamily:"'Courier New',monospace", lineHeight:1.5, fontStyle:"italic" }}>
+              G &amp; G Enterprises LLC
             </div>
           </div>
 
@@ -2568,7 +2596,7 @@ ${docHTML}
       </div>
 
       {/* Botones de exportación al pie */}
-      <div className="no-print" style={{ maxWidth: 1200, margin: "20px auto 0", display: "flex", justifyContent: "center", gap: 10 }}>
+      <div className="no-print" style={{ maxWidth: 1400, margin: "20px auto 0", display: "flex", justifyContent: "center", gap: 10 }}>
         <button
           onClick={exportarCSV45}
           disabled={!p || desglose45.length === 0}
@@ -2604,7 +2632,7 @@ ${docHTML}
       {/* Banner de error/confirmación de exportación */}
       {exportError && (
         <div className="no-print" style={{
-          maxWidth: 1200, margin: "12px auto 0", padding: "10px 16px",
+          maxWidth: 1400, margin: "12px auto 0", padding: "10px 16px",
           background: exportError.tipo === "ok" ? "#e8f5e8" : "#fdf0f0",
           border: `1px solid ${exportError.tipo === "ok" ? "#c0e0c0" : "#e8c0c0"}`,
           borderRadius: 5, color: exportError.tipo === "ok" ? "#2a7a50" : "#b02020",
@@ -2614,10 +2642,10 @@ ${docHTML}
         </div>
       )}
 
-      <div style={{ maxWidth:1200, margin:"12px auto 0", textAlign:"center", fontSize:8, color:"#aaa", letterSpacing:"0.1em", textTransform:"uppercase" }}>
+      <div style={{ maxWidth:1400, margin:"12px auto 0", textAlign:"center", fontSize:8, color:"#aaa", letterSpacing:"0.1em", textTransform:"uppercase" }}>
         P40 = P45 ÷ (1 + 0,89286/30×7/40×1,5 × h) · Base = P40 × 0,89286 · Vac = Base ÷ 11,478452 · Plus Actividad = máx(0, P45×fracc − cobro)
       </div>
-      <div style={{ maxWidth: 1200, margin: "8px auto 0", textAlign: "center", fontSize: 7, color: "#bbb", letterSpacing: "0.05em" }}>
+      <div style={{ maxWidth: 1400, margin: "8px auto 0", textAlign: "center", fontSize: 7, color: "#bbb", letterSpacing: "0.05em" }}>
         {DISCLAIMER_PDF}
       </div>
 
