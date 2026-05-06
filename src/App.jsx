@@ -699,17 +699,27 @@ function InputsPorMes({ desglose, horasPorMes, setHorasPorMes, vacDiasPorMes, se
 
   return (
     <div>
-      <div style={{ display:"grid", gridTemplateColumns:cols, gap:6, marginBottom:8, padding:"0 2px" }}>
-        <div style={{ fontSize:9, color:"#777", letterSpacing:"0.1em", textTransform:"uppercase", fontFamily:"'Courier New',monospace" }}>Mes</div>
-        <div style={{ fontSize:9, color:"#3a6090", letterSpacing:"0.1em", textTransform:"uppercase", fontFamily:"'Courier New',monospace", textAlign:"center" }}>H.Extra</div>
-        <div style={{ fontSize:9, color:"#907060", letterSpacing:"0.1em", textTransform:"uppercase", fontFamily:"'Courier New',monospace", textAlign:"center" }}>Vac.d</div>
-        {hasFest && <div style={{ fontSize:9, color:"#6a4a8a", letterSpacing:"0.1em", textTransform:"uppercase", fontFamily:"'Courier New',monospace", textAlign:"center" }}>Festivo</div>}
+      <div style={{ display:"grid", gridTemplateColumns:cols, gap:6, marginBottom:12, padding:"0 2px 6px", borderBottom:"1px solid #eae7e2" }}>
+        <div style={{ fontSize:9, color:"#888", letterSpacing:"0.12em", textTransform:"uppercase", fontFamily:"'Courier New',monospace", fontWeight:700 }}>Mes</div>
+        <div style={{ fontSize:9, color:"#3a6090", letterSpacing:"0.1em", textTransform:"uppercase", fontFamily:"'Courier New',monospace", textAlign:"center", fontWeight:700 }}>H.Ext</div>
+        <div style={{ fontSize:9, color:"#907060", letterSpacing:"0.1em", textTransform:"uppercase", fontFamily:"'Courier New',monospace", textAlign:"center", fontWeight:700 }}>Vac</div>
+        {hasFest && <div style={{ fontSize:9, color:"#6a4a8a", letterSpacing:"0.1em", textTransform:"uppercase", fontFamily:"'Courier New',monospace", textAlign:"center", fontWeight:700 }}>Fest</div>}
       </div>
 
-      {desglose.map((d,i) => (
-        <div key={i} style={{ display:"grid", gridTemplateColumns:cols, gap:6, marginBottom:16, alignItems:"center" }}>
-          <div style={{ fontSize:11, color:"#444", fontFamily:"'Courier New',monospace", textTransform:"capitalize" }}>
-            {d.mes}{!d.esCompleto&&<span style={{fontSize:9,color:"#aaa",marginLeft:4}}>{d.desde}–{d.hasta}</span>}
+      {desglose.map((d,i) => {
+        // Separar "enero de 2026" en mes y año para mostrarlos en 2 líneas
+        const partes = d.mes.split(" de ");
+        const mesNombre = partes[0] || d.mes;
+        const anio = partes[1] || "";
+        return (
+        <div key={i} style={{ display:"grid", gridTemplateColumns:cols, gap:6, marginBottom:14, alignItems:"center" }}>
+          <div style={{ fontFamily:"'Courier New',monospace", lineHeight:1.25, paddingRight:4 }}>
+            <div style={{ fontSize:10.5, color:"#1a1a1a", fontWeight:600, textTransform:"capitalize", letterSpacing:"0.02em" }}>
+              {mesNombre}
+            </div>
+            <div style={{ fontSize:9, color:"#888", marginTop:1, letterSpacing:"0.03em" }}>
+              {anio}{!d.esCompleto && <span style={{ color:"#b8864a", marginLeft:4 }}>({d.desde}–{d.hasta})</span>}
+            </div>
           </div>
           {(() => {
             const autoH = Math.round(d.semanasLaborables * 5);
@@ -745,7 +755,8 @@ function InputsPorMes({ desglose, horasPorMes, setHorasPorMes, vacDiasPorMes, se
             style={{ background:"#f0ede8", border:"1px solid #c8b0d8", borderRadius:4, color:"#6a3a9a", fontFamily:"'Courier New',monospace", fontSize:11, padding:"4px 4px", outline:"none", textAlign:"center", colorScheme:"light", minWidth:0, width:"100%", boxSizing:"border-box" }}
             onFocus={e=>e.target.style.borderColor="#8a5aaa"} onBlur={e=>e.target.style.borderColor="#c8b0d8"} />}
         </div>
-      ))}
+        );
+      })}
 
       <div style={{ display:"grid", gridTemplateColumns:cols, gap:6, marginTop:8, paddingTop:8, borderTop:"1px solid #e0ddd8" }}>
         <div style={{ fontSize:9, color:"#777", textTransform:"uppercase", letterSpacing:"0.1em", fontFamily:"'Courier New',monospace", display:"flex", alignItems:"center" }}>Total</div>
@@ -3476,6 +3487,7 @@ export default function App() {
   if (comprobando) return <div style={{ minHeight: "100vh", background: "#1a1a1a" }} />;
   if (!usuario) return <PantallaLogin onAcierto={onLoginAcierto} />;
 
+  
   return (
     <UsuarioContext.Provider value={usuario}>
       <div style={{ minHeight: "100vh", background: "#f0ede8" }}>
