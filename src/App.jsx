@@ -695,7 +695,7 @@ function InputsPorMes({ desglose, horasPorMes, setHorasPorMes, vacDiasPorMes, se
   const totalF = (festivosPorMes||[]).reduce((s,v)=>s+(v||0),0);
   const hasFest = !!setFestivosPorMes;
 
-  const cols = hasFest ? "1fr 68px 68px 68px" : "1fr 80px 80px";
+  const cols = hasFest ? "1fr 56px 56px 56px" : "1fr 70px 70px";
 
   return (
     <div>
@@ -707,7 +707,7 @@ function InputsPorMes({ desglose, horasPorMes, setHorasPorMes, vacDiasPorMes, se
       </div>
 
       {desglose.map((d,i) => (
-        <div key={i} style={{ display:"grid", gridTemplateColumns:cols, gap:6, marginBottom:14, alignItems:"center" }}>
+        <div key={i} style={{ display:"grid", gridTemplateColumns:cols, gap:6, marginBottom:16, alignItems:"center" }}>
           <div style={{ fontSize:11, color:"#444", fontFamily:"'Courier New',monospace", textTransform:"capitalize" }}>
             {d.mes}{!d.esCompleto&&<span style={{fontSize:9,color:"#aaa",marginLeft:4}}>{d.desde}–{d.hasta}</span>}
           </div>
@@ -729,20 +729,20 @@ function InputsPorMes({ desglose, horasPorMes, setHorasPorMes, vacDiasPorMes, se
                     setHorasPorMes(a);
                   }}
                   title={`Estimado L-V: ${autoH}h (puedes modificarlo)`}
-                  style={{ background: esEstimadoOriginal?"#eef3f8":"#f0ede8", border:`1px solid ${esEstimadoOriginal?"#b8cce0":"#4a6a9a"}`, borderRadius:4, color:"#2a5a8a", fontFamily:"'Courier New',monospace", fontSize:12, padding:"5px 6px", outline:"none", textAlign:"center", colorScheme:"light", minWidth:0, width:"100%" }}
+                  style={{ background: esEstimadoOriginal?"#eef3f8":"#f0ede8", border:`1px solid ${esEstimadoOriginal?"#b8cce0":"#4a6a9a"}`, borderRadius:4, color:"#2a5a8a", fontFamily:"'Courier New',monospace", fontSize:11, padding:"4px 4px", outline:"none", textAlign:"center", colorScheme:"light", minWidth:0, width:"100%", boxSizing:"border-box" }}
                   onFocus={e=>e.target.style.borderColor="#4a6a9a"} onBlur={e=>e.target.style.borderColor=esEstimadoOriginal?"#b8cce0":"#4a6a9a"} />
-                {esEstimadoOriginal && <div style={{ position:"absolute", top:-8, right:0, fontSize:7, color:"#4a6a9a", fontFamily:"'Courier New',monospace", letterSpacing:"0.05em" }}>L-V</div>}
-                <div style={{ position:"absolute", bottom:-10, right:0, fontSize:8, color:"#8aa0b8", fontFamily:"'Courier New',monospace", letterSpacing:"0.03em", whiteSpace:"nowrap" }}>/{autoH}d</div>
+                {esEstimadoOriginal && <div style={{ position:"absolute", top:-9, left:0, right:0, fontSize:7, color:"#4a6a9a", fontFamily:"'Courier New',monospace", letterSpacing:"0.05em", textAlign:"center", pointerEvents:"none" }}>L-V</div>}
+                <div style={{ position:"absolute", bottom:-11, left:0, right:0, fontSize:7, color:"#8aa0b8", fontFamily:"'Courier New',monospace", letterSpacing:"0.03em", textAlign:"center", pointerEvents:"none" }}>/{autoH}d</div>
               </div>
             );
           })()}
           <input type="number" min="0" step="1" value={vacDiasPorMes[i]||""} placeholder="0"
             onChange={e=>setV(i,parseFloat(e.target.value)||0)}
-            style={{ background:"#f0ede8", border:"1px solid #e0c8b0", borderRadius:4, color:"#8a2a20", fontFamily:"'Courier New',monospace", fontSize:12, padding:"5px 6px", outline:"none", textAlign:"center", colorScheme:"light", minWidth:0 }}
+            style={{ background:"#f0ede8", border:"1px solid #e0c8b0", borderRadius:4, color:"#8a2a20", fontFamily:"'Courier New',monospace", fontSize:11, padding:"4px 4px", outline:"none", textAlign:"center", colorScheme:"light", minWidth:0, width:"100%", boxSizing:"border-box" }}
             onFocus={e=>e.target.style.borderColor="#8a5030"} onBlur={e=>e.target.style.borderColor="#e0c8b0"} />
           {hasFest && <input type="number" min="0" step="1" value={(festivosPorMes||[])[i]||""} placeholder="0"
             onChange={e=>setF(i,parseFloat(e.target.value)||0)}
-            style={{ background:"#f0ede8", border:"1px solid #c8b0d8", borderRadius:4, color:"#6a3a9a", fontFamily:"'Courier New',monospace", fontSize:12, padding:"5px 6px", outline:"none", textAlign:"center", colorScheme:"light", minWidth:0 }}
+            style={{ background:"#f0ede8", border:"1px solid #c8b0d8", borderRadius:4, color:"#6a3a9a", fontFamily:"'Courier New',monospace", fontSize:11, padding:"4px 4px", outline:"none", textAlign:"center", colorScheme:"light", minWidth:0, width:"100%", boxSizing:"border-box" }}
             onFocus={e=>e.target.style.borderColor="#8a5aaa"} onBlur={e=>e.target.style.borderColor="#c8b0d8"} />}
         </div>
       ))}
@@ -2181,7 +2181,7 @@ ${docHTML}
 
           {p && (
             <div style={P}>
-              <div style={ST}>▸ Horas Extra y Vacaciones por Mes</div>
+              <div style={ST}>▸ Horas Extra, Vacaciones, Festivos</div>
               <InputsPorMes
                 desglose={p.desglose}
                 horasPorMes={horasPorMes}       setHorasPorMes={setHorasPorMes}
@@ -2733,7 +2733,15 @@ ${docHTML}
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "";
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
-const AUTH_KEY = "calc_user_v1";
+const AUTH_KEY = "calc_user_v2";
+
+// Duración máxima de sesión sin actividad (en milisegundos).
+// El contador se resetea cada vez que el usuario interactúa con la app.
+// Cambia este valor si quieres más/menos tiempo:
+//   30 min = 30 * 60 * 1000
+//   1 hora = 60 * 60 * 1000
+//   1 día  = 24 * 60 * 60 * 1000
+const SESION_DURACION_MS = 30 * 60 * 1000;
 
 // --- Cliente REST ligero a Supabase (sin librería externa) ---
 async function supabaseFetch(path, options = {}) {
@@ -2880,7 +2888,8 @@ function PantallaLogin({ onAcierto }) {
       if (user) {
         try {
           localStorage.setItem(AUTH_KEY, JSON.stringify({
-            id: user.id, nombre: user.nombre, es_admin: user.es_admin, pin
+            id: user.id, nombre: user.nombre, es_admin: user.es_admin, pin,
+            ultima_actividad: Date.now(),
           }));
         } catch {}
         // Registrar log de acceso (no bloqueante)
@@ -3357,24 +3366,107 @@ export default function App() {
   const [mostrarAdmin, setMostrarAdmin] = useState(false);
   const [mostrarLogs, setMostrarLogs] = useState(false);
 
+  // ── Carga inicial: lee sesión, comprueba si ha expirado, entra directo si vale
   useEffect(() => {
     try {
       const guardado = localStorage.getItem(AUTH_KEY);
-      if (guardado) {
-        const parsed = JSON.parse(guardado);
-        // Re-validamos el PIN contra Supabase por si el usuario fue borrado/cambiado
-        loginUsuario(parsed.nombre, parsed.pin)
-          .then(u => {
-            if (u) setUsuario({ id: u.id, nombre: u.nombre, es_admin: u.es_admin, pin: parsed.pin });
-            else { localStorage.removeItem(AUTH_KEY); }
-            setComprobando(false);
-          })
-          .catch(() => setComprobando(false));
-      } else {
+      if (!guardado) { setComprobando(false); return; }
+
+      const parsed = JSON.parse(guardado);
+      const ahora = Date.now();
+      const ultima = parsed.ultima_actividad || 0;
+      const tiempoSinActividad = ahora - ultima;
+
+      // Si pasaron más de SESION_DURACION_MS sin actividad → caducada
+      if (tiempoSinActividad > SESION_DURACION_MS) {
+        localStorage.removeItem(AUTH_KEY);
         setComprobando(false);
+        return;
       }
-    } catch { setComprobando(false); }
+
+      // Sesión válida: entrar DIRECTO sin esperar a Supabase (modo híbrido)
+      setUsuario({
+        id: parsed.id,
+        nombre: parsed.nombre,
+        es_admin: parsed.es_admin,
+        pin: parsed.pin,
+      });
+      // Renovar timestamp
+      localStorage.setItem(AUTH_KEY, JSON.stringify({ ...parsed, ultima_actividad: ahora }));
+      setComprobando(false);
+
+      // Revalidar contra Supabase EN SEGUNDO PLANO. Si falla, no hacer nada
+      // (el usuario sigue dentro). Solo cerrar si Supabase confirma que el
+      // usuario fue borrado o el PIN cambió.
+      loginUsuario(parsed.nombre, parsed.pin)
+        .then(u => {
+          if (!u) {
+            // Confirmado: el usuario ya no existe o cambió el PIN
+            localStorage.removeItem(AUTH_KEY);
+            setUsuario(null);
+          }
+        })
+        .catch(() => { /* error de red: dejar al usuario dentro */ });
+    } catch {
+      setComprobando(false);
+    }
   }, []);
+
+  // ── Detector de actividad: cada interacción renueva el timestamp
+  // y un check periódico cierra sesión si pasó SESION_DURACION_MS
+  useEffect(() => {
+    if (!usuario) return;
+
+    const renovar = () => {
+      try {
+        const guardado = localStorage.getItem(AUTH_KEY);
+        if (!guardado) return;
+        const parsed = JSON.parse(guardado);
+        parsed.ultima_actividad = Date.now();
+        localStorage.setItem(AUTH_KEY, JSON.stringify(parsed));
+      } catch {}
+    };
+
+    // Throttle: como mucho una vez cada 30 segundos
+    let ultimoRenovado = Date.now();
+    const onActividad = () => {
+      const ahora = Date.now();
+      if (ahora - ultimoRenovado > 30000) {
+        ultimoRenovado = ahora;
+        renovar();
+      }
+    };
+
+    const eventos = ["mousedown", "keydown", "scroll", "touchstart"];
+    eventos.forEach(e => window.addEventListener(e, onActividad, { passive: true }));
+
+    // Check periódico de expiración (cada 60s mira si pasaron 30 min sin actividad)
+    const timer = setInterval(() => {
+      try {
+        const guardado = localStorage.getItem(AUTH_KEY);
+        if (!guardado) {
+          setUsuario(null);
+          return;
+        }
+        const parsed = JSON.parse(guardado);
+        const tiempoSinActividad = Date.now() - (parsed.ultima_actividad || 0);
+        if (tiempoSinActividad > SESION_DURACION_MS) {
+          localStorage.removeItem(AUTH_KEY);
+          setUsuario(null);
+        }
+      } catch {}
+    }, 60000);
+
+    return () => {
+      eventos.forEach(e => window.removeEventListener(e, onActividad));
+      clearInterval(timer);
+    };
+  }, [usuario]);
+
+  // Wrapper para el setUsuario que recibe PantallaLogin (incluye ultima_actividad)
+  const onLoginAcierto = (u) => {
+    setUsuario(u);
+  };
 
   const cerrarSesion = () => {
     try { localStorage.removeItem(AUTH_KEY); } catch {}
@@ -3382,7 +3474,7 @@ export default function App() {
   };
 
   if (comprobando) return <div style={{ minHeight: "100vh", background: "#1a1a1a" }} />;
-  if (!usuario) return <PantallaLogin onAcierto={setUsuario} />;
+  if (!usuario) return <PantallaLogin onAcierto={onLoginAcierto} />;
 
   return (
     <UsuarioContext.Provider value={usuario}>
