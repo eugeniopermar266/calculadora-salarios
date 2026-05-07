@@ -1654,7 +1654,7 @@ function DocumentoImprimible({
 }
 
 
-function App45() {
+function App45({ modoTab = "iruna45" }) {
   // Usuario actual de la sesión (para mostrar autor en exports)
   const usuarioSesion = useContext(UsuarioContext);
 
@@ -1916,7 +1916,7 @@ function App45() {
     // Registrar log de exportación
     if (usuarioSesion) {
       const detalle = [proyecto, productora, nombre].filter(Boolean).join(" | ") || "(sin datos)";
-      registrarLog(usuarioSesion.nombre, "export_csv", `${filename} · ${detalle}`);
+      registrarLog(usuarioSesion.nombre, "export_csv", `[${modoTab === "tab40" ? "40H" : "45H Iruña"}] ${filename} · ${detalle}`);
     }
   };
 
@@ -2072,7 +2072,7 @@ ${docHTML}
       // Registrar log de exportación
       if (usuarioSesion) {
         const detalle = [proyecto, productora, nombre].filter(Boolean).join(" | ") || "(sin datos)";
-        registrarLog(usuarioSesion.nombre, "export_pdf", `${baseFilename}_45h.html · ${detalle}`);
+        registrarLog(usuarioSesion.nombre, "export_pdf", `[${modoTab === "tab40" ? "40H" : "45H Iruña"}] ${baseFilename}_45h.html · ${detalle}`);
       }
     } catch (e) {
       console.error("Error al exportar:", e);
@@ -2136,7 +2136,7 @@ ${docHTML}
         <div className="no-print">
 
           <GestorPerfiles
-            tabId="45h"
+            tabId={modoTab === "tab40" ? "40h" : "45h"}
             datosActuales={{
               proyecto, productora, nombre, puesto, salario45, horasRef, modoInverso45, objetivoSemanal45,
               fechaInicio, fechaFin, vacAcumulada, indemAcumulada,
@@ -3431,12 +3431,38 @@ function PanelLogs({ usuarioActual, onCerrar }) {
 // BANNER SUPERIOR (sesión actual)
 // ═══════════════════════════════════════════════════════════════════════
 
-function BannerSesion({ usuario, onLogout, onAdmin, onLogs }) {
+function BannerSesion({ usuario, onLogout, onAdmin, onLogs, tab, onChangeTab }) {
+  const tabBtn = (id, label) => {
+    const activa = tab === id;
+    return (
+      <button
+        onClick={() => onChangeTab(id)}
+        style={{
+          background: activa ? "#c8a96e" : "transparent",
+          color: activa ? "#1a1a1a" : "#aaa",
+          border: `1px solid ${activa ? "#c8a96e" : "#444"}`,
+          padding: "5px 14px",
+          borderRadius: 4,
+          cursor: "pointer",
+          fontSize: 10,
+          fontFamily: "'Courier New',monospace",
+          fontWeight: 700,
+          letterSpacing: "0.12em",
+          textTransform: "uppercase",
+          transition: "all 0.15s",
+        }}
+      >
+        {label}
+      </button>
+    );
+  };
+
   return (
     <div className="no-print" style={{
       background: "#1a1a1a", color: "#f0ede8", padding: "8px 16px",
       display: "flex", alignItems: "center", justifyContent: "space-between",
       fontFamily: "'Courier New',monospace", fontSize: 11, letterSpacing: "0.08em",
+      gap: 12, flexWrap: "wrap",
     }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <span style={{ width: 24, height: 24, background: "#c8a96e", color: "#1a1a1a", borderRadius: 4, display: "inline-flex", alignItems: "center", justifyContent: "center", fontWeight: 700 }}>B</span>
@@ -3444,6 +3470,13 @@ function BannerSesion({ usuario, onLogout, onAdmin, onLogs }) {
         <span style={{ fontWeight: 700, color: "#f0ede8" }}>{usuario.nombre}</span>
         {usuario.es_admin && <span style={{ background: "#c8a96e", color: "#1a1a1a", padding: "2px 6px", borderRadius: 3, fontSize: 8, fontWeight: 700, letterSpacing: "0.1em" }}>ADMIN</span>}
       </div>
+
+      {/* Pestañas centrales */}
+      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+        {tabBtn("iruna45", "45H Iruña")}
+        {tabBtn("tab40", "40H")}
+      </div>
+
       <div style={{ display: "flex", gap: 8 }}>
         {usuario.es_admin && (
           <>
@@ -3467,6 +3500,7 @@ export default function App() {
   const [comprobando, setComprobando] = useState(true);
   const [mostrarAdmin, setMostrarAdmin] = useState(false);
   const [mostrarLogs, setMostrarLogs] = useState(false);
+  const [tab, setTab] = useState("iruna45"); // "iruna45" | "tab40"
 
   // ── Carga inicial: lee sesión, comprueba si ha expirado, entra directo si vale
   useEffect(() => {
@@ -3586,8 +3620,11 @@ export default function App() {
           onLogout={cerrarSesion}
           onAdmin={() => setMostrarAdmin(true)}
           onLogs={() => setMostrarLogs(true)}
+          tab={tab}
+          onChangeTab={setTab}
         />
-        <App45 />
+        {/* key={tab} fuerza remount al cambiar de pestaña → cada una tiene su propio estado */}
+        <App45 key={tab} modoTab={tab} />
         {mostrarAdmin && usuario.es_admin && (
           <PanelAdmin usuarioActual={usuario} onCerrar={() => setMostrarAdmin(false)} />
         )}
