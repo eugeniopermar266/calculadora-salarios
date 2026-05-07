@@ -54,7 +54,7 @@ const FESTIVOS_BILBAO = [
   // 1 territorial Bizkaia
   { fecha: "2026-07-31", nombre: "San Ignacio de Loyola",      tipo: "territorial" },
   // 1 local Bilbao
-  { fecha: "2026-08-21", nombre: "Semana Grande (Aste Nagusia)", tipo: "local" },
+  { fecha: "2026-08-28", nombre: "Semana Grande (Aste Nagusia)", tipo: "local" },
 ];
 
 // Alias para compatibilidad con el resto del código
@@ -1131,7 +1131,7 @@ function ModalPDF({ contenidoPrint, onClose, filename = "calculadora_45h.pdf" })
       }}>
         <div>
           <div style={{ fontSize: 9, letterSpacing: "0.2em", color: "#b8864a", textTransform: "uppercase", marginBottom: 2 }}>
-            EXPORTAR PDF · 45 HORAS
+            EXPORTAR PDF
           </div>
           <div style={{ fontSize: 13, fontWeight: 700 }}>{filename}</div>
         </div>
@@ -1252,6 +1252,7 @@ function DocumentoImprimible({
   totalVac45, totalIndem45,
   totalFestDias45, totalFestImport45,
   plusHerramienta, plusCoche, plusVivienda, plusSeguroVida, plusComida,
+  es40h = false,
 }) {
   // Estilos reutilizables
   const sectionTitle = {
@@ -1349,7 +1350,7 @@ function DocumentoImprimible({
             </td>
             <td style={{ width: "55%", verticalAlign: "middle", padding: 0, textAlign: "right" }}>
               <div style={{ fontSize: 8, color: "#888", letterSpacing: "0.3em", textTransform: "uppercase", marginBottom: 3 }}>
-                Desglose Salarial · 45 Horas
+                Desglose Salarial · {es40h ? "40 Horas" : "45 Horas"}
               </div>
               <div style={{ fontSize: 16, fontWeight: 700, letterSpacing: "0.05em", color: "#1a1a1a", marginBottom: 5 }}>
                 CALCULADORA DE SALARIOS
@@ -1391,10 +1392,10 @@ function DocumentoImprimible({
               { l: "BASE 40H",      v: baseRef,  s: "× 0,89286" },
               { l: "VACACIONES",    v: vacRef,   s: "Base ÷ 11,478452" },
               { l: "INDEMNIZACIÓN", v: indemRef, s: "(Base/30) × 0,98632" },
-              { l: `H.EXTRA (${horasRef}H)`, v: hxRef, s: `${horasRef}h × ${fmt(vHoraEx)} €`, blue: true },
-            ].map((it, idx) => (
+              ...(es40h ? [] : [{ l: `H.EXTRA (${horasRef}H)`, v: hxRef, s: `${horasRef}h × ${fmt(vHoraEx)} €`, blue: true }]),
+            ].map((it, idx, arr) => (
               <td key={idx} style={{
-                width: "25%",
+                width: `${100/arr.length}%`,
                 border: "1px solid #e0ddd8",
                 padding: "10px 6px",
                 textAlign: "center",
@@ -1409,7 +1410,7 @@ function DocumentoImprimible({
         </tbody>
       </table>
       <div style={{ background: "#fdf8f0", border: "1px solid #e8d4a8", padding: "8px 12px", textAlign: "center", fontSize: 11, fontWeight: 700, color: "#1a1a1a", letterSpacing: "0.05em" }}>
-        TOTAL ≈ P45 · <span style={{ color: "#b8864a", fontSize: 13 }}>{fmt(sumaRef)} €</span> <span style={{ display: "inline-block", background: "#b8864a", color: "#fff", fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", padding: "2px 7px", borderRadius: 3, marginLeft: 8, verticalAlign: "middle" }}>BRUTOS</span>
+        {es40h ? "TOTAL ≈ 40" : "TOTAL ≈ P45"} · <span style={{ color: "#b8864a", fontSize: 13 }}>{fmt(es40h ? (baseRef + vacRef + indemRef) : sumaRef)} €</span> <span style={{ display: "inline-block", background: "#b8864a", color: "#fff", fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", padding: "2px 7px", borderRadius: 3, marginLeft: 8, verticalAlign: "middle" }}>BRUTOS</span>
       </div>
 
       {/* ═══ CÁLCULO DE HORAS ═══ */}
@@ -1430,7 +1431,7 @@ function DocumentoImprimible({
       </table>
 
       {/* ═══ NÓMINA 45H POR MES TRABAJADO ═══ */}
-      <div style={sectionTitle}>▸ NÓMINA 45H POR MES TRABAJADO <span style={{ display: "inline-block", background: "#b8864a", color: "#fff", fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", padding: "2px 7px", borderRadius: 3, marginLeft: 8, verticalAlign: "middle", textTransform: "uppercase" }}>Importes Brutos</span></div>
+      <div style={sectionTitle}>▸ NÓMINA {es40h ? "40H" : "45H"} POR MES TRABAJADO <span style={{ display: "inline-block", background: "#b8864a", color: "#fff", fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", padding: "2px 7px", borderRadius: 3, marginLeft: 8, verticalAlign: "middle", textTransform: "uppercase" }}>Importes Brutos</span></div>
       <table style={{ width: "100%", borderCollapse: "collapse" }}>
         <thead>
           <tr>
@@ -1442,7 +1443,7 @@ function DocumentoImprimible({
               { l: "INDEM.", a: "right" },
               { l: "H.EX H", a: "right" },
               { l: "H.EX €", a: "right" },
-              { l: "PLUS ACT.", a: "right" },
+              ...(es40h ? [] : [{ l: "PLUS ACT.", a: "right" }]),
               { l: "−VAC.D", a: "right" },
               { l: "FEST. €", a: "right" },
               { l: "PLUSES", a: "right" },
@@ -1468,7 +1469,8 @@ function DocumentoImprimible({
             const plusesSinComida = (c.herramienta || 0) + (c.coche || 0) + (c.vivienda || 0) + (c.seguroVida || 0);
             const comida = c.comida || 0;
             // TOTAL = totalMes (que incluye base+vac+indem+h.extra+plusAct−vd) + festivos + complementos
-            const totalRow = d.totalMes + fest + (c.total || 0);
+            // En 40H restamos el plusAct del totalMes porque esa columna se elimina
+            const totalRow = (es40h ? (d.totalMes - (d.plusAct || 0)) : d.totalMes) + fest + (c.total || 0);
             return (
               <tr key={i} style={{ background: i % 2 === 0 ? "#fff" : "#fafaf7" }}>
                 <td style={tdCell({ textTransform: "capitalize", fontWeight: 700 })}>
@@ -1481,7 +1483,7 @@ function DocumentoImprimible({
                 <td style={tdCell({ textAlign: "right", color: d.indem40 === 0 ? "#bbb" : "#1a1a1a" })}>{d.indem40 === 0 ? "—" : fmt(d.indem40)}</td>
                 <td style={tdCell({ textAlign: "right", color: "#3a6898" })}>{d.hMes}h</td>
                 <td style={tdCell({ textAlign: "right", color: "#3a6898" })}>{fmt(d.cobroHx)}</td>
-                <td style={tdCell({ textAlign: "right", color: d.plusAct > 0 ? "#b07030" : "#bbb", fontWeight: d.plusAct > 0 ? 600 : 400 })}>{d.plusAct > 0 ? fmt(d.plusAct) : "—"}</td>
+                {!es40h && <td style={tdCell({ textAlign: "right", color: d.plusAct > 0 ? "#b07030" : "#bbb", fontWeight: d.plusAct > 0 ? 600 : 400 })}>{d.plusAct > 0 ? fmt(d.plusAct) : "—"}</td>}
                 <td style={tdCell({ textAlign: "right", color: vd > 0 ? "#8a2a20" : "#bbb" })}>{vd > 0 ? `−${fmt(vd)}` : "—"}</td>
                 <td style={tdCell({ textAlign: "right", color: fest > 0 ? "#6a3a9a" : "#bbb" })}>{fest > 0 ? fmt(fest) : "—"}</td>
                 <td style={tdCell({ textAlign: "right", color: plusesSinComida > 0 ? "#5a8a5a" : "#bbb" })}>{plusesSinComida > 0 ? fmt(plusesSinComida) : "—"}</td>
@@ -1504,7 +1506,7 @@ function DocumentoImprimible({
               }, 0)}h
             </td>
             <td style={tdCell({ background: "#fdf8f0", textAlign: "right", color: "#3a6898" })}>{fmt(totHx)}</td>
-            <td style={tdCell({ background: "#fdf8f0", textAlign: "right", color: totPlus > 0 ? "#b07030" : "#bbb" })}>{totPlus > 0 ? fmt(totPlus) : "—"}</td>
+            {!es40h && <td style={tdCell({ background: "#fdf8f0", textAlign: "right", color: totPlus > 0 ? "#b07030" : "#bbb" })}>{totPlus > 0 ? fmt(totPlus) : "—"}</td>}
             <td style={tdCell({ background: "#fdf8f0", textAlign: "right", color: totVd > 0 ? "#8a2a20" : "#bbb" })}>{totVd > 0 ? `−${fmt(totVd)}` : "—"}</td>
             <td style={tdCell({ background: "#fdf8f0", textAlign: "right", color: totalFestImport45 > 0 ? "#6a3a9a" : "#bbb" })}>{totalFestImport45 > 0 ? fmt(totalFestImport45) : "—"}</td>
             <td style={tdCell({ background: "#fdf8f0", textAlign: "right", color: "#5a8a5a" })}>
@@ -1513,7 +1515,7 @@ function DocumentoImprimible({
             <td style={tdCell({ background: "#fdf8f0", textAlign: "right", color: "#5a8a5a" })}>
               {fmt(complementos45.reduce((s,c)=>s+(c.comida||0), 0))}
             </td>
-            <td style={tdCell({ background: "#fdf8f0", textAlign: "right", color: "#b8864a" })}>{fmt(totalConExtras)}</td>
+            <td style={tdCell({ background: "#fdf8f0", textAlign: "right", color: "#b8864a" })}>{fmt(es40h ? (totalConExtras - (totPlus || 0)) : totalConExtras)}</td>
           </tr>
         </tbody>
       </table>
@@ -1556,7 +1558,7 @@ function DocumentoImprimible({
             <td style={tdLabel}>+ Horas extra ({horasPorMes.reduce((s,v)=>s+(v||0),0)}h)</td>
             <td style={{ ...tdValue, textAlign: "right", color: "#3a6898", fontWeight: 700 }}>+ {fmtE(totHx)}</td>
           </tr>
-          {totPlus > 0 && (
+          {totPlus > 0 && !es40h && (
             <tr>
               <td style={tdLabel}>+ Plus de Actividad</td>
               <td style={{ ...tdValue, textAlign: "right", color: "#b07030", fontWeight: 700 }}>+ {fmtE(totPlus)}</td>
@@ -1576,19 +1578,19 @@ function DocumentoImprimible({
           )}
           <tr style={{ background: "#fdf8f0" }}>
             <td style={{ ...tdLabel, background: "#fdf8f0", color: "#b8864a", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", fontSize: 10, padding: "8px 8px" }}>
-              TOTAL A PERCIBIR 45h {tieneCompl ? "(sin extras)" : ""} <span style={{ display: "inline-block", background: "#b8864a", color: "#fff", fontSize: 8, fontWeight: 700, letterSpacing: "0.12em", padding: "1px 6px", borderRadius: 3, marginLeft: 6, verticalAlign: "middle", textTransform: "uppercase" }}>Importe Bruto</span>
+              TOTAL A PERCIBIR ({es40h ? "40h" : "45h"}) {tieneCompl ? "(sin extras)" : ""} <span style={{ display: "inline-block", background: "#b8864a", color: "#fff", fontSize: 8, fontWeight: 700, letterSpacing: "0.12em", padding: "1px 6px", borderRadius: 3, marginLeft: 6, verticalAlign: "middle", textTransform: "uppercase" }}>Importe Bruto</span>
             </td>
             <td style={{ ...tdValue, background: "#fdf8f0", textAlign: "right", fontSize: 13, fontWeight: 700, color: "#b8864a", padding: "8px 8px" }}>
-              {fmtE(totFinal)}
+              {fmtE(es40h ? (totFinal - (totPlus || 0)) : totFinal)}
             </td>
           </tr>
           <tr>
             <td style={{ ...tdLabel, paddingLeft: 18, color: "#666" }}>· Promedio mensual ({fmtM(p?.mesesTotales || 0)} meses)</td>
-            <td style={{ ...tdValue, textAlign: "right", color: "#1a7a58", fontWeight: 700 }}>{p && p.mesesTotales > 0 ? fmtE(totFinal / p.mesesTotales) : "—"}</td>
+            <td style={{ ...tdValue, textAlign: "right", color: "#1a7a58", fontWeight: 700 }}>{p && p.mesesTotales > 0 ? fmtE((es40h ? (totFinal - (totPlus || 0)) : totFinal) / p.mesesTotales) : "—"}</td>
           </tr>
           <tr>
             <td style={{ ...tdLabel, paddingLeft: 18, color: "#666" }}>· Promedio semanal ({fmt(p?.semanasTotales || 0, 1)} sem L-V)</td>
-            <td style={{ ...tdValue, textAlign: "right", color: "#1a7a58" }}>{p && p.semanasTotales > 0 ? fmtE(totFinal / p.semanasTotales) : "—"}</td>
+            <td style={{ ...tdValue, textAlign: "right", color: "#1a7a58" }}>{p && p.semanasTotales > 0 ? fmtE((es40h ? (totFinal - (totPlus || 0)) : totFinal) / p.semanasTotales) : "—"}</td>
           </tr>
 
           {/* EXTRAS DEL PERÍODO */}
@@ -1658,7 +1660,14 @@ function App45({ modoTab = "iruna45" }) {
   // Usuario actual de la sesión (para mostrar autor en exports)
   const usuarioSesion = useContext(UsuarioContext);
 
-  const [proyecto,         setProyecto]       = useState("IRUÑA 97");
+  // === FLAG PESTAÑA 40H ===
+  // Cuando es40h=true, varios textos y bloques cambian para reflejar la jornada de 40h
+  const es40h = modoTab === "tab40";
+  const labelHoras = es40h ? "40h" : "45h";
+  const labelHorasUpper = es40h ? "40H" : "45h";
+  const labelTotalRef = es40h ? "TOTAL ≈ 40" : "TOTAL ≈ P45";
+
+  const [proyecto,         setProyecto]       = useState(es40h ? "" : "IRUÑA 97");
   const [productora,       setProductora]     = useState("");
   const [logoEmpresa,      setLogoEmpresa]    = useState("bizkaia");
   const [nombre,           setNombre]          = useState("");
@@ -1812,7 +1821,7 @@ function App45({ modoTab = "iruna45" }) {
     const decimal = (n) => parseFloat(n).toFixed(2).replace(".", ",");
     const lines = [];
 
-    lines.push(["CALCULADORA SALARIAL · 45 HORAS"].join(sep));
+    lines.push([`CALCULADORA SALARIAL · ${es40h ? "40 HORAS" : "45 HORAS"}`].join(sep));
     if (usuarioSesion) {
       const fechaGen = new Date().toLocaleString("es-ES");
       lines.push(["Generado por", `${usuarioSesion.nombre} · ${fechaGen}`].join(sep));
@@ -1823,8 +1832,8 @@ function App45({ modoTab = "iruna45" }) {
     lines.push(["Trabajador", nombre || "—"].join(sep));
     lines.push(["Puesto", puesto || "—"].join(sep));
     lines.push(["Período", `${fechaInicio} → ${fechaFin}`].join(sep));
-    lines.push(["Salario pactado 45h (€/mes)", decimal(salario45efectivo)].join(sep));
-    lines.push(["Horas extra de referencia (h/mes)", horasRef].join(sep));
+    lines.push([`Salario pactado ${es40h ? "40h" : "45h"} (€/mes)`, decimal(salario45efectivo)].join(sep));
+    if (!es40h) lines.push(["Horas extra de referencia (h/mes)", horasRef].join(sep));
     lines.push(["P40 equivalente (€/mes)", decimal(p40ref)].join(sep));
     lines.push(["Días normalizados", p.diasNormalizados].join(sep));
     lines.push(["Meses totales", decimal(p.mesesTotales)].join(sep));
@@ -1840,8 +1849,8 @@ function App45({ modoTab = "iruna45" }) {
     lines.push(["Base 40h (€)", decimal(baseRef)].join(sep));
     lines.push(["Vacaciones (€)", decimal(vacRef)].join(sep));
     lines.push(["Indemnización (€)", decimal(indemRef)].join(sep));
-    lines.push([`H.Extra (${horasRef}h) (€)`, decimal(hxRef)].join(sep));
-    lines.push(["Total ≈ P45 (€)", decimal(sumaRef)].join(sep));
+    if (!es40h) lines.push([`H.Extra (${horasRef}h) (€)`, decimal(hxRef)].join(sep));
+    lines.push([`Total ≈ ${es40h ? "40" : "P45"} (€)`, decimal(es40h ? (baseRef + vacRef + indemRef) : sumaRef)].join(sep));
     lines.push([""].join(sep));
 
     lines.push(["VALORES DE CÁLCULO"].join(sep));
@@ -1855,7 +1864,8 @@ function App45({ modoTab = "iruna45" }) {
     lines.push(["NÓMINA POR MES"].join(sep));
     const headers = [
       "Mes","Fracción","Base 40h €","Vacaciones €","Indemnización €",
-      "H.Extra (h)","H.Extra €","Plus Actividad €",
+      "H.Extra (h)","H.Extra €",
+      ...(es40h ? [] : ["Plus Actividad €"]),
       "Vac. disfr. (días)","Vac. disfr. €",
       "Festivos (días)","Festivos €",
       "Plus Herramienta €","Plus Coche €","Plus Vivienda €",
@@ -1865,6 +1875,7 @@ function App45({ modoTab = "iruna45" }) {
     lines.push(headers.join(sep));
     desglose45.forEach((d, i) => {
       const c = complementos45[i] || {};
+      const totalMesAjustado = es40h ? (d.totalMes - (d.plusAct || 0)) : d.totalMes;
       lines.push([
         d.mes + (d.esCompleto ? "" : ` (${d.desde}-${d.hasta})`),
         decimal(d.fraccion),
@@ -1873,7 +1884,7 @@ function App45({ modoTab = "iruna45" }) {
         decimal(d.indem40),
         d.hMes,
         decimal(d.cobroHx),
-        decimal(d.plusAct),
+        ...(es40h ? [] : [decimal(d.plusAct)]),
         d.vdDias,
         decimal(d.vdShow),
         festivosPorMes[i] || 0,
@@ -1884,9 +1895,9 @@ function App45({ modoTab = "iruna45" }) {
         decimal(c.seguroVida || 0),
         c.diasComida || 0,
         decimal(c.comida || 0),
-        decimal(d.totalMes),
+        decimal(totalMesAjustado),
         decimal(c.total || 0),
-        decimal(d.totalMes + (c.total || 0)),
+        decimal(totalMesAjustado + (c.total || 0)),
       ].join(sep));
     });
     lines.push([""].join(sep));
@@ -1896,19 +1907,20 @@ function App45({ modoTab = "iruna45" }) {
     lines.push(["Vacaciones (€)", decimal(totVac)].join(sep));
     lines.push(["Indemnización (€)", decimal(totIndem)].join(sep));
     lines.push([`H.Extra totales (${horasPorMes.reduce((s,v)=>s+(v||0),0)}h) €`, decimal(totHx)].join(sep));
-    if (totPlus > 0) lines.push(["Plus Actividad (€)", decimal(totPlus)].join(sep));
+    if (totPlus > 0 && !es40h) lines.push(["Plus Actividad (€)", decimal(totPlus)].join(sep));
     if (totVd > 0)   lines.push([`− Vac. disfrutadas (${totalVdDias}d) €`, decimal(totVd)].join(sep));
     if (totalFestDias45 > 0) lines.push([`+ Festivos trabajados (${totalFestDias45}d) €`, decimal(totalFestImport45)].join(sep));
     if (totalCompl > 0)      lines.push(["+ Complementos (€)", decimal(totalCompl)].join(sep));
-    lines.push(["TOTAL A PERCIBIR (€)", decimal(totFinal + totalFestImport45 + totalCompl)].join(sep));
-    lines.push(["Promedio mensual (€)", decimal(totFinal / p.mesesTotales)].join(sep));
-    lines.push(["Promedio semanal (€)", decimal(totFinal / p.semanasTotales)].join(sep));
+    const totFinalAjustado = es40h ? (totFinal - (totPlus || 0)) : totFinal;
+    lines.push(["TOTAL A PERCIBIR (€)", decimal(totFinalAjustado + totalFestImport45 + totalCompl)].join(sep));
+    lines.push(["Promedio mensual (€)", decimal(totFinalAjustado / p.mesesTotales)].join(sep));
+    lines.push(["Promedio semanal (€)", decimal(totFinalAjustado / p.semanasTotales)].join(sep));
     lines.push([""].join(sep));
     lines.push([DISCLAIMER_PDF].join(sep));
 
     const csv = "\uFEFF" + lines.join("\n");
     const partes = [proyecto, productora, nombre].filter(Boolean).map(s => s.replace(/[^a-zA-Z0-9]/g, "_"));
-    const filename = (partes.length ? partes.join("_") : "calculadora") + "_45h.csv";
+    const filename = (partes.length ? partes.join("_") : "calculadora") + (es40h ? "_40h.csv" : "_45h.csv");
 
     // Abrir modal con el contenido del CSV
     setModalCSV({ contenido: csv, filename });
@@ -2058,7 +2070,7 @@ ${docHTML}
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = baseFilename + "_45h.html";
+      a.download = baseFilename + (es40h ? "_40h.html" : "_45h.html");
       a.style.display = "none";
       document.body.appendChild(a);
       a.click();
@@ -2066,13 +2078,13 @@ ${docHTML}
       setTimeout(() => URL.revokeObjectURL(url), 1000);
 
       // Confirmación visual breve
-      setExportError({ tipo: "ok", mensaje: `✓ Descargando: ${baseFilename}_45h.html` });
+      setExportError({ tipo: "ok", mensaje: `✓ Descargando: ${baseFilename}${es40h ? "_40h.html" : "_45h.html"}` });
       setTimeout(() => setExportError(null), 4000);
 
       // Registrar log de exportación
       if (usuarioSesion) {
         const detalle = [proyecto, productora, nombre].filter(Boolean).join(" | ") || "(sin datos)";
-        registrarLog(usuarioSesion.nombre, "export_pdf", `[${modoTab === "tab40" ? "40H" : "45H Iruña"}] ${baseFilename}_45h.html · ${detalle}`);
+        registrarLog(usuarioSesion.nombre, "export_pdf", `[${modoTab === "tab40" ? "40H" : "45H Iruña"}] ${baseFilename}${es40h ? "_40h.html" : "_45h.html"} · ${detalle}`);
       }
     } catch (e) {
       console.error("Error al exportar:", e);
@@ -2093,7 +2105,7 @@ ${docHTML}
             <LogoBizkaia height={48} />
           </div>
           <div style={{ textAlign:"right" }}>
-            <div style={{ fontSize:9, letterSpacing:"0.25em", color:"#b8864a", textTransform:"uppercase", marginBottom:4 }}>Desglose Salarial · 45 Horas</div>
+            <div style={{ fontSize:9, letterSpacing:"0.25em", color:"#b8864a", textTransform:"uppercase", marginBottom:4 }}>Desglose Salarial · {es40h ? "40 Horas" : "45 Horas"}</div>
             <div style={{ fontSize:18, fontWeight:700, letterSpacing:"0.07em", color:"#f0e6d0", fontFamily:"'Courier New',monospace" }}>CALCULADORA DE SALARIOS</div>
             {(nombre||puesto) && <div style={{ fontSize:12, color:"#b8864a", marginTop:4, fontFamily:"'Courier New',monospace" }}>{[nombre,puesto].filter(Boolean).join(" · ")}</div>}
             <div className="no-print" style={{ display: "flex", gap: 6, marginTop: 8, justifyContent: "flex-end" }}>
@@ -2194,10 +2206,10 @@ ${docHTML}
             </div>
 
             {!modoInverso45 ? (
-              <Field label="Salario Pactado 45h" value={salario45} onChange={setSalario45} prefix="€" hint="Bruto mensual 45h: base 40h + vac + indem + horas extra" />
+              <Field label={`Salario Pactado ${es40h ? "40h" : "45h"}`} value={salario45} onChange={setSalario45} prefix="€" hint={es40h ? "Bruto mensual: salario 40h + vacaciones + indemnización" : "Bruto mensual 45h: base 40h + vac + indem + horas extra"} />
             ) : (
               <div style={{ marginBottom:14 }}>
-                <label style={LS}>Salario Pactado 45h</label>
+                <label style={LS}>Salario Pactado {es40h ? "40h" : "45h"}</label>
                 <div style={{ padding:"10px 14px", background:"#f0ede8", borderRadius:4, border:"1px solid #c8963a", textAlign:"center", marginBottom:4 }}>
                   {p && p45Inverso
                     ? <span style={{ fontSize:20, fontWeight:700, color:"#b8864a", fontFamily:"'Courier New',monospace" }}>{fmtE(p45Inverso)}</span>
@@ -2208,16 +2220,16 @@ ${docHTML}
               </div>
             )}
 
-            <Field label="Horas de referencia / mes" value={horasRef} onChange={setHorasRef} hint="Nº horas extra del mes tipo (ej. 22)" />
+            {!es40h && <Field label="Horas de referencia / mes" value={horasRef} onChange={setHorasRef} hint="Nº horas extra del mes tipo (ej. 22)" />}
 
             <div style={{ padding:12, background:"#f0ede8", borderRadius:6, border:"1px solid #e0ddd8" }}>
               <div style={{ fontSize:9, color:"#666", letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:8 }}>Desglose mensual referencia</div>
-              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:6 }}>
+              <div style={{ display:"grid", gridTemplateColumns: es40h ? "1fr 1fr 1fr" : "1fr 1fr", gap:6 }}>
                 {[
                   { l:"Base 40h",     v:baseRef,  s:"×0,89286" },
                   { l:"Vacaciones",   v:vacRef,   s:"Base÷11,478" },
                   { l:"Indemnización",v:indemRef, s:"(Base/30)×0,986" },
-                  { l:`H.Extra (${horasRef}h)`,v:hxRef,s:`${horasRef}h×${fmt(vHoraEx)}€`, blue:true },
+                  ...(es40h ? [] : [{ l:`H.Extra (${horasRef}h)`,v:hxRef,s:`${horasRef}h×${fmt(vHoraEx)}€`, blue:true }]),
                 ].map(it=>(
                   <div key={it.l} style={{ background:"#fff", borderRadius:4, padding:"7px", border:"1px solid #e8e4de", textAlign:"center" }}>
                     <div style={{ fontSize:8, color:"#666", textTransform:"uppercase", marginBottom:3 }}>{it.l}</div>
@@ -2227,8 +2239,8 @@ ${docHTML}
                 ))}
               </div>
               <div style={{ marginTop:8, display:"flex", justifyContent:"space-between", alignItems:"center", padding:"6px 10px", background:"#fff", borderRadius:4, border:"1px solid #d8d4ce" }}>
-                <span style={{ fontSize:9, color:"#666", textTransform:"uppercase", letterSpacing:"0.1em" }}>TOTAL ≈ P45</span>
-                <span style={{ fontSize:15, fontWeight:700, color:"#b8864a", fontFamily:"'Courier New',monospace" }}>{fmt(sumaRef)} €</span>
+                <span style={{ fontSize:9, color:"#666", textTransform:"uppercase", letterSpacing:"0.1em" }}>{es40h ? "TOTAL ≈ P40" : "TOTAL ≈ P45"}</span>
+                <span style={{ fontSize:15, fontWeight:700, color:"#b8864a", fontFamily:"'Courier New',monospace" }}>{fmt(es40h ? (baseRef + vacRef + indemRef) : sumaRef)} €</span>
               </div>
             </div>
           </div>
@@ -2462,12 +2474,12 @@ ${docHTML}
             <>
               <div style={P}>
                 <div style={ST}>▸ Desglose Mensual Referencia <BadgeBrutos /></div>
-                <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:10 }}>
+                <div style={{ display:"grid", gridTemplateColumns: es40h ? "repeat(3,1fr)" : "repeat(4,1fr)", gap:10 }}>
                   {[
                     { l:"Base 40h",     v:baseRef,  s:"× 0,89286" },
                     { l:"Vacaciones",   v:vacRef,   s:"Base ÷ 11,478" },
                     { l:"Indemnización",v:indemRef, s:"(Base/30) × 0,986" },
-                    { l:`H.Extra (${horasRef}h)`, v:hxRef, s:`${horasRef}h × ${fmt(vHoraEx)}€`, blue:true },
+                    ...(es40h ? [] : [{ l:`H.Extra (${horasRef}h)`, v:hxRef, s:`${horasRef}h × ${fmt(vHoraEx)}€`, blue:true }]),
                   ].map(it=>(
                     <div key={it.l} style={{ background:"#f0ede8", borderRadius:6, padding:"12px 10px", border:"1px solid #e0ddd8", textAlign:"center" }}>
                       <div style={{ fontSize:9, color:"#666", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:6 }}>{it.l}</div>
@@ -2477,8 +2489,8 @@ ${docHTML}
                   ))}
                 </div>
                 <div style={{ marginTop:10, padding:"10px 14px", background:"rgba(184,134,74,0.08)", borderRadius:6, border:"1px solid #e0ddd8", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                  <span style={{ fontSize:10, color:"#7a5a2a", letterSpacing:"0.12em", textTransform:"uppercase", fontFamily:"'Courier New',monospace" }}>TOTAL ≈ P45</span>
-                  <span style={{ fontSize:16, fontWeight:700, color:"#b8864a", fontFamily:"'Courier New',monospace" }}>{fmt(sumaRef)} €</span>
+                  <span style={{ fontSize:10, color:"#7a5a2a", letterSpacing:"0.12em", textTransform:"uppercase", fontFamily:"'Courier New',monospace" }}>{es40h ? "TOTAL ≈ 40" : "TOTAL ≈ P45"}</span>
+                  <span style={{ fontSize:16, fontWeight:700, color:"#b8864a", fontFamily:"'Courier New',monospace" }}>{es40h ? fmt(baseRef + vacRef + indemRef) : fmt(sumaRef)} €</span>
                 </div>
               </div>
 
@@ -2503,7 +2515,7 @@ ${docHTML}
 
               <div style={P}>
                 <div style={{ ...ST, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                  <span>▸ Nómina 45h por Mes <BadgeBrutos /></span>
+                  <span>▸ Nómina {es40h ? "40h" : "45h"} por Mes <BadgeBrutos /></span>
                   <span style={{ display:"flex", gap:5 }}>
                     {vacAcumulada   && <span style={{ fontSize:8, background:"rgba(184,134,74,0.12)", color:"#8a5e20", borderRadius:3, padding:"2px 6px" }}>VAC AL FINAL</span>}
                     {indemAcumulada && <span style={{ fontSize:8, background:"rgba(184,134,74,0.12)", color:"#8a5e20", borderRadius:3, padding:"2px 6px" }}>INDEM AL FINAL</span>}
@@ -2520,7 +2532,7 @@ ${docHTML}
                         <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Courier New',monospace",borderBottom:"1px solid #e0ddd8",color:"#555"}}>Indem. €</th>
                         <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Courier New',monospace",borderBottom:"1px solid #e0ddd8",color:"#3a6898"}}>H.Ex h</th>
                         <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Courier New',monospace",borderBottom:"1px solid #e0ddd8",color:"#3a6898"}}>H.Ex €</th>
-                        <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Courier New',monospace",borderBottom:"1px solid #e0ddd8",color:"#b07030"}}>Plus Act. €</th>
+                        {!es40h && <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Courier New',monospace",borderBottom:"1px solid #e0ddd8",color:"#b07030"}}>Plus Act. €</th>}
                         <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Courier New',monospace",borderBottom:"1px solid #e0ddd8",color:"#1a1a1a"}}>TOTAL MES €</th>
                         <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Courier New',monospace",borderBottom:"1px solid #e0ddd8",color:"#5a8a5a"}}>Compl. €</th>
                         <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Courier New',monospace",borderBottom:"1px solid #e0ddd8",color:"#b8864a"}}>TOTAL MES + Compl. €</th>
@@ -2549,10 +2561,10 @@ ${docHTML}
                           <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Courier New',monospace",color:d.indem40===0?"#ccc":"#1a1a1a",borderBottom:"1px solid #eae7e2"}}>{d.indem40===0?"—":fmt(d.indem40)}</td>
                           <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Courier New',monospace",color:"#3a6898",borderBottom:"1px solid #eae7e2"}}>{d.hMes}h</td>
                           <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Courier New',monospace",color:"#3a6898",borderBottom:"1px solid #eae7e2"}}>{fmt(d.cobroHx)}</td>
-                          <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Courier New',monospace",color:d.plusAct>0?"#b07030":"#ccc",fontWeight:d.plusAct>0?600:400,borderBottom:"1px solid #eae7e2"}}>{d.plusAct>0?fmt(d.plusAct):"—"}</td>
-                          <td style={{padding:"6px 6px",fontSize:13,textAlign:"right",fontFamily:"'Courier New',monospace",color:"#1a1a1a",fontWeight:700,borderBottom:"1px solid #eae7e2"}}>{fmt(d.totalMes)}</td>
+                          {!es40h && <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Courier New',monospace",color:d.plusAct>0?"#b07030":"#ccc",fontWeight:d.plusAct>0?600:400,borderBottom:"1px solid #eae7e2"}}>{d.plusAct>0?fmt(d.plusAct):"—"}</td>}
+                          <td style={{padding:"6px 6px",fontSize:13,textAlign:"right",fontFamily:"'Courier New',monospace",color:"#1a1a1a",fontWeight:700,borderBottom:"1px solid #eae7e2"}}>{fmt(es40h ? (d.totalMes - (d.plusAct || 0)) : d.totalMes)}</td>
                           <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Courier New',monospace",color:(complementos45[i]?.total || 0) > 0 ? "#5a8a5a" : "#ccc",fontWeight:(complementos45[i]?.total || 0) > 0 ? 600 : 400,borderBottom:"1px solid #eae7e2"}}>{(complementos45[i]?.total || 0) > 0 ? fmt(complementos45[i].total) : "—"}</td>
-                          <td style={{padding:"6px 6px",fontSize:13,textAlign:"right",fontFamily:"'Courier New',monospace",color:"#b8864a",fontWeight:700,borderBottom:"1px solid #eae7e2"}}>{fmt(d.totalMes + (complementos45[i]?.total || 0))}</td>
+                          <td style={{padding:"6px 6px",fontSize:13,textAlign:"right",fontFamily:"'Courier New',monospace",color:"#b8864a",fontWeight:700,borderBottom:"1px solid #eae7e2"}}>{fmt((es40h ? (d.totalMes - (d.plusAct || 0)) : d.totalMes) + (complementos45[i]?.total || 0))}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -2564,10 +2576,10 @@ ${docHTML}
                         <td style={{padding:"8px",fontSize:11,textAlign:"right",fontFamily:"'Courier New',monospace",color:"#666",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{fmt(totIndem)}</td>
                         <td style={{padding:"8px",fontSize:11,textAlign:"right",fontFamily:"'Courier New',monospace",color:"#3a6898",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{horasPorMes.reduce((s,v,i)=>{if (v === undefined || v === null || v === "") return s + Math.round((p.desglose[i]?.semanasLaborables||0)*5);return s + (v || 0);},0)}h</td>
                         <td style={{padding:"8px",fontSize:11,textAlign:"right",fontFamily:"'Courier New',monospace",color:"#3a6898",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{fmt(totHx)}</td>
-                        <td style={{padding:"8px",fontSize:11,textAlign:"right",fontFamily:"'Courier New',monospace",color:totPlus>0?"#b07030":"#ccc",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{totPlus>0?fmt(totPlus):"—"}</td>
-                        <td style={{padding:"8px",fontSize:13,textAlign:"right",fontFamily:"'Courier New',monospace",color:"#1a1a1a",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{fmt(totFinal)}</td>
+                        {!es40h && <td style={{padding:"8px",fontSize:11,textAlign:"right",fontFamily:"'Courier New',monospace",color:totPlus>0?"#b07030":"#ccc",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{totPlus>0?fmt(totPlus):"—"}</td>}
+                        <td style={{padding:"8px",fontSize:13,textAlign:"right",fontFamily:"'Courier New',monospace",color:"#1a1a1a",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{fmt(es40h ? (totFinal - (totPlus || 0)) : totFinal)}</td>
                         <td style={{padding:"8px",fontSize:11,textAlign:"right",fontFamily:"'Courier New',monospace",color:totalCompl > 0 ? "#5a8a5a" : "#ccc",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{totalCompl > 0 ? fmt(totalCompl) : "—"}</td>
-                        <td style={{padding:"8px",fontSize:13,textAlign:"right",fontFamily:"'Courier New',monospace",color:"#b8864a",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{fmt(totFinal + totalCompl)}</td>
+                        <td style={{padding:"8px",fontSize:13,textAlign:"right",fontFamily:"'Courier New',monospace",color:"#b8864a",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{fmt((es40h ? (totFinal - (totPlus || 0)) : totFinal) + totalCompl)}</td>
                       </tr>
                     </tfoot>
                   </table>
@@ -2656,12 +2668,12 @@ ${docHTML}
                 <Row label="  · Indemnización"      value={fmtE(totalIndem45)} muted />
                 <Div />
                 <Row label={`+ Horas extra (${horasPorMes.reduce((s,v)=>s+(v||0),0)}h)`} value={`+ ${fmtE(totHx)}`} />
-                {totPlus > 0 && <Row label="+ Plus de Actividad" value={`+ ${fmtE(totPlus)}`} />}
+                {totPlus > 0 && !es40h && <Row label="+ Plus de Actividad" value={`+ ${fmtE(totPlus)}`} />}
                 {totVd  > 0 && <Row label={`− Vac. disfrutadas (${totalVdDias}d)`} value={`− ${fmtE(totVd)}`} />}
                 <Div />
-                <Row label="TOTAL A PERCIBIR (45h)" value={fmtE(totFinal)} highlight />
-                <Row label="Promedio mensual" value={fmtE(totFinal/p.mesesTotales)} sub={`sobre ${fmtM(p.mesesTotales)} meses`} green />
-                <Row label="Promedio semanal" value={fmtE(totFinal/p.semanasTotales)} sub={`sobre ${p.semanasTotales} sem. L-V`} />
+                <Row label={`TOTAL A PERCIBIR (${es40h ? "40h" : "45h"})`} value={fmtE(es40h ? (totFinal - (totPlus || 0)) : totFinal)} highlight />
+                <Row label="Promedio mensual" value={fmtE((es40h ? (totFinal - (totPlus || 0)) : totFinal)/p.mesesTotales)} sub={`sobre ${fmtM(p.mesesTotales)} meses`} green />
+                <Row label="Promedio semanal" value={fmtE((es40h ? (totFinal - (totPlus || 0)) : totFinal)/p.semanasTotales)} sub={`sobre ${p.semanasTotales} sem. L-V`} />
                 {(totalCompl > 0 || totalFestDias45 > 0) && (
                   <>
                     <Div />
@@ -2790,7 +2802,8 @@ ${docHTML}
               plusHerramienta={plusHerramienta} plusCoche={plusCoche}
               plusVivienda={plusVivienda} plusSeguroVida={plusSeguroVida}
               plusComida={plusComida}
-            />
+              es40h={es40h}
+          />
           }
         />
       )}
@@ -2819,6 +2832,7 @@ ${docHTML}
             plusHerramienta={plusHerramienta} plusCoche={plusCoche}
             plusVivienda={plusVivienda} plusSeguroVida={plusSeguroVida}
             plusComida={plusComida}
+            es40h={es40h}
           />
         </div>
       )}
