@@ -1289,7 +1289,39 @@ function DocumentoImprimible({
   const totalConExtras = totFinal + totalFestImport45 + totalCompl;
 
   return (
-    <div style={{ fontFamily: "'Courier New', monospace", color: "#1a1a1a", fontSize: 10 }}>
+    <div style={{ fontFamily: "'Courier New', monospace", color: "#1a1a1a", fontSize: 10, position: "relative" }}>
+
+      {/* ═══ MARCA DE AGUA "SIMULACRO" ═══ */}
+      {/* Patrón repetido en diagonal cubriendo todo el documento.
+          z-index 0 + posición absoluta + color con baja opacidad para que el
+          contenido (z-index 1) se lea perfectamente encima. */}
+      <div
+        aria-hidden="true"
+        style={{
+          position: "absolute",
+          top: 0, left: 0, right: 0, bottom: 0,
+          pointerEvents: "none",
+          overflow: "hidden",
+          zIndex: 10,
+          // Patrón SVG en diagonal, repetido vertical y horizontalmente
+          backgroundImage: `url("data:image/svg+xml;utf8,${encodeURIComponent(
+            `<svg xmlns='http://www.w3.org/2000/svg' width='600' height='400' viewBox='0 0 600 400'>
+              <text x='300' y='220' fill='%231a1a1a' fill-opacity='0.10'
+                    font-family='Courier New, monospace' font-size='90' font-weight='700'
+                    text-anchor='middle' transform='rotate(-28 300 200)'
+                    letter-spacing='8'>SIMULACRO</text>
+            </svg>`
+          )}")`,
+          backgroundRepeat: "repeat",
+          backgroundPosition: "center top",
+          // Forzar que se imprima al exportar
+          WebkitPrintColorAdjust: "exact",
+          printColorAdjust: "exact",
+        }}
+      />
+
+      {/* Contenido del documento (z-index 1 para quedar SOBRE la marca de agua) */}
+      <div style={{ position: "relative", zIndex: 1 }}>
 
       {/* ═══ CABECERA ═══ */}
       <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 14 }}>
@@ -1587,6 +1619,11 @@ function DocumentoImprimible({
         </tbody>
       </table>
 
+      {/* Aviso orientativo */}
+      <div style={{ marginTop: 16, padding: "10px 14px", background: "#fafaf7", border: "1px solid #e0ddd8", borderRadius: 4, textAlign: "center", fontSize: 10, fontWeight: 700, color: "#1a1a1a", letterSpacing: "0.02em", lineHeight: 1.5 }}>
+        Cálculo orientativo del salario mensual bruto, que puede diferir ligeramente de la nómina real generada en cada periodo.
+      </div>
+
       {/* ═══ PIE ═══ */}
       <div style={{ marginTop: 22, paddingTop: 10, borderTop: "1px solid #e0ddd8", textAlign: "center" }}>
         <div style={{ fontSize: 8, color: "#888", letterSpacing: "0.15em", textTransform: "uppercase", fontWeight: 700, marginBottom: 4 }}>
@@ -1600,6 +1637,7 @@ function DocumentoImprimible({
         </div>
       </div>
 
+      </div>
     </div>
   );
 }
@@ -2633,6 +2671,10 @@ ${docHTML}
                     </div>
                   </>
                 )}
+                {/* Aviso orientativo */}
+                <div style={{ marginTop:16, paddingTop:12, borderTop:"1px solid #e0ddd8", fontSize:10, color:"#666", fontFamily:"'Courier New',monospace", lineHeight:1.5, fontStyle:"italic", textAlign:"center" }}>
+                  Cálculo orientativo del salario mensual bruto, que puede diferir ligeramente de la nómina real generada en cada periodo.
+                </div>
               </div>
             </>
           ) : (
