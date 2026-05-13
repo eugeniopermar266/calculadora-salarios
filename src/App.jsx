@@ -1424,14 +1424,17 @@ function DocumentoImprimible({
                   TOTAL MES 40H · <span style={{ color: "#b8864a", fontSize: 12 }}>{fmt(baseRef + vacRef + indemRef)} €</span> <span style={{ display: "inline-block", background: "#b8864a", color: "#fff", fontSize: 8, fontWeight: 700, letterSpacing: "0.1em", padding: "1px 5px", borderRadius: 3, marginLeft: 4, verticalAlign: "middle" }}>BRUTOS</span>
                 </td>
                 <td style={{ background: "#f0f6fc", border: "1px solid #c8d8e8", padding: "7px 10px", textAlign: "center", fontSize: 10, fontWeight: 700, color: "#1a1a1a", letterSpacing: "0.04em", width: "50%" }}>
-                  SALARIO EN CONTRATO · <span style={{ color: "#3a6898", fontSize: 12 }}>{fmt(baseRef + vacRef)} €</span> <span style={{ display: "inline-block", background: "#3a6898", color: "#fff", fontSize: 8, fontWeight: 700, letterSpacing: "0.1em", padding: "1px 5px", borderRadius: 3, marginLeft: 4, verticalAlign: "middle" }}>BRUTOS</span>
+                  SALARIO EN CONTRATO · <span style={{ color: "#3a6898", fontSize: 12 }}>{fmt(vacAcumulada ? baseRef : (baseRef + vacRef))} €</span> <span style={{ display: "inline-block", background: "#3a6898", color: "#fff", fontSize: 8, fontWeight: 700, letterSpacing: "0.1em", padding: "1px 5px", borderRadius: 3, marginLeft: 4, verticalAlign: "middle" }}>BRUTOS</span>
+                  {vacAcumulada && <div style={{ fontSize: 7.5, color: "#5a7a9a", marginTop: 2, letterSpacing: "0.05em", fontStyle: "italic", fontWeight: 400 }}>Base 40h · vacaciones al final</div>}
                 </td>
               </tr>
             </tbody>
           </table>
-          <div style={{ marginTop: 8, padding: "7px 10px", background: "#fafaf7", border: "1px solid #e0ddd8", borderRadius: 3, fontSize: 9, color: "#555", lineHeight: 1.5, fontStyle: "italic" }}>
-            <strong style={{ color: "#1a1a1a", fontStyle: "normal" }}>Nota:</strong> Salario en contrato es la suma del salario base + las vacaciones.
-          </div>
+          {!vacAcumulada && (
+            <div style={{ marginTop: 8, padding: "7px 10px", background: "#fafaf7", border: "1px solid #e0ddd8", borderRadius: 3, fontSize: 9, color: "#555", lineHeight: 1.5, fontStyle: "italic" }}>
+              <strong style={{ color: "#1a1a1a", fontStyle: "normal" }}>Nota:</strong> Salario en contrato es la suma del salario base + las vacaciones.
+            </div>
+          )}
         </>
       ) : (
         <>
@@ -2541,9 +2544,14 @@ ${docHTML}
                       <span style={{ fontSize:9.5, color:"#7a5a2a", letterSpacing:"0.1em", textTransform:"uppercase", fontFamily:"'Courier New',monospace" }}>Total Mes 40h</span>
                       <span style={{ fontSize:16, fontWeight:700, color:"#b8864a", fontFamily:"'Courier New',monospace" }}>{fmt(baseRef + vacRef + indemRef)} €</span>
                     </div>
-                    <div style={{ padding:"10px 14px", background:"rgba(58,104,152,0.08)", borderRadius:6, border:"1px solid #b8cce0", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                      <span style={{ fontSize:9.5, color:"#2a5a8a", letterSpacing:"0.1em", textTransform:"uppercase", fontFamily:"'Courier New',monospace" }}>Salario en Contrato</span>
-                      <span style={{ fontSize:16, fontWeight:700, color:"#3a6898", fontFamily:"'Courier New',monospace" }}>{fmt(baseRef + vacRef)} €</span>
+                    <div style={{ padding:"10px 14px", background:"rgba(58,104,152,0.08)", borderRadius:6, border:"1px solid #b8cce0", display:"flex", flexDirection:"column" }}>
+                      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                        <span style={{ fontSize:9.5, color:"#2a5a8a", letterSpacing:"0.1em", textTransform:"uppercase", fontFamily:"'Courier New',monospace" }}>Salario en Contrato</span>
+                        <span style={{ fontSize:16, fontWeight:700, color:"#3a6898", fontFamily:"'Courier New',monospace" }}>{fmt(vacAcumulada ? baseRef : (baseRef + vacRef))} €</span>
+                      </div>
+                      {vacAcumulada && (
+                        <div style={{ fontSize:8.5, color:"#5a7a9a", marginTop:2, textAlign:"right", letterSpacing:"0.05em", fontStyle:"italic", fontFamily:"'Courier New',monospace" }}>Base 40h · vacaciones al final</div>
+                      )}
                     </div>
                   </div>
                 ) : (
@@ -2560,12 +2568,14 @@ ${docHTML}
                 )}
               </div>
 
-              {/* Nota informativa (texto distinto en 45H vs 40H) */}
-              <div style={{ background:"#fafaf7", padding:"10px 14px", borderRadius:6, border:"1px solid #e0ddd8", marginBottom:20, fontSize:10, color:"#666", fontFamily:"'Courier New',monospace", lineHeight:1.5, fontStyle:"italic" }}>
-                <strong style={{ color:"#444", fontStyle:"normal" }}>Nota:</strong> {es40h
-                  ? "Salario en contrato es la suma del salario base + las vacaciones."
-                  : "El salario que figura en contrato es la suma del salario base 40h más las vacaciones."}
-              </div>
+              {/* Nota informativa. En 45H siempre se muestra. En 40H solo si vacaciones NO van al final */}
+              {(!es40h || !vacAcumulada) && (
+                <div style={{ background:"#fafaf7", padding:"10px 14px", borderRadius:6, border:"1px solid #e0ddd8", marginBottom:20, fontSize:10, color:"#666", fontFamily:"'Courier New',monospace", lineHeight:1.5, fontStyle:"italic" }}>
+                  <strong style={{ color:"#444", fontStyle:"normal" }}>Nota:</strong> {es40h
+                    ? "Salario en contrato es la suma del salario base + las vacaciones."
+                    : "El salario que figura en contrato es la suma del salario base 40h más las vacaciones."}
+                </div>
+              )}
 
               <div style={P}>
                 <div style={ST}>▸ Valores de Referencia <BadgeBrutos /></div>
