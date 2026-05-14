@@ -2966,15 +2966,16 @@ async function loginUsuario(nombre, pin) {
   const params = new URLSearchParams({
     nombre: `eq.${nombre}`,
     pin: `eq.${pin}`,
+    activo: `eq.true`,
     select: "id,nombre,es_admin",
   });
   const data = await supabaseFetch(`usuarios?${params}`);
   return Array.isArray(data) && data.length === 1 ? data[0] : null;
 }
 
-// Lista de nombres (para dropdown)
+// Lista de nombres (para dropdown del login - solo usuarios activos)
 async function listarNombres() {
-  const data = await supabaseFetch(`usuarios?select=nombre&order=nombre.asc`);
+  const data = await supabaseFetch(`usuarios?activo=eq.true&select=nombre&order=nombre.asc`);
   return data.map(u => u.nombre);
 }
 
@@ -3290,21 +3291,41 @@ function PanelAdmin({ usuarioActual, onCerrar }) {
 
   const onDelete = async (u) => {
     if (u.id === usuarioActual.id) { alert("No puedes borrarte a ti mismo"); return; }
-    if (!confirm(`¿Eliminar a "${u.nombre}"?`)) return;
+    if (!confirm(`¿Eliminar a "${u.nombre}" DEFINITIVAMENTE? Esta acción no se puede deshacer.\n\nSi solo quieres impedir el acceso temporal, usa "Desactivar".`)) return;
     try {
       await borrarUsuario(usuarioActual.pin, u.id);
       recargar();
     } catch (err) { alert("Error: " + err.message); }
   };
 
+  const onToggleActivo = async (u) => {
+    if (u.id === usuarioActual.id) { alert("No puedes desactivarte a ti mismo"); return; }
+    const accion = u.activo ? "desactivar" : "activar";
+    const msg = u.activo
+      ? `¿Desactivar a "${u.nombre}"? No podrá hacer login pero sus datos se conservarán.`
+      : `¿Reactivar a "${u.nombre}"? Podrá volver a hacer login.`;
+    if (!confirm(msg)) return;
+    try {
+      await actualizarUsuario(usuarioActual.pin, u.id, { activo: !u.activo });
+      recargar();
+    } catch (err) { alert("Error al " + accion + ": " + err.message); }
+  };
+
+  // Separar activos e inactivos. Activos primero (ya ordenados por nombre desde la API).
+  // Inactivos al final, también ordenados por nombre.
+  const usuariosActivos = usuarios.filter(u => u.activo !== false);
+  const usuariosInactivos = usuarios.filter(u => u.activo === false);
+  const usuariosOrdenados = [...usuariosActivos, ...usuariosInactivos];
+
   const C = { padding: "8px 10px", fontSize: 11, fontFamily: "'Courier New',monospace", borderBottom: "1px solid #eae7e2" };
   const TH = { ...C, fontSize: 9, letterSpacing: "0.12em", textTransform: "uppercase", color: "#666", fontWeight: 700, textAlign: "left", borderBottom: "1px solid #d0ccc6" };
   const inp = { padding: "6px 8px", fontSize: 11, border: "1px solid #c0bcb5", borderRadius: 4, fontFamily: "'Courier New',monospace", boxSizing: "border-box" };
   const btn = (bg, color = "#fff") => ({ padding: "6px 12px", fontSize: 10, fontFamily: "'Courier New',monospace", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", background: bg, color, border: "none", borderRadius: 4, cursor: "pointer" });
+  const btnSm = (bg, color = "#fff") => ({ padding: "4px 9px", fontSize: 9, fontFamily: "'Courier New',monospace", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", background: bg, color, border: "none", borderRadius: 3, cursor: "pointer" });
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 1000, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: 20, overflowY: "auto" }}>
-      <div style={{ background: "#f0ede8", borderRadius: 10, padding: 24, maxWidth: 800, width: "100%", marginTop: 40, boxShadow: "0 20px 60px rgba(0,0,0,0.5)" }}>
+      <div style={{ background: "#f0ede8", borderRadius: 10, padding: 24, maxWidth: 900, width: "100%", marginTop: 40, boxShadow: "0 20px 60px rgba(0,0,0,0.5)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
           <h2 style={{ margin: 0, fontSize: 14, letterSpacing: "0.15em", textTransform: "uppercase", color: "#1a1a1a", fontFamily: "'Courier New',monospace" }}>⚙ Gestión de Usuarios</h2>
           <button onClick={onCerrar} style={btn("#1a1a1a")}>✕ Cerrar</button>
@@ -3333,36 +3354,66 @@ function PanelAdmin({ usuarioActual, onCerrar }) {
         ) : (
           <div style={{ background: "#fff", borderRadius: 6, overflow: "hidden", border: "1px solid #d0ccc6" }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead><tr><th style={TH}>Nombre</th><th style={TH}>PIN</th><th style={{ ...TH, textAlign: "center" }}>Admin</th><th style={{ ...TH, textAlign: "right" }}>Acciones</th></tr></thead>
+              <thead><tr>
+                <th style={TH}>Nombre</th>
+                <th style={TH}>PIN</th>
+                <th style={{ ...TH, textAlign: "center" }}>Admin</th>
+                <th style={{ ...TH, textAlign: "center" }}>Estado</th>
+                <th style={{ ...TH, textAlign: "right" }}>Acciones</th>
+              </tr></thead>
               <tbody>
-                {usuarios.map(u => editando && editando.id === u.id ? (
-                  <tr key={u.id}>
-                    <td style={C}><input style={{ ...inp, width: "100%" }} value={editando.nombre} onChange={e => setEditando({ ...editando, nombre: e.target.value })} /></td>
-                    <td style={C}><input style={{ ...inp, width: "100%" }} value={editando.pin} onChange={e => setEditando({ ...editando, pin: e.target.value })} /></td>
-                    <td style={{ ...C, textAlign: "center" }}><input type="checkbox" checked={editando.es_admin} onChange={e => setEditando({ ...editando, es_admin: e.target.checked })} /></td>
-                    <td style={{ ...C, textAlign: "right" }}>
-                      <button onClick={onSaveEdit} style={{ ...btn("#5a8a5a"), marginRight: 4 }}>✓</button>
-                      <button onClick={() => setEditando(null)} style={btn("#888")}>✕</button>
-                    </td>
-                  </tr>
-                ) : (
-                  <tr key={u.id}>
-                    <td style={{ ...C, fontWeight: u.id === usuarioActual.id ? 700 : 400 }}>{u.nombre}{u.id === usuarioActual.id && <span style={{ fontSize: 9, color: "#888", marginLeft: 6 }}>(tú)</span>}</td>
-                    <td style={C}>••••</td>
-                    <td style={{ ...C, textAlign: "center" }}>{u.es_admin ? "✓" : "—"}</td>
-                    <td style={{ ...C, textAlign: "right" }}>
-                      <button onClick={() => setEditando({ ...u })} style={{ ...btn("#b8864a"), marginRight: 4 }}>Editar</button>
-                      <button onClick={() => onDelete(u)} style={btn("#a04545")} disabled={u.id === usuarioActual.id}>Borrar</button>
-                    </td>
-                  </tr>
-                ))}
+                {usuariosOrdenados.map(u => {
+                  const inactivo = u.activo === false;
+                  if (editando && editando.id === u.id) {
+                    return (
+                      <tr key={u.id}>
+                        <td style={C}><input style={{ ...inp, width: "100%" }} value={editando.nombre} onChange={e => setEditando({ ...editando, nombre: e.target.value })} /></td>
+                        <td style={C}><input style={{ ...inp, width: "100%" }} value={editando.pin} onChange={e => setEditando({ ...editando, pin: e.target.value })} /></td>
+                        <td style={{ ...C, textAlign: "center" }}><input type="checkbox" checked={editando.es_admin} onChange={e => setEditando({ ...editando, es_admin: e.target.checked })} /></td>
+                        <td style={{ ...C, textAlign: "center", color: "#888", fontSize: 9 }}>—</td>
+                        <td style={{ ...C, textAlign: "right" }}>
+                          <button onClick={onSaveEdit} style={{ ...btn("#5a8a5a"), marginRight: 4 }}>✓</button>
+                          <button onClick={() => setEditando(null)} style={btn("#888")}>✕</button>
+                        </td>
+                      </tr>
+                    );
+                  }
+                  return (
+                    <tr key={u.id} style={inactivo ? { opacity: 0.55, background: "#fafaf7" } : {}}>
+                      <td style={{ ...C, fontWeight: u.id === usuarioActual.id ? 700 : 400, color: inactivo ? "#888" : "#1a1a1a" }}>
+                        {u.nombre}
+                        {u.id === usuarioActual.id && <span style={{ fontSize: 9, color: "#888", marginLeft: 6 }}>(tú)</span>}
+                      </td>
+                      <td style={{ ...C, color: inactivo ? "#aaa" : "#888" }}>••••</td>
+                      <td style={{ ...C, textAlign: "center" }}>{u.es_admin ? "✓" : "—"}</td>
+                      <td style={{ ...C, textAlign: "center" }}>
+                        {inactivo ? (
+                          <span style={{ background: "rgba(136,136,136,0.15)", color: "#666", padding: "2px 7px", borderRadius: 3, fontSize: 9, fontWeight: 700, letterSpacing: "0.05em" }}>⊘ INACTIVO</span>
+                        ) : (
+                          <span style={{ background: "rgba(90,138,90,0.15)", color: "#2a6e2a", padding: "2px 7px", borderRadius: 3, fontSize: 9, fontWeight: 700, letterSpacing: "0.05em" }}>✓ ACTIVO</span>
+                        )}
+                      </td>
+                      <td style={{ ...C, textAlign: "right", whiteSpace: "nowrap" }}>
+                        <button onClick={() => setEditando({ ...u })} style={{ ...btnSm("#b8864a"), marginRight: 4 }}>✎ Editar</button>
+                        {u.id !== usuarioActual.id && (
+                          inactivo ? (
+                            <button onClick={() => onToggleActivo(u)} style={{ ...btnSm("transparent", "#2a6e2a"), border: "1px solid #2a6e2a", marginRight: 4 }}>✓ Activar</button>
+                          ) : (
+                            <button onClick={() => onToggleActivo(u)} style={{ ...btnSm("transparent", "#b07030"), border: "1px solid #b07030", marginRight: 4 }}>⊘ Desactivar</button>
+                          )
+                        )}
+                        <button onClick={() => onDelete(u)} style={btnSm("#a04545")} disabled={u.id === usuarioActual.id}>🗑 Borrar</button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         )}
 
-        <div style={{ marginTop: 14, fontSize: 9, color: "#888", fontFamily: "'Courier New',monospace", letterSpacing: "0.05em" }}>
-          {usuarios.length} usuario{usuarios.length !== 1 ? "s" : ""} en total
+        <div style={{ marginTop: 14, fontSize: 9, color: "#888", fontFamily: "'Courier New',monospace", letterSpacing: "0.05em", textAlign: "center" }}>
+          {usuariosActivos.length} activo{usuariosActivos.length !== 1 ? "s" : ""} · {usuariosInactivos.length} inactivo{usuariosInactivos.length !== 1 ? "s" : ""} · {usuarios.length} total{usuarios.length !== 1 ? "es" : ""}
         </div>
       </div>
     </div>
