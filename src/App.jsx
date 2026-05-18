@@ -1,4 +1,4 @@
-import { useState, useEffect, createContext, useContext } from "react";
+import { useState, useEffect, useRef, createContext, useContext } from "react";
 
 // Context para que componentes anidados accedan al usuario actual
 const UsuarioContext = createContext(null);
@@ -91,6 +91,490 @@ const FACTOR_INDEM_DIA = 0.98632;
 // Base * (1 + 1/11,478452 + 0,98632/30) = Salario_pactado
 // Base * 1,119996 = Salario_pactado
 const DIVISOR_40H_BASE = 1 + 1/DIVISOR_VAC + FACTOR_INDEM_DIA/30; // = 1.119996
+
+// 334 puestos extraídos del Listado COAC Técnicos
+const PUESTOS_COAC = [
+  { codigo: "003010100", puesto: "DIRECTOR/A 1", categoria: "DIRECCIÓN, CASTING Y REDACCION" },
+  { codigo: "003010101", puesto: "DIRECTOR/A 2", categoria: "DIRECCIÓN, CASTING Y REDACCION" },
+  { codigo: "003010102", puesto: "DIRECTOR/A 3", categoria: "DIRECCIÓN, CASTING Y REDACCION" },
+  { codigo: "003010200", puesto: "SCRIPT 1", categoria: "DIRECCIÓN, CASTING Y REDACCION" },
+  { codigo: "003010201", puesto: "SCRIPT 2", categoria: "DIRECCIÓN, CASTING Y REDACCION" },
+  { codigo: "003010300", puesto: "COORDINADOR/A DE DIRECCIÓN", categoria: "DIRECCIÓN, CASTING Y REDACCION" },
+  { codigo: "003010400", puesto: "PRIMER/A AYTE. DIRECCIÓN 1", categoria: "DIRECCIÓN, CASTING Y REDACCION" },
+  { codigo: "003010401", puesto: "PRIMER/A AYTE. DIRECCIÓN 2", categoria: "DIRECCIÓN, CASTING Y REDACCION" },
+  { codigo: "003010500", puesto: "SEGUNDO/A AYTE DIRECCIÓN RODAJE 1", categoria: "DIRECCIÓN, CASTING Y REDACCION" },
+  { codigo: "003010501", puesto: "SEGUNDO/A AYTE DIRECCIÓN RODAJE 2", categoria: "DIRECCIÓN, CASTING Y REDACCION" },
+  { codigo: "003010502", puesto: "SEGUNDO/A AYTE DIRECCIÓN RODAJE 3", categoria: "DIRECCIÓN, CASTING Y REDACCION" },
+  { codigo: "003010600", puesto: "SEGUNDO/A AYTE DIRECCIÓN PAPELES 1", categoria: "DIRECCIÓN, CASTING Y REDACCION" },
+  { codigo: "003010601", puesto: "SEGUNDO/A AYTE DIRECCIÓN PAPELES 2", categoria: "DIRECCIÓN, CASTING Y REDACCION" },
+  { codigo: "003010602", puesto: "SEGUNDO/A AYTE DIRECCIÓN PAPELES 3", categoria: "DIRECCIÓN, CASTING Y REDACCION" },
+  { codigo: "003010700", puesto: "AUXILIAR DE DIRECCIÓN 1", categoria: "DIRECCIÓN, CASTING Y REDACCION" },
+  { codigo: "003010701", puesto: "AUXILIAR DE DIRECCIÓN 2", categoria: "DIRECCIÓN, CASTING Y REDACCION" },
+  { codigo: "003010702", puesto: "AUXILIAR DE DIRECCIÓN 3", categoria: "DIRECCIÓN, CASTING Y REDACCION" },
+  { codigo: "003010800", puesto: "MERITORIO/A DE DIRECCIÓN", categoria: "DIRECCIÓN, CASTING Y REDACCION" },
+  { codigo: "003010900", puesto: "BECARIO/A DE DIRECCIÓN", categoria: "DIRECCIÓN, CASTING Y REDACCION" },
+  { codigo: "003011000", puesto: "REFUERZOS DE DIRECCIÓN", categoria: "DIRECCIÓN, CASTING Y REDACCION" },
+  { codigo: "003011100", puesto: "HORAS EXTRAS DIRECCIÓN", categoria: "DIRECCIÓN, CASTING Y REDACCION" },
+  { codigo: "003011200", puesto: "DIRECTOR/A DE CASTING", categoria: "DIRECCIÓN, CASTING Y REDACCION" },
+  { codigo: "003011300", puesto: "AYTE. CASTING", categoria: "DIRECCIÓN, CASTING Y REDACCION" },
+  { codigo: "003011400", puesto: "SCOUTING CASTING", categoria: "DIRECCIÓN, CASTING Y REDACCION" },
+  { codigo: "003011500", puesto: "COACH 1", categoria: "DIRECCIÓN, CASTING Y REDACCION" },
+  { codigo: "003011501", puesto: "COACH 2", categoria: "DIRECCIÓN, CASTING Y REDACCION" },
+  { codigo: "003011600", puesto: "AYUDANTE DE COACH", categoria: "DIRECCIÓN, CASTING Y REDACCION" },
+  { codigo: "003011700", puesto: "DIBUJANTE DE STORY BOARD", categoria: "DIRECCIÓN, CASTING Y REDACCION" },
+  { codigo: "003011800", puesto: "ASISTENTE PERSONAL DEL DIRECTO", categoria: "DIRECCIÓN, CASTING Y REDACCION" },
+  { codigo: "003011900", puesto: "ASISTENTE PERSONAL DE ACTORES/", categoria: "DIRECCIÓN, CASTING Y REDACCION" },
+  { codigo: "003012000", puesto: "HORAS EXTRAS CASTING Y ASISTEN", categoria: "DIRECCIÓN, CASTING Y REDACCION" },
+  { codigo: "003020100", puesto: "PRODUCTOR/A EJECUTIVO 1", categoria: "PRODUCCIÓN" },
+  { codigo: "003020101", puesto: "PRODUCTOR/A EJECUTIVO 2", categoria: "PRODUCCIÓN" },
+  { codigo: "003020102", puesto: "PRODUCTOR/A EJECUTIVO 3", categoria: "PRODUCCIÓN" },
+  { codigo: "003020200", puesto: "AYTE. PRODUCCIÓN EJECUTIVA", categoria: "PRODUCCIÓN" },
+  { codigo: "003020300", puesto: "DIRECTOR/A DE PRODUCCIÓN", categoria: "PRODUCCIÓN" },
+  { codigo: "003020400", puesto: "JEFE/A DE PRODUCCIÓN 1", categoria: "PRODUCCIÓN" },
+  { codigo: "003020401", puesto: "JEFE/A DE PRODUCCIÓN 2", categoria: "PRODUCCIÓN" },
+  { codigo: "003020500", puesto: "AYTE. DE PRODUCCIÓN 1", categoria: "PRODUCCIÓN" },
+  { codigo: "003020501", puesto: "AYTE. DE PRODUCCIÓN 2", categoria: "PRODUCCIÓN" },
+  { codigo: "003020502", puesto: "AYTE. DE PRODUCCIÓN 3", categoria: "PRODUCCIÓN" },
+  { codigo: "003020503", puesto: "AYTE. DE PRODUCCIÓN 4", categoria: "PRODUCCIÓN" },
+  { codigo: "003020504", puesto: "AYTE. DE PRODUCCIÓN 5", categoria: "PRODUCCIÓN" },
+  { codigo: "003020505", puesto: "AYTE. DE PRODUCCIÓN 6", categoria: "PRODUCCIÓN" },
+  { codigo: "003020600", puesto: "KEY SET 1", categoria: "PRODUCCIÓN" },
+  { codigo: "003020601", puesto: "KEY SET 2", categoria: "PRODUCCIÓN" },
+  { codigo: "003020700", puesto: "AUXILIAR DE PRODUCCIÓN 1", categoria: "PRODUCCIÓN" },
+  { codigo: "003020701", puesto: "AUXILIAR DE PRODUCCIÓN 2", categoria: "PRODUCCIÓN" },
+  { codigo: "003020702", puesto: "AUXILIAR DE PRODUCCIÓN 3", categoria: "PRODUCCIÓN" },
+  { codigo: "003020703", puesto: "AUXILIAR DE PRODUCCIÓN 4", categoria: "PRODUCCIÓN" },
+  { codigo: "003020704", puesto: "AUXILIAR DE PRODUCCIÓN 5", categoria: "PRODUCCIÓN" },
+  { codigo: "003020705", puesto: "AUXILIAR DE PRODUCCIÓN 6", categoria: "PRODUCCIÓN" },
+  { codigo: "003020706", puesto: "AUXILIAR DE PRODUCCIÓN 7", categoria: "PRODUCCIÓN" },
+  { codigo: "003020800", puesto: "JEFE/A  DE TRANSPORTES 1", categoria: "PRODUCCIÓN" },
+  { codigo: "003020801", puesto: "JEFE/A  DE TRANSPORTES 2", categoria: "PRODUCCIÓN" },
+  { codigo: "003020900", puesto: "COORDINADOR/A DE TRANSPORTES", categoria: "PRODUCCIÓN" },
+  { codigo: "003021000", puesto: "CAPITAN/A DE TRANSPORTES", categoria: "PRODUCCIÓN" },
+  { codigo: "003021100", puesto: "RUNNERS 1", categoria: "PRODUCCIÓN" },
+  { codigo: "003021101", puesto: "RUNNERS 2", categoria: "PRODUCCIÓN" },
+  { codigo: "003021102", puesto: "RUNNERS 3", categoria: "PRODUCCIÓN" },
+  { codigo: "003021103", puesto: "RUNNERS 4", categoria: "PRODUCCIÓN" },
+  { codigo: "003021200", puesto: "OTROS CONDUCTORES 1", categoria: "PRODUCCIÓN" },
+  { codigo: "003021201", puesto: "OTROS CONDUCTORES 2", categoria: "PRODUCCIÓN" },
+  { codigo: "003021300", puesto: "JEFE/A LOCALIZACIONES 1", categoria: "PRODUCCIÓN" },
+  { codigo: "003021301", puesto: "JEFE/A LOCALIZACIONES 2", categoria: "PRODUCCIÓN" },
+  { codigo: "003021400", puesto: "COORDINADOR/A DE LOCALIZACIONES", categoria: "PRODUCCIÓN" },
+  { codigo: "003021500", puesto: "AYTE DE LOCALIZACIONES 1", categoria: "PRODUCCIÓN" },
+  { codigo: "003021501", puesto: "AYTE DE LOCALIZACIONES 2", categoria: "PRODUCCIÓN" },
+  { codigo: "003021502", puesto: "AYTE DE LOCALIZACIONES 3", categoria: "PRODUCCIÓN" },
+  { codigo: "003021600", puesto: "AUXILIAR DE LOCALIZACIONES 1", categoria: "PRODUCCIÓN" },
+  { codigo: "003021601", puesto: "AUXILIAR DE LOCALIZACIONES 2", categoria: "PRODUCCIÓN" },
+  { codigo: "003021700", puesto: "PEONES DE LOCALIZACIONES", categoria: "PRODUCCIÓN" },
+  { codigo: "003021800", puesto: "COORDINADOR/A DE PRODUCCIÓN", categoria: "PRODUCCIÓN" },
+  { codigo: "003021900", puesto: "AYTE. COORDINACIÓN DE PRODUCCIÓN 1", categoria: "PRODUCCIÓN" },
+  { codigo: "003021901", puesto: "AYTE. COORDINACIÓN DE PRODUCCIÓN 2", categoria: "PRODUCCIÓN" },
+  { codigo: "003022000", puesto: "SECRETARIO/A DE PRODUCCIÓN", categoria: "PRODUCCIÓN" },
+  { codigo: "003022100", puesto: "CONTROLLER 1", categoria: "PRODUCCIÓN" },
+  { codigo: "003022101", puesto: "CONTROLLER 2", categoria: "PRODUCCIÓN" },
+  { codigo: "003022200", puesto: "CONTABLE", categoria: "PRODUCCIÓN" },
+  { codigo: "003022300", puesto: "CAJERO/A PAGADOR", categoria: "PRODUCCIÓN" },
+  { codigo: "003022400", puesto: "AUXILAR DE CONTROLLER", categoria: "PRODUCCIÓN" },
+  { codigo: "003022500", puesto: "PEONES DE PRODUCCIÓN", categoria: "PRODUCCIÓN" },
+  { codigo: "003022600", puesto: "MERITORIO/A DE PRODUCCIÓN 1", categoria: "PRODUCCIÓN" },
+  { codigo: "003022601", puesto: "MERITORIO/A DE PRODUCCIÓN 2", categoria: "PRODUCCIÓN" },
+  { codigo: "003022602", puesto: "MERITORIO/A DE PRODUCCIÓN 3", categoria: "PRODUCCIÓN" },
+  { codigo: "003022603", puesto: "MERITORIO/A DE PRODUCCIÓN 4", categoria: "PRODUCCIÓN" },
+  { codigo: "003022604", puesto: "MERITORIO/A DE PRODUCCIÓN 5", categoria: "PRODUCCIÓN" },
+  { codigo: "003022700", puesto: "BECARIO/A DE PRODUCCIÓN", categoria: "PRODUCCIÓN" },
+  { codigo: "003022800", puesto: "REFUERZOS DE PRODUCCIÓN", categoria: "PRODUCCIÓN" },
+  { codigo: "003022900", puesto: "HORAS EXTRAS PRODUCCIÓN", categoria: "PRODUCCIÓN" },
+  { codigo: "003030100", puesto: "DIRECTOR/A DE FOTOGRAFIA 1", categoria: "FOTOGRAFÍA" },
+  { codigo: "003030101", puesto: "DIRECTOR/A DE FOTOGRAFIA 2", categoria: "FOTOGRAFÍA" },
+  { codigo: "003030200", puesto: "DIT 1", categoria: "FOTOGRAFÍA" },
+  { codigo: "003030201", puesto: "DIT 2", categoria: "FOTOGRAFÍA" },
+  { codigo: "003030202", puesto: "DIT 3", categoria: "FOTOGRAFÍA" },
+  { codigo: "003030300", puesto: "OPERADOR/A DE CÁMARA 1", categoria: "FOTOGRAFÍA" },
+  { codigo: "003030301", puesto: "OPERADOR/A DE CÁMARA 2", categoria: "FOTOGRAFÍA" },
+  { codigo: "003030302", puesto: "OPERADOR/A DE CÁMARA 3", categoria: "FOTOGRAFÍA" },
+  { codigo: "003030400", puesto: "OPERADOR/A DE STEADY 1", categoria: "FOTOGRAFÍA" },
+  { codigo: "003030401", puesto: "OPERADOR/A DE STEADY 2", categoria: "FOTOGRAFÍA" },
+  { codigo: "003030402", puesto: "OPERADOR/A DE STEADY 3", categoria: "FOTOGRAFÍA" },
+  { codigo: "003030500", puesto: "AYUDANTE DE CÁMARA 1", categoria: "FOTOGRAFÍA" },
+  { codigo: "003030501", puesto: "AYUDANTE DE CÁMARA 2", categoria: "FOTOGRAFÍA" },
+  { codigo: "003030502", puesto: "AYUDANTE DE CÁMARA 3", categoria: "FOTOGRAFÍA" },
+  { codigo: "003030503", puesto: "AYUDANTE DE CÁMARA 4", categoria: "FOTOGRAFÍA" },
+  { codigo: "003030504", puesto: "AYUDANTE DE CÁMARA 5", categoria: "FOTOGRAFÍA" },
+  { codigo: "003030600", puesto: "AYUDANTE DE STEADY", categoria: "FOTOGRAFÍA" },
+  { codigo: "003030700", puesto: "AUXILIAR DE CÁMARA 1", categoria: "FOTOGRAFÍA" },
+  { codigo: "003030701", puesto: "AUXILIAR DE CÁMARA 2", categoria: "FOTOGRAFÍA" },
+  { codigo: "003030702", puesto: "AUXILIAR DE CÁMARA 3", categoria: "FOTOGRAFÍA" },
+  { codigo: "003030703", puesto: "AUXILIAR DE CÁMARA 4", categoria: "FOTOGRAFÍA" },
+  { codigo: "003030704", puesto: "AUXILIAR DE CÁMARA 5", categoria: "FOTOGRAFÍA" },
+  { codigo: "003030800", puesto: "VIDEOASSIST 1", categoria: "FOTOGRAFÍA" },
+  { codigo: "003030801", puesto: "VIDEOASSIST 2", categoria: "FOTOGRAFÍA" },
+  { codigo: "003030802", puesto: "VIDEOASSIST 3", categoria: "FOTOGRAFÍA" },
+  { codigo: "003030900", puesto: "DATA WRANGLER 1", categoria: "FOTOGRAFÍA" },
+  { codigo: "003030901", puesto: "DATA WRANGLER 2", categoria: "FOTOGRAFÍA" },
+  { codigo: "003031000", puesto: "FOTO-FIJA 1", categoria: "FOTOGRAFÍA" },
+  { codigo: "003031001", puesto: "FOTO-FIJA 2", categoria: "FOTOGRAFÍA" },
+  { codigo: "003031100", puesto: "MERITORIO/A DE CÁMARA 1", categoria: "FOTOGRAFÍA" },
+  { codigo: "003031101", puesto: "MERITORIO/A DE CÁMARA 2", categoria: "FOTOGRAFÍA" },
+  { codigo: "003031200", puesto: "BECARIO/A DE CÁMARA 1", categoria: "FOTOGRAFÍA" },
+  { codigo: "003031201", puesto: "BECARIO/A DE CÁMARA 2", categoria: "FOTOGRAFÍA" },
+  { codigo: "003031300", puesto: "REFUERZOS DE CÁMARA", categoria: "FOTOGRAFÍA" },
+  { codigo: "003031400", puesto: "HORAS EXTRAS CÁMARA", categoria: "FOTOGRAFÍA" },
+  { codigo: "003040100", puesto: "DISEÑADOR/A DE PROYECTO 1", categoria: "DECORACIÓN" },
+  { codigo: "003040101", puesto: "DISEÑADOR/A DE PROYECTO 2", categoria: "DECORACIÓN" },
+  { codigo: "003040200", puesto: "PRODUCTION DESIGNER", categoria: "DECORACIÓN" },
+  { codigo: "003040300", puesto: "DIRECTOR/A ARTÍSTICO", categoria: "DECORACIÓN" },
+  { codigo: "003040400", puesto: "ASISTENTE DE DIRECCIÓN ARTÍSTICO", categoria: "DECORACIÓN" },
+  { codigo: "003040500", puesto: "COORDINADOR/A DE ARTE", categoria: "DECORACIÓN" },
+  { codigo: "003040600", puesto: "DIBUJANTE", categoria: "DECORACIÓN" },
+  { codigo: "003040700", puesto: "DECORADOR/A", categoria: "DECORACIÓN" },
+  { codigo: "003040800", puesto: "DISEÑADOR/A GRAFISTA POR ORDENADOR", categoria: "DECORACIÓN" },
+  { codigo: "003040900", puesto: "AMBIENTADOR", categoria: "DECORACIÓN" },
+  { codigo: "003041000", puesto: "AYUDANTE DE DECORACIÓN 1", categoria: "DECORACIÓN" },
+  { codigo: "003041001", puesto: "AYUDANTE DE DECORACIÓN 2", categoria: "DECORACIÓN" },
+  { codigo: "003041002", puesto: "AYUDANTE DE DECORACIÓN 3", categoria: "DECORACIÓN" },
+  { codigo: "003041003", puesto: "AYUDANTE DE DECORACIÓN 4", categoria: "DECORACIÓN" },
+  { codigo: "003041100", puesto: "AUXILIAR DE DECORACIÓN 1", categoria: "DECORACIÓN" },
+  { codigo: "003041101", puesto: "AUXILIAR DE DECORACIÓN 2", categoria: "DECORACIÓN" },
+  { codigo: "003041102", puesto: "AUXILIAR DE DECORACIÓN 3", categoria: "DECORACIÓN" },
+  { codigo: "003041103", puesto: "AUXILIAR DE DECORACIÓN 4", categoria: "DECORACIÓN" },
+  { codigo: "003041200", puesto: "ATRECISTA DE RODAJE 1", categoria: "DECORACIÓN" },
+  { codigo: "003041201", puesto: "ATRECISTA DE RODAJE 2", categoria: "DECORACIÓN" },
+  { codigo: "003041300", puesto: "ATRECISTA DE AVANCE 1", categoria: "DECORACIÓN" },
+  { codigo: "003041301", puesto: "ATRECISTA DE AVANCE 2", categoria: "DECORACIÓN" },
+  { codigo: "003041302", puesto: "ATRECISTA DE AVANCE 3", categoria: "DECORACIÓN" },
+  { codigo: "003041303", puesto: "ATRECISTA DE AVANCE 4", categoria: "DECORACIÓN" },
+  { codigo: "003041304", puesto: "ATRECISTA DE AVANCE 5", categoria: "DECORACIÓN" },
+  { codigo: "003041400", puesto: "REGIDOR/A", categoria: "DECORACIÓN" },
+  { codigo: "003041500", puesto: "AYUDANTE DE REGIDURÍA 1", categoria: "DECORACIÓN" },
+  { codigo: "003041501", puesto: "AYUDANTE DE REGIDURÍA 2", categoria: "DECORACIÓN" },
+  { codigo: "003041600", puesto: "AUXILIAR DE REGIDURÍA", categoria: "DECORACIÓN" },
+  { codigo: "003041700", puesto: "AYUDANTE DE ATREZZO 1", categoria: "DECORACIÓN" },
+  { codigo: "003041701", puesto: "AYUDANTE DE ATREZZO 2", categoria: "DECORACIÓN" },
+  { codigo: "003041702", puesto: "AYUDANTE DE ATREZZO 3", categoria: "DECORACIÓN" },
+  { codigo: "003041800", puesto: "AUXILIAR DE ATREZZO 1", categoria: "DECORACIÓN" },
+  { codigo: "003041801", puesto: "AUXILIAR DE ATREZZO 2", categoria: "DECORACIÓN" },
+  { codigo: "003041802", puesto: "AUXILIAR DE ATREZZO 3", categoria: "DECORACIÓN" },
+  { codigo: "003041803", puesto: "AUXILIAR DE ATREZZO 4", categoria: "DECORACIÓN" },
+  { codigo: "003041804", puesto: "AUXILIAR DE ATREZZO 5", categoria: "DECORACIÓN" },
+  { codigo: "003041805", puesto: "AUXILIAR DE ATREZZO 6", categoria: "DECORACIÓN" },
+  { codigo: "003041806", puesto: "AUXILIAR DE ATREZZO 7", categoria: "DECORACIÓN" },
+  { codigo: "003041807", puesto: "AUXILIAR DE ATREZZO 8", categoria: "DECORACIÓN" },
+  { codigo: "003041900", puesto: "JEFE/A DE VEHÍCULOS DE ESCENA 1", categoria: "DECORACIÓN" },
+  { codigo: "003041901", puesto: "JEFE/A DE VEHÍCULOS DE ESCENA 2", categoria: "DECORACIÓN" },
+  { codigo: "003042000", puesto: "JEFE/A DE CONSTRUCCIÓN", categoria: "DECORACIÓN" },
+  { codigo: "003042100", puesto: "AYUDANTE DE CONSTRUCCIÓN", categoria: "DECORACIÓN" },
+  { codigo: "003042200", puesto: "ESCAYOLISTA", categoria: "DECORACIÓN" },
+  { codigo: "003042300", puesto: "CARPINTERO/A", categoria: "DECORACIÓN" },
+  { codigo: "003042400", puesto: "PINTOR/A", categoria: "DECORACIÓN" },
+  { codigo: "003042500", puesto: "HERRERO/A / CERRAJERO/A", categoria: "DECORACIÓN" },
+  { codigo: "003042600", puesto: "TAPICERO/A", categoria: "DECORACIÓN" },
+  { codigo: "003042700", puesto: "PAISAJISTA", categoria: "DECORACIÓN" },
+  { codigo: "003042800", puesto: "PEONES DE DECORACIÓN", categoria: "DECORACIÓN" },
+  { codigo: "003042900", puesto: "MERITORIO/A DE DECORACIÓN", categoria: "DECORACIÓN" },
+  { codigo: "003043000", puesto: "BECARIO/A DE DECORACIÓN", categoria: "DECORACIÓN" },
+  { codigo: "003043100", puesto: "REFUERZOS DE DECORACIÓN", categoria: "DECORACIÓN" },
+  { codigo: "003043200", puesto: "HORAS EXTRAS DECORACIÓN", categoria: "DECORACIÓN" },
+  { codigo: "003050100", puesto: "DISEÑADOR/A DE VESTUARIO - FIGURINISTA", categoria: "VESTUARIO" },
+  { codigo: "003050200", puesto: "JEFE/A DE VESTUARIO", categoria: "VESTUARIO" },
+  { codigo: "003050300", puesto: "COORDINADOR/A DE VESTUARIO", categoria: "VESTUARIO" },
+  { codigo: "003050400", puesto: "AYUDANTE DE VESTUARIO 1", categoria: "VESTUARIO" },
+  { codigo: "003050401", puesto: "AYUDANTE DE VESTUARIO 2", categoria: "VESTUARIO" },
+  { codigo: "003050402", puesto: "AYUDANTE DE VESTUARIO 3", categoria: "VESTUARIO" },
+  { codigo: "003050500", puesto: "AUXILIAR DE VESTUARIO 1", categoria: "VESTUARIO" },
+  { codigo: "003050501", puesto: "AUXILIAR DE VESTUARIO 2", categoria: "VESTUARIO" },
+  { codigo: "003050502", puesto: "AUXILIAR DE VESTUARIO 3", categoria: "VESTUARIO" },
+  { codigo: "003050600", puesto: "SASTRE/A (CONFECCIÓN)", categoria: "VESTUARIO" },
+  { codigo: "003050700", puesto: "SASTRE/A DE RODAJE", categoria: "VESTUARIO" },
+  { codigo: "003050800", puesto: "AUXILIAR DE SASTRERÍA", categoria: "VESTUARIO" },
+  { codigo: "003050900", puesto: "PEONES DE VESTUARIO 1", categoria: "VESTUARIO" },
+  { codigo: "003050901", puesto: "PEONES DE VESTUARIO 2", categoria: "VESTUARIO" },
+  { codigo: "003051000", puesto: "MERITORIO/A DE VESTUARIO 1", categoria: "VESTUARIO" },
+  { codigo: "003051001", puesto: "MERITORIO/A DE VESTUARIO 2", categoria: "VESTUARIO" },
+  { codigo: "003051100", puesto: "BECARIO/A DE VESTUARIO", categoria: "VESTUARIO" },
+  { codigo: "003051200", puesto: "REFUERZOS DE VESTUARIO", categoria: "VESTUARIO" },
+  { codigo: "003051300", puesto: "HORAS EXTRAS VESTUARIO", categoria: "VESTUARIO" },
+  { codigo: "003060100", puesto: "JEFE/A DE MAQUILLAJE 1", categoria: "MAQUILLADORES. CARACTERIZADORES" },
+  { codigo: "003060101", puesto: "JEFE/A DE MAQUILLAJE 2", categoria: "MAQUILLADORES. CARACTERIZADORES" },
+  { codigo: "003060102", puesto: "JEFE/A DE MAQUILLAJE 3", categoria: "MAQUILLADORES. CARACTERIZADORES" },
+  { codigo: "003060103", puesto: "JEFE/A DE MAQUILLAJE 4", categoria: "MAQUILLADORES. CARACTERIZADORES" },
+  { codigo: "003060200", puesto: "COORDINADOR/A DE MAQUILLAJE 1", categoria: "MAQUILLADORES. CARACTERIZADORES" },
+  { codigo: "003060201", puesto: "COORDINADOR/A DE MAQUILLAJE 2", categoria: "MAQUILLADORES. CARACTERIZADORES" },
+  { codigo: "003060300", puesto: "AYUDANTE DE MAQUILLAJE 1", categoria: "MAQUILLADORES. CARACTERIZADORES" },
+  { codigo: "003060301", puesto: "AYUDANTE DE MAQUILLAJE 2", categoria: "MAQUILLADORES. CARACTERIZADORES" },
+  { codigo: "003060302", puesto: "AYUDANTE DE MAQUILLAJE 3", categoria: "MAQUILLADORES. CARACTERIZADORES" },
+  { codigo: "003060400", puesto: "AUXILIAR DE MAQUILLAJE 1", categoria: "MAQUILLADORES. CARACTERIZADORES" },
+  { codigo: "003060401", puesto: "AUXILIAR DE MAQUILLAJE 2", categoria: "MAQUILLADORES. CARACTERIZADORES" },
+  { codigo: "003060500", puesto: "CARACTERIZADOR/A", categoria: "MAQUILLADORES. CARACTERIZADORES" },
+  { codigo: "003060600", puesto: "AYUDANTE DE CARACTERIZACIÓN", categoria: "MAQUILLADORES. CARACTERIZADORES" },
+  { codigo: "003060700", puesto: "AUXILIAR DE CARACTERIZACIÓN", categoria: "MAQUILLADORES. CARACTERIZADORES" },
+  { codigo: "003060800", puesto: "MAQUILLADOR/A DE FX", categoria: "MAQUILLADORES. CARACTERIZADORES" },
+  { codigo: "003060900", puesto: "AYUDANTE DE FX", categoria: "MAQUILLADORES. CARACTERIZADORES" },
+  { codigo: "003061000", puesto: "AUXILIAR DE FX", categoria: "MAQUILLADORES. CARACTERIZADORES" },
+  { codigo: "003061100", puesto: "MERITORIO/A DE MAQUILLAJE", categoria: "MAQUILLADORES. CARACTERIZADORES" },
+  { codigo: "003061200", puesto: "BECARIO/A DE MAQUILLAJE", categoria: "MAQUILLADORES. CARACTERIZADORES" },
+  { codigo: "003061300", puesto: "REFUERZOS DE MAQUILLAJE", categoria: "MAQUILLADORES. CARACTERIZADORES" },
+  { codigo: "003061400", puesto: "HORAS EXTRAS MAQUILLAJE", categoria: "MAQUILLADORES. CARACTERIZADORES" },
+  { codigo: "003070100", puesto: "JEFE DE PELUQUERO/A", categoria: "EQUIPO PROGRAMAS ESPECIALES" },
+  { codigo: "003070200", puesto: "AYUDANTE DE PELUQUERÍA", categoria: "EQUIPO PROGRAMAS ESPECIALES" },
+  { codigo: "003070300", puesto: "AUXILIAR DE PELUQUERÍA", categoria: "EQUIPO PROGRAMAS ESPECIALES" },
+  { codigo: "003070400", puesto: "POSTICERO/A", categoria: "EQUIPO PROGRAMAS ESPECIALES" },
+  { codigo: "003070500", puesto: "AYUDANTE DE POSTICERÍA", categoria: "EQUIPO PROGRAMAS ESPECIALES" },
+  { codigo: "003070600", puesto: "MERITORIO/A DE PELUQUERÍA", categoria: "EQUIPO PROGRAMAS ESPECIALES" },
+  { codigo: "003070700", puesto: "BECARIO/A DE PELUQUERÍA", categoria: "EQUIPO PROGRAMAS ESPECIALES" },
+  { codigo: "003070800", puesto: "REFUERZOS DE PELUQUERÍA", categoria: "EQUIPO PROGRAMAS ESPECIALES" },
+  { codigo: "003070900", puesto: "HORAS EXTRAS  PELUQUERÍA", categoria: "EQUIPO PROGRAMAS ESPECIALES" },
+  { codigo: "003080100", puesto: "COORDINADOR/A DE EFECTOS ESPEC", categoria: "TÉCNICOS/ AS EFECTOS ESPECIALES Y SONOROS" },
+  { codigo: "003080200", puesto: "JEFE/A DE EFECTOS ESPECIALES", categoria: "TÉCNICOS/ AS EFECTOS ESPECIALES Y SONOROS" },
+  { codigo: "003080300", puesto: "AYUDANTE DE EFECTOS ESPECIALES 1", categoria: "TÉCNICOS/ AS EFECTOS ESPECIALES Y SONOROS" },
+  { codigo: "003080301", puesto: "AYUDANTE DE EFECTOS ESPECIALES 2", categoria: "TÉCNICOS/ AS EFECTOS ESPECIALES Y SONOROS" },
+  { codigo: "003080400", puesto: "AUXILIAR DE EFECTOS ESPECIALES", categoria: "TÉCNICOS/ AS EFECTOS ESPECIALES Y SONOROS" },
+  { codigo: "003080500", puesto: "ARMERO/A", categoria: "TÉCNICOS/ AS EFECTOS ESPECIALES Y SONOROS" },
+  { codigo: "003080600", puesto: "AYUDANTE DE ARMERO/A", categoria: "TÉCNICOS/ AS EFECTOS ESPECIALES Y SONOROS" },
+  { codigo: "003080700", puesto: "MERITORIO/A DE EFECTOS ESPECIA", categoria: "TÉCNICOS/ AS EFECTOS ESPECIALES Y SONOROS" },
+  { codigo: "003080800", puesto: "BECARIO/A DE EFECTOS ESPECIALE", categoria: "TÉCNICOS/ AS EFECTOS ESPECIALES Y SONOROS" },
+  { codigo: "003080900", puesto: "REFUERZOS DE EFECTOS ESPECIALE", categoria: "TÉCNICOS/ AS EFECTOS ESPECIALES Y SONOROS" },
+  { codigo: "003081000", puesto: "HORAS EXTRAS EFECTOS ESPECIALE", categoria: "TÉCNICOS/ AS EFECTOS ESPECIALES Y SONOROS" },
+  { codigo: "003090100", puesto: "JEFE/A DE SONIDO 1", categoria: "SONIDO" },
+  { codigo: "003090101", puesto: "JEFE/A DE SONIDO 2", categoria: "SONIDO" },
+  { codigo: "003090200", puesto: "AYUDANTE DE SONIDO 1", categoria: "SONIDO" },
+  { codigo: "003090201", puesto: "AYUDANTE DE SONIDO 2", categoria: "SONIDO" },
+  { codigo: "003090300", puesto: "MICROFONISTA 1 1", categoria: "SONIDO" },
+  { codigo: "003090301", puesto: "MICROFONISTA 2", categoria: "SONIDO" },
+  { codigo: "003090302", puesto: "MICROFONISTA 1 2", categoria: "SONIDO" },
+  { codigo: "003090400", puesto: "AUXILIAR DE SONIDO", categoria: "SONIDO" },
+  { codigo: "003090500", puesto: "MERITORIO/A DE SONIDO", categoria: "SONIDO" },
+  { codigo: "003090600", puesto: "BECARIO/A DE SONIDO", categoria: "SONIDO" },
+  { codigo: "003090700", puesto: "REFUERZOS DE SONIDO", categoria: "SONIDO" },
+  { codigo: "003090800", puesto: "HORAS EXTRAS SONIDO", categoria: "SONIDO" },
+  { codigo: "003100100", puesto: "COORDINADOR/A DE POSTPRODUCCIÓ 1", categoria: "EQUIPO DE POSTPRODUCCIÓN" },
+  { codigo: "003100101", puesto: "COORDINADOR/A DE POSTPRODUCCIÓ 2", categoria: "EQUIPO DE POSTPRODUCCIÓN" },
+  { codigo: "003100200", puesto: "AYUDANTE DE COORDINADOR DE POSTPRODUCCIÓN 1", categoria: "EQUIPO DE POSTPRODUCCIÓN" },
+  { codigo: "003100201", puesto: "AYUDANTE DE COORDINADOR DE POSTPRODUCCIÓN 2", categoria: "EQUIPO DE POSTPRODUCCIÓN" },
+  { codigo: "003100300", puesto: "MONTADOR/A 1", categoria: "EQUIPO DE POSTPRODUCCIÓN" },
+  { codigo: "003100301", puesto: "MONTADOR/A 2", categoria: "EQUIPO DE POSTPRODUCCIÓN" },
+  { codigo: "003100400", puesto: "AYUDANTE DE MONTAJE 1", categoria: "EQUIPO DE POSTPRODUCCIÓN" },
+  { codigo: "003100401", puesto: "AYUDANTE DE MONTAJE 2", categoria: "EQUIPO DE POSTPRODUCCIÓN" },
+  { codigo: "003100402", puesto: "AYUDANTE DE MONTAJE 3", categoria: "EQUIPO DE POSTPRODUCCIÓN" },
+  { codigo: "003100403", puesto: "AYUDANTE DE MONTAJE 4", categoria: "EQUIPO DE POSTPRODUCCIÓN" },
+  { codigo: "003100500", puesto: "DIGITALIZADOR/A 1", categoria: "EQUIPO DE POSTPRODUCCIÓN" },
+  { codigo: "003100501", puesto: "DIGITALIZADOR/A 2", categoria: "EQUIPO DE POSTPRODUCCIÓN" },
+  { codigo: "003100502", puesto: "DIGITALIZADOR/A 3", categoria: "EQUIPO DE POSTPRODUCCIÓN" },
+  { codigo: "003100600", puesto: "SUPERVISOR/A DE VFX", categoria: "EQUIPO DE POSTPRODUCCIÓN" },
+  { codigo: "003100700", puesto: "GRAFISTA", categoria: "EQUIPO DE POSTPRODUCCIÓN" },
+  { codigo: "003100800", puesto: "AYUDANTE DE GRAFISMO 1", categoria: "EQUIPO DE POSTPRODUCCIÓN" },
+  { codigo: "003100801", puesto: "AYUDANTE DE GRAFISMO 2", categoria: "EQUIPO DE POSTPRODUCCIÓN" },
+  { codigo: "003100900", puesto: "JEFE/A DE ANIMACIÓN", categoria: "EQUIPO DE POSTPRODUCCIÓN" },
+  { codigo: "003101000", puesto: "ANIMADOR/A", categoria: "EQUIPO DE POSTPRODUCCIÓN" },
+  { codigo: "003101100", puesto: "TRANSCIPTOR/A", categoria: "EQUIPO DE POSTPRODUCCIÓN" },
+  { codigo: "003101200", puesto: "SUBTITULADOR/A 1", categoria: "EQUIPO DE POSTPRODUCCIÓN" },
+  { codigo: "003101201", puesto: "SUBTITULADOR/A 2", categoria: "EQUIPO DE POSTPRODUCCIÓN" },
+  { codigo: "003101202", puesto: "SUBTITULADOR/A 3", categoria: "EQUIPO DE POSTPRODUCCIÓN" },
+  { codigo: "003101300", puesto: "MONTADOR/A DE SONIDO", categoria: "EQUIPO DE POSTPRODUCCIÓN" },
+  { codigo: "003101400", puesto: "AYUDANTE DE MONTAJE DE SONIDO", categoria: "EQUIPO DE POSTPRODUCCIÓN" },
+  { codigo: "003101500", puesto: "MERITORIO/A DE MONTAJE", categoria: "EQUIPO DE POSTPRODUCCIÓN" },
+  { codigo: "003101600", puesto: "BECARIO/A DE MONTAJE", categoria: "EQUIPO DE POSTPRODUCCIÓN" },
+  { codigo: "003101700", puesto: "REFUERZOS DE MONTAJE", categoria: "EQUIPO DE POSTPRODUCCIÓN" },
+  { codigo: "003101800", puesto: "HORAS EXTRAS MONTAJE", categoria: "EQUIPO DE POSTPRODUCCIÓN" },
+  { codigo: "003110100", puesto: "JEFE/A ELÉCTRICOS", categoria: "ELÉCTRICOS. MAQUINISTAS" },
+  { codigo: "003110200", puesto: "BEST-BOY 1", categoria: "ELÉCTRICOS. MAQUINISTAS" },
+  { codigo: "003110201", puesto: "BEST-BOY 2", categoria: "ELÉCTRICOS. MAQUINISTAS" },
+  { codigo: "003110300", puesto: "ELÉCTRICO/A 1", categoria: "ELÉCTRICOS. MAQUINISTAS" },
+  { codigo: "003110301", puesto: "ELÉCTRICO/A 2", categoria: "ELÉCTRICOS. MAQUINISTAS" },
+  { codigo: "003110302", puesto: "ELÉCTRICO/A 3", categoria: "ELÉCTRICOS. MAQUINISTAS" },
+  { codigo: "003110303", puesto: "ELÉCTRICO/A 4", categoria: "ELÉCTRICOS. MAQUINISTAS" },
+  { codigo: "003110304", puesto: "ELÉCTRICO/A 5", categoria: "ELÉCTRICOS. MAQUINISTAS" },
+  { codigo: "003110305", puesto: "ELÉCTRICO/A 6", categoria: "ELÉCTRICOS. MAQUINISTAS" },
+  { codigo: "003110306", puesto: "ELÉCTRICO/A 7", categoria: "ELÉCTRICOS. MAQUINISTAS" },
+  { codigo: "003110400", puesto: "RIGGER GAFFER", categoria: "ELÉCTRICOS. MAQUINISTAS" },
+  { codigo: "003110500", puesto: "BEST-BOY RIGGER", categoria: "ELÉCTRICOS. MAQUINISTAS" },
+  { codigo: "003110600", puesto: "RIGGER", categoria: "ELÉCTRICOS. MAQUINISTAS" },
+  { codigo: "003110700", puesto: "GRUPISTA", categoria: "ELÉCTRICOS. MAQUINISTAS" },
+  { codigo: "003110800", puesto: "MERITORIO/A DE ELÉCTRICO", categoria: "ELÉCTRICOS. MAQUINISTAS" },
+  { codigo: "003110900", puesto: "BECARIO/A DE ELÉCTRICO", categoria: "ELÉCTRICOS. MAQUINISTAS" },
+  { codigo: "003111000", puesto: "REFUERZOS ELÉCTRICO", categoria: "ELÉCTRICOS. MAQUINISTAS" },
+  { codigo: "003111100", puesto: "HORAS EXTRAS ELÉCTRICOS Y RIGGER", categoria: "ELÉCTRICOS. MAQUINISTAS" },
+  { codigo: "003111200", puesto: "JEFE/A DE MAQUINISTA 1", categoria: "ELÉCTRICOS. MAQUINISTAS" },
+  { codigo: "003111201", puesto: "JEFE/A DE MAQUINISTA 2", categoria: "ELÉCTRICOS. MAQUINISTAS" },
+  { codigo: "003111300", puesto: "MAQUINISTA", categoria: "ELÉCTRICOS. MAQUINISTAS" },
+  { codigo: "003111400", puesto: "AYUDANTE DE MAQUINISTA 1", categoria: "ELÉCTRICOS. MAQUINISTAS" },
+  { codigo: "003111401", puesto: "AYUDANTE DE MAQUINISTA 2", categoria: "ELÉCTRICOS. MAQUINISTAS" },
+  { codigo: "003111500", puesto: "AUXILIAR DE MAQUINISTA", categoria: "ELÉCTRICOS. MAQUINISTAS" },
+  { codigo: "003111600", puesto: "MERITORIO/A DE MAQUINISTA", categoria: "ELÉCTRICOS. MAQUINISTAS" },
+  { codigo: "003111700", puesto: "BECARIO/A DE MAQUINISTA", categoria: "ELÉCTRICOS. MAQUINISTAS" },
+  { codigo: "003111800", puesto: "REFUERZOS MAQUINISTA", categoria: "ELÉCTRICOS. MAQUINISTAS" },
+  { codigo: "003111900", puesto: "HORAS EXTRAS MAQUINISTAS", categoria: "ELÉCTRICOS. MAQUINISTAS" },
+  { codigo: "003120100", puesto: "MÉDICOS", categoria: "PERSONAL COMPLEMENTARIO Y OTROS" },
+  { codigo: "003120200", puesto: "ENFERMERO/A", categoria: "PERSONAL COMPLEMENTARIO Y OTROS" },
+  { codigo: "003120300", puesto: "OTROS SANITARIOS", categoria: "PERSONAL COMPLEMENTARIO Y OTROS" },
+  { codigo: "003120400", puesto: "TÉCNICO/A EN PREVENCIÓN DE RIESGOS", categoria: "PERSONAL COMPLEMENTARIO Y OTROS" },
+  { codigo: "003120500", puesto: "AYUDANTE DE TÉCNICO EN PREVENCIÓN", categoria: "PERSONAL COMPLEMENTARIO Y OTROS" },
+  { codigo: "003120600", puesto: "BOMBEROS/AS", categoria: "PERSONAL COMPLEMENTARIO Y OTROS" },
+  { codigo: "003120700", puesto: "PROTECCIÓN CIVIL", categoria: "PERSONAL COMPLEMENTARIO Y OTROS" },
+  { codigo: "003120800", puesto: "SEGURIDAD PRIVADA", categoria: "PERSONAL COMPLEMENTARIO Y OTROS" },
+  { codigo: "003120900", puesto: "GUARDAESPALDAS", categoria: "PERSONAL COMPLEMENTARIO Y OTROS" },
+  { codigo: "003121000", puesto: "BLOCKERS", categoria: "PERSONAL COMPLEMENTARIO Y OTROS" },
+  { codigo: "003121100", puesto: "PERSONAL DE LIMPIEZA", categoria: "PERSONAL COMPLEMENTARIO Y OTROS" },
+  { codigo: "003121200", puesto: "PERSONAL DE LIMPIEZA HIGIENICO", categoria: "PERSONAL COMPLEMENTARIO Y OTROS" },
+  { codigo: "003121300", puesto: "PERSONAL PARA RESERVAS DE ESPACIO", categoria: "PERSONAL COMPLEMENTARIO Y OTROS" },
+  { codigo: "003121400", puesto: "MOZOS/AS", categoria: "PERSONAL COMPLEMENTARIO Y OTROS" },
+  { codigo: "003121500", puesto: "COORDINADOR/A DE SEMOVIENTES", categoria: "PERSONAL COMPLEMENTARIO Y OTROS" },
+  { codigo: "003121600", puesto: "CUADRERO/A", categoria: "PERSONAL COMPLEMENTARIO Y OTROS" },
+  { codigo: "003121700", puesto: "RAMALERO/A 1", categoria: "PERSONAL COMPLEMENTARIO Y OTROS" },
+  { codigo: "003121701", puesto: "RAMALERO/A 2", categoria: "PERSONAL COMPLEMENTARIO Y OTROS" },
+  { codigo: "003121702", puesto: "RAMALERO/A 3", categoria: "PERSONAL COMPLEMENTARIO Y OTROS" },
+  { codigo: "003121800", puesto: "ADIESTRADOR/A", categoria: "PERSONAL COMPLEMENTARIO Y OTROS" },
+  { codigo: "003121900", puesto: "VETERINARIO/A 1", categoria: "PERSONAL COMPLEMENTARIO Y OTROS" },
+  { codigo: "003121901", puesto: "VETERINARIO/A 2", categoria: "PERSONAL COMPLEMENTARIO Y OTROS" },
+  { codigo: "003122000", puesto: "ENTRENADORES/AS", categoria: "PERSONAL COMPLEMENTARIO Y OTROS" },
+  { codigo: "003122100", puesto: "PROFESORES/AS", categoria: "PERSONAL COMPLEMENTARIO Y OTROS" },
+  { codigo: "003122200", puesto: "BUZOS", categoria: "PERSONAL COMPLEMENTARIO Y OTROS" },
+];
+
+// ═══════════════════════════════════════════════════════════════════
+// COMPONENTE: SELECTOR DE PUESTO (filtrable + agrupado + permite texto libre)
+// ═══════════════════════════════════════════════════════════════════
+function PuestoSelector({ puesto, codigoContable, onPuesto, onCodigoContable }) {
+  const [mostrarLista, setMostrarLista] = useState(false);
+  const [busqueda, setBusqueda] = useState(puesto || "");
+  const inputRef = useRef(null);
+  const listaRef = useRef(null);
+
+  // Sincronizar búsqueda cuando cambia el puesto externamente (ej. al cargar perfil)
+  useEffect(() => {
+    setBusqueda(puesto || "");
+  }, [puesto]);
+
+  // Cerrar al hacer click fuera
+  useEffect(() => {
+    if (!mostrarLista) return;
+    const onClickFuera = (e) => {
+      if (listaRef.current && !listaRef.current.contains(e.target) && inputRef.current && !inputRef.current.contains(e.target)) {
+        setMostrarLista(false);
+      }
+    };
+    document.addEventListener("mousedown", onClickFuera);
+    return () => document.removeEventListener("mousedown", onClickFuera);
+  }, [mostrarLista]);
+
+  // Filtrar puestos según búsqueda
+  const norm = (s) => (s || "").toString().toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, ""); // sin acentos
+  const q = norm(busqueda);
+  const puestosFiltrados = q
+    ? PUESTOS_COAC.filter(p => norm(p.puesto).includes(q) || norm(p.codigo).includes(q) || norm(p.categoria).includes(q))
+    : PUESTOS_COAC;
+
+  // Agrupar por categoría
+  const grupos = {};
+  for (const p of puestosFiltrados) {
+    if (!grupos[p.categoria]) grupos[p.categoria] = [];
+    grupos[p.categoria].push(p);
+  }
+
+  const seleccionar = (p) => {
+    onPuesto(p.puesto);
+    onCodigoContable(p.codigo);
+    setBusqueda(p.puesto);
+    setMostrarLista(false);
+  };
+
+  const onInputChange = (val) => {
+    setBusqueda(val);
+    onPuesto(val);
+    // Si lo que escribe no coincide con ningún puesto exactamente, limpiar código
+    const match = PUESTOS_COAC.find(p => p.puesto === val);
+    if (match) onCodigoContable(match.codigo);
+    else onCodigoContable(""); // texto libre = sin código
+  };
+
+  const inp = { padding: "11px 13px", fontSize: 13, border: "1px solid #c0bcb5", borderRadius: 6, fontFamily: "'Courier New',monospace", boxSizing: "border-box", width: "100%", outline: "none", background: "#fafaf7", color: "#1a1a1a" };
+  const LS = { display: "block", fontSize: 10, color: "#666", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 6, fontWeight: 700, fontFamily: "'Courier New',monospace" };
+
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <label style={LS}>Puesto</label>
+      <div style={{ position: "relative" }}>
+        <input
+          ref={inputRef}
+          type="text"
+          value={busqueda}
+          onChange={e => onInputChange(e.target.value)}
+          onFocus={() => setMostrarLista(true)}
+          placeholder="Escribe para filtrar o elige de la lista..."
+          style={inp}
+          autoComplete="off"
+        />
+        <button
+          type="button"
+          onClick={() => setMostrarLista(!mostrarLista)}
+          style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", background: "transparent", border: "none", cursor: "pointer", padding: "4px 8px", fontSize: 12, color: "#666" }}
+          tabIndex={-1}
+        >
+          {mostrarLista ? "▲" : "▼"}
+        </button>
+      </div>
+
+      {mostrarLista && (
+        <div
+          ref={listaRef}
+          style={{
+            position: "relative", zIndex: 100, marginTop: 4,
+            background: "#fff", border: "1px solid #c0bcb5", borderRadius: 6,
+            maxHeight: 320, overflowY: "auto", fontFamily: "'Courier New',monospace",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+          }}
+        >
+          {puestosFiltrados.length === 0 ? (
+            <div style={{ padding: 14, textAlign: "center", color: "#888", fontSize: 11, fontStyle: "italic" }}>
+              Sin resultados. Puedes escribir libremente este puesto sin código.
+            </div>
+          ) : (
+            Object.entries(grupos).map(([cat, items]) => (
+              <div key={cat}>
+                <div style={{ padding: "6px 12px", background: "#f0ede8", fontSize: 9, color: "#7a5a2a", letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 700, borderBottom: "1px solid #e0ddd8", position: "sticky", top: 0 }}>
+                  {cat} <span style={{ color: "#aaa", fontWeight: 400, marginLeft: 4 }}>({items.length})</span>
+                </div>
+                {items.map(p => (
+                  <div
+                    key={p.codigo}
+                    onClick={() => seleccionar(p)}
+                    style={{
+                      padding: "7px 14px", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center",
+                      borderBottom: "1px solid #f0ede8", fontSize: 11,
+                      background: p.puesto === puesto ? "rgba(184,134,74,0.1)" : "transparent",
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = "rgba(184,134,74,0.15)"}
+                    onMouseLeave={e => e.currentTarget.style.background = p.puesto === puesto ? "rgba(184,134,74,0.1)" : "transparent"}
+                  >
+                    <span style={{ color: "#1a1a1a", fontWeight: p.puesto === puesto ? 700 : 400 }}>{p.puesto}</span>
+                    <span style={{ color: "#888", fontSize: 10, fontFamily: "'Courier New',monospace" }}>{p.codigo}</span>
+                  </div>
+                ))}
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {/* Campo Código Contable (solo lectura) */}
+      <div style={{ marginTop: 10 }}>
+        <label style={LS}>Código Contable</label>
+        <input
+          type="text"
+          value={codigoContable || ""}
+          readOnly
+          placeholder="— se rellena automáticamente al elegir un puesto —"
+          style={{ ...inp, background: codigoContable ? "#f0ede8" : "#fafaf7", color: codigoContable ? "#1a1a1a" : "#aaa", fontWeight: codigoContable ? 700 : 400, cursor: "default" }}
+        />
+        {!codigoContable && busqueda && (
+          <div style={{ fontSize: 9, color: "#a07030", marginTop: 4, fontFamily: "'Courier New',monospace", fontStyle: "italic" }}>
+            ℹ Puesto no estándar (sin código contable asignado)
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 // ═══════════════════════════════════════════════════════════════════
 // CONSTANTES COSTE EMPRESA
@@ -1362,6 +1846,7 @@ function DocumentoImprimible({
   totalFestDias45, totalFestImport45,
   plusHerramienta, plusCoche, plusVivienda, plusSeguroVida, plusComida,
   es40h = false,
+  codigoContable = "",
 }) {
   // Estilos reutilizables
   const sectionTitle = {
@@ -1483,7 +1968,7 @@ function DocumentoImprimible({
           </tr>
           <tr>
             <td style={tdLabel}><strong>Nombre:</strong> {nombre || "—"}</td>
-            <td style={tdValue}><strong>Puesto:</strong> {puesto || "—"}</td>
+            <td style={tdValue}><strong>Puesto:</strong> {puesto || "—"}{codigoContable ? <span style={{ color: "#888", marginLeft: 6, fontWeight: 400, fontSize: 10 }}>· {codigoContable}</span> : null}</td>
           </tr>
           <tr>
             <td style={tdLabel}><strong>Salario pactado 45h:</strong> <span style={{ color: "#b8864a", fontWeight: 700 }}>{fmtE(salario45efectivo)}</span></td>
@@ -1818,6 +2303,7 @@ function App45({ modoTab = "iruna45" }) {
   const [logoEmpresa,      setLogoEmpresa]    = useState("bizkaia");
   const [nombre,           setNombre]          = useState("");
   const [puesto,           setPuesto]          = useState("");
+  const [codigoContable,   setCodigoContable]  = useState("");
   const [salario45,        setSalario45]       = useState("");
   const [horasRef,         setHorasRef]        = useState(22);
   const [modoInverso45,    setModoInverso45]   = useState(false);
@@ -1984,6 +2470,7 @@ function App45({ modoTab = "iruna45" }) {
     lines.push(["Productora", productora || "—"].join(sep));
     lines.push(["Trabajador", nombre || "—"].join(sep));
     lines.push(["Puesto", puesto || "—"].join(sep));
+    lines.push(["Código Contable", codigoContable || "—"].join(sep));
     lines.push(["Período", `${fechaInicio} → ${fechaFin}`].join(sep));
     lines.push([`Salario pactado ${es40h ? "40h" : "45h"} (€/mes)`, decimal(salario45efectivo)].join(sep));
     if (!es40h) lines.push(["Horas extra de referencia (h/mes)", horasRef].join(sep));
@@ -2303,7 +2790,7 @@ ${docHTML}
           <GestorPerfiles
             tabId={modoTab === "tab40" ? "40h" : "45h"}
             datosActuales={{
-              proyecto, productora, nombre, puesto, salario45, horasRef, modoInverso45, objetivoSemanal45,
+              proyecto, productora, nombre, puesto, codigoContable, salario45, horasRef, modoInverso45, objetivoSemanal45,
               fechaInicio, fechaFin, vacAcumulada, indemAcumulada,
               horasPorMes, vacDiasPorMes, festivosPorMes, festivosActivos, comidaDiasPorMes,
               plusHerramienta, plusCoche, plusVivienda, plusSeguroVida, plusComida,
@@ -2323,6 +2810,7 @@ ${docHTML}
               if (d.productora !== undefined) setProductora(d.productora);
               if (d.nombre !== undefined) setNombre(d.nombre);
               if (d.puesto !== undefined) setPuesto(d.puesto);
+              if (d.codigoContable !== undefined) setCodigoContable(d.codigoContable);
               if (d.salario45 !== undefined) setSalario45(d.salario45);
               if (d.horasRef !== undefined) setHorasRef(d.horasRef);
               if (d.modoInverso45 !== undefined) setModoInverso45(d.modoInverso45);
@@ -2349,7 +2837,12 @@ ${docHTML}
             <Field label="Proyecto" value={proyecto} onChange={setProyecto} type="text" hint="Nombre del proyecto / producción" />
             <Field label="Productora" value={productora} onChange={setProductora} type="text" hint="Empresa productora" />
             <Field label="Nombre" value={nombre} onChange={setNombre} type="text" />
-            <Field label="Puesto" value={puesto} onChange={setPuesto} type="text" />
+            <PuestoSelector
+              puesto={puesto}
+              codigoContable={codigoContable}
+              onPuesto={setPuesto}
+              onCodigoContable={setCodigoContable}
+            />
           </div>
 
           <div style={P}>
@@ -2999,7 +3492,8 @@ ${docHTML}
               plusVivienda={plusVivienda} plusSeguroVida={plusSeguroVida}
               plusComida={plusComida}
               es40h={es40h}
-          />
+              codigoContable={codigoContable}
+            />
           }
         />
       )}
@@ -3029,6 +3523,7 @@ ${docHTML}
             plusVivienda={plusVivienda} plusSeguroVida={plusSeguroVida}
             plusComida={plusComida}
             es40h={es40h}
+            codigoContable={codigoContable}
           />
         </div>
       )}
@@ -3901,6 +4396,7 @@ function CosteEmpresa() {
     lines.push(["Productora", d.productora || "—"].join(sep));
     lines.push(["Trabajador", d.nombre || "—"].join(sep));
     lines.push(["Puesto", d.puesto || "—"].join(sep));
+    lines.push(["Código Contable", d.codigoContable || "—"].join(sep));
     lines.push(["Salario pactado", dec(Number(d.salario45) || 0) + " EUR"].join(sep));
     lines.push(["Periodo", (d.fechaInicio && d.fechaFin) ? `${d.fechaInicio} a ${d.fechaFin}` : "—"].join(sep));
     lines.push(["Modo vacaciones", d.vacAcumulada ? "Al final" : "Prorrateadas"].join(sep));
@@ -4098,6 +4594,7 @@ function CosteEmpresa() {
     <div><div class="l">Productora</div><div class="v">${d.productora || "—"}</div></div>
     <div><div class="l">Trabajador</div><div class="v">${d.nombre || "—"}</div></div>
     <div><div class="l">Puesto</div><div class="v">${d.puesto || "—"}</div></div>
+    <div><div class="l">Código contable</div><div class="v">${d.codigoContable || "—"}</div></div>
     <div><div class="l">Salario pactado</div><div class="v">${d.salario45 ? fmt(Number(d.salario45)) + " €" : "—"}</div></div>
     <div><div class="l">Período</div><div class="v">${(d.fechaInicio && d.fechaFin) ? `${d.fechaInicio} → ${d.fechaFin}` : "—"}</div></div>
     <div><div class="l">Vacaciones</div><div class="v">${d.vacAcumulada ? "Al final" : "Prorrateadas"}</div></div>
@@ -4378,6 +4875,7 @@ function CosteEmpresa() {
               { l: "Productora", v: d.productora },
               { l: "Trabajador", v: d.nombre },
               { l: "Puesto", v: d.puesto },
+              { l: "Código contable", v: d.codigoContable },
               { l: "Salario pactado", v: d.salario45 ? `${fmt(Number(d.salario45))} €` : "—" },
               { l: "Período", v: (d.fechaInicio && d.fechaFin) ? `${d.fechaInicio} → ${d.fechaFin}` : "—" },
             ].map(it => (
