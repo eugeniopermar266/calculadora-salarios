@@ -503,7 +503,21 @@ function GestorPerfiles({ tabId, datosActuales, onCargarPerfil }) {
             return { key: k, ...data };
           } catch { return null; }
         }));
-        setPerfiles(lista.filter(Boolean).sort((a,b) => (b.timestamp||0) - (a.timestamp||0)));
+        // Filtrar por tabId actual de la pestaña.
+        // 45H ve: perfiles con tabId="45h" + antiguos sin tabId (los del prefijo perfil_45h_ o perfil_unif_ sin tabId)
+        // 40H ve: solo perfiles con tabId="40h" (los antiguos sin tabId NO van a 40H)
+        const lista2 = lista.filter(Boolean).filter(p => {
+          if (!tabId) return true; // sin tabId → no filtrar (no debería pasar)
+          if (p.tabId === tabId) return true;
+          // Caso de perfiles antiguos sin tabId: van a 45H
+          if (!p.tabId && tabId === "45h") return true;
+          // Perfiles legacy en prefijo perfil_45h_ sin tabId → 45H
+          if (!p.tabId && tabId === "45h" && p.key && p.key.startsWith("perfil_45h_")) return true;
+          // Perfiles legacy en prefijo perfil_40h_ sin tabId → 40H
+          if (!p.tabId && tabId === "40h" && p.key && p.key.startsWith("perfil_40h_")) return true;
+          return false;
+        });
+        setPerfiles(lista2.sort((a,b) => (b.timestamp||0) - (a.timestamp||0)));
       } catch (e) { console.error("Error cargando perfiles:", e); }
       setCargando(false);
     })();
@@ -4000,31 +4014,33 @@ function CosteEmpresa() {
 <meta charset="UTF-8">
 <title>${titulo} · Coste Empresa</title>
 <style>
-  @page { size: A4 landscape; margin: 12mm; }
-  body { font-family: 'Courier New', monospace; color: #1a1a1a; font-size: 9px; margin: 0; padding: 0; position: relative; }
-  .watermark { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-28deg); font-size: 100px; font-weight: 900; color: rgba(160, 69, 69, 0.07); letter-spacing: 0.15em; z-index: 0; pointer-events: none; white-space: nowrap; line-height: 0.9; text-align: center; }
+  @page { size: A4 portrait; margin: 10mm; }
+  body { font-family: 'Courier New', monospace; color: #1a1a1a; font-size: 8.5px; margin: 0; padding: 0; position: relative; }
+  .watermark { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-28deg); font-weight: 900; color: rgba(160, 69, 69, 0.10); letter-spacing: 0.15em; z-index: 9999; pointer-events: none; text-align: center; white-space: nowrap; line-height: 0.95; }
+  .watermark .wm1 { font-size: 90px; display: block; }
+  .watermark .wm2 { font-size: 38px; display: block; letter-spacing: 0.20em; margin-top: 6px; }
   .content { position: relative; z-index: 1; }
-  .banner { background: #1a1a1a; color: #f0e6d0; padding: 12px 18px; display: flex; justify-content: space-between; align-items: center; border-radius: 4px; margin-bottom: 14px; }
-  .logo { background: #c8a96e; color: #1a1a1a; padding: 6px 10px; font-weight: 700; letter-spacing: 0.1em; border-radius: 3px; font-size: 10px; }
+  .banner { background: #1a1a1a; color: #f0e6d0; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; border-radius: 4px; margin-bottom: 12px; }
+  .logo { background: #c8a96e; color: #1a1a1a; padding: 5px 8px; font-weight: 700; letter-spacing: 0.1em; border-radius: 3px; font-size: 9px; }
   .title-right { text-align: right; }
-  .subtitle { font-size: 8px; color: #c8a96e; letter-spacing: 0.25em; text-transform: uppercase; }
-  .title { font-size: 14px; font-weight: 700; letter-spacing: 0.07em; }
-  .meta { font-size: 8px; color: #aaa; margin-top: 2px; }
-  .section { margin-bottom: 14px; }
-  h2 { font-size: 9px; letter-spacing: 0.18em; color: #b8864a; text-transform: uppercase; margin: 0 0 8px; padding-bottom: 6px; border-bottom: 1px solid #e0ddd8; }
+  .subtitle { font-size: 7px; color: #c8a96e; letter-spacing: 0.25em; text-transform: uppercase; }
+  .title { font-size: 12px; font-weight: 700; letter-spacing: 0.07em; }
+  .meta { font-size: 7px; color: #aaa; margin-top: 2px; }
+  .section { margin-bottom: 12px; }
+  h2 { font-size: 8px; letter-spacing: 0.18em; color: #b8864a; text-transform: uppercase; margin: 0 0 6px; padding-bottom: 5px; border-bottom: 1px solid #e0ddd8; }
   h2.red { color: #a04545; }
-  .datos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
-  .datos > div { background: #fafaf7; border: 1px solid #e0ddd8; border-radius: 3px; padding: 6px 8px; }
-  .datos .l { font-size: 7px; color: #888; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 2px; }
-  .datos .v { font-size: 10px; font-weight: 700; }
-  table { width: 100%; border-collapse: collapse; font-size: 8.5px; }
-  th { background: #f0ede8; color: #666; font-size: 7.5px; letter-spacing: 0.05em; text-transform: uppercase; font-weight: 700; padding: 5px 4px; border-bottom: 1px solid #d0ccc6; text-align: right; }
+  .datos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
+  .datos > div { background: #fafaf7; border: 1px solid #e0ddd8; border-radius: 3px; padding: 5px 7px; }
+  .datos .l { font-size: 6.5px; color: #888; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 2px; }
+  .datos .v { font-size: 9px; font-weight: 700; }
+  table { width: 100%; border-collapse: collapse; font-size: 7px; table-layout: fixed; }
+  th { background: #f0ede8; color: #666; font-size: 6.5px; letter-spacing: 0.03em; text-transform: uppercase; font-weight: 700; padding: 4px 2px; border-bottom: 1px solid #d0ccc6; text-align: right; word-wrap: break-word; }
   th.first { text-align: left; }
   th.gold { color: #b8864a; }
   th.red { color: #a04545; }
-  th .pct { display: block; font-weight: 400; font-size: 7px; color: #999; margin-top: 1px; }
-  td { padding: 4px 4px; border-bottom: 1px solid #eae7e2; }
-  td.m { font-weight: 600; text-transform: capitalize; }
+  th .pct { display: block; font-weight: 400; font-size: 6px; color: #999; margin-top: 1px; }
+  td { padding: 3px 2px; border-bottom: 1px solid #eae7e2; word-wrap: break-word; }
+  td.m { font-weight: 600; text-transform: capitalize; font-size: 7px; }
   td.n { text-align: right; }
   td.b { color: #3a6898; }
   td.o { color: #b07030; }
@@ -4033,15 +4049,15 @@ function CosteEmpresa() {
   td.gold { color: #b8864a; }
   td.red { color: #a04545; }
   td.z { color: #ccc; }
-  .small { font-size: 7px; color: #888; }
+  .small { font-size: 6px; color: #888; }
   tr.total td { background: #fdf8f0; font-weight: 700; border-top: 1.5px solid #d8a8a8; }
-  tr.total td.first { color: #6a2020; text-transform: uppercase; letter-spacing: 0.1em; font-size: 8px; }
+  tr.total td.first { color: #6a2020; text-transform: uppercase; letter-spacing: 0.08em; font-size: 7px; }
   .ce table tr.total td { background: #fdf0f0; }
-  .resumen { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 10px; }
-  .resumen > div { background: #f0ede8; border: 1px solid #e0ddd8; border-radius: 3px; padding: 7px; text-align: center; }
-  .resumen .l { font-size: 7px; color: #666; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 3px; }
-  .resumen .v { font-size: 11px; font-weight: 700; }
-  .resumen .vL { font-size: 13px; font-weight: 700; }
+  .resumen { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-top: 8px; }
+  .resumen > div { background: #f0ede8; border: 1px solid #e0ddd8; border-radius: 3px; padding: 6px; text-align: center; }
+  .resumen .l { font-size: 6.5px; color: #666; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 3px; }
+  .resumen .v { font-size: 10px; font-weight: 700; }
+  .resumen .vL { font-size: 12px; font-weight: 700; }
   .reglas { margin-top: 10px; padding: 8px 10px; background: #fafaf7; border: 1px solid #e0ddd8; border-radius: 3px; font-size: 7.5px; color: #666; line-height: 1.5; }
   .reglas b { color: #444; }
   .legal { margin-top: 14px; padding: 10px 12px; background: #fafaf7; border: 1px solid #e8e4de; border-radius: 3px; }
@@ -4057,7 +4073,7 @@ function CosteEmpresa() {
 </style>
 </head>
 <body>
-<div class="watermark">COSTE EMPRESA · CONFIDENCIAL</div>
+<div class="watermark"><span class="wm1">CONFIDENCIAL</span><span class="wm2">USO INTERNO</span></div>
 <div class="content">
 
 <div class="no-print">
@@ -4327,12 +4343,28 @@ function CosteEmpresa() {
               </div>
             </div>
           </div>
-          <button
-            onClick={() => setPerfilCargado(null)}
-            style={{ background: "transparent", color: "#aaa", border: "1px solid #555", padding: "6px 12px", borderRadius: 4, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Courier New',monospace" }}
-          >
-            ← Cambiar perfil
-          </button>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <button
+              onClick={exportarCSV}
+              style={{ background: "transparent", color: "#5a8a5a", border: "1px solid #5a8a5a", padding: "6px 12px", borderRadius: 4, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Courier New',monospace" }}
+              title="Descargar CSV"
+            >
+              📊 CSV
+            </button>
+            <button
+              onClick={exportarPDF}
+              style={{ background: "transparent", color: "#d8a0a0", border: "1px solid #a04545", padding: "6px 12px", borderRadius: 4, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Courier New',monospace" }}
+              title="Generar PDF (se abre en otra ventana para imprimir o guardar como PDF)"
+            >
+              📄 PDF
+            </button>
+            <button
+              onClick={() => setPerfilCargado(null)}
+              style={{ background: "transparent", color: "#aaa", border: "1px solid #555", padding: "6px 12px", borderRadius: 4, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Courier New',monospace" }}
+            >
+              ← Cambiar perfil
+            </button>
+          </div>
         </div>
       </div>
 
@@ -4479,22 +4511,7 @@ function CosteEmpresa() {
             <div style={{ ...P, borderColor: "#d8c0c0" }}>
               <div style={{ fontSize: 10, letterSpacing: "0.2em", color: "#a04545", textTransform: "uppercase", marginBottom: 14, paddingBottom: 12, borderBottom: "1px solid #e8d0d0", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
                 <span>▸ Coste Empresa (Mensual)</span>
-                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                  <button
-                    onClick={exportarCSV}
-                    style={{ background: "#fff", color: "#1a7a58", border: "1px solid #1a7a58", padding: "5px 12px", borderRadius: 4, cursor: "pointer", fontSize: 10, fontFamily: "'Courier New',monospace", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}
-                    title="Descargar CSV"
-                  >
-                    📊 CSV
-                  </button>
-                  <button
-                    onClick={exportarPDF}
-                    style={{ background: "#fff", color: "#a04545", border: "1px solid #a04545", padding: "5px 12px", borderRadius: 4, cursor: "pointer", fontSize: 10, fontFamily: "'Courier New',monospace", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}
-                    title="Generar PDF (se abre en otra ventana para imprimir o guardar como PDF)"
-                  >
-                    📄 PDF
-                  </button>
-                </div>
+                <span style={{ fontSize: 9, color: "#888", textTransform: "none", letterSpacing: "0.05em" }}>Importes que paga la empresa</span>
               </div>
 
               <div style={{ overflowX: "auto" }}>
