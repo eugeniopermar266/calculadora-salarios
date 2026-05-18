@@ -436,8 +436,39 @@ const PUESTOS_COAC = [
 function PuestoSelector({ puesto, codigoContable, onPuesto, onCodigoContable }) {
   const [mostrarLista, setMostrarLista] = useState(false);
   const [busqueda, setBusqueda] = useState(puesto || "");
+  const [puestosLista, setPuestosLista] = useState(() => {
+    // Fallback inicial: constante embebida (normalizada al formato {codigo, nombre, categoria})
+    return PUESTOS_COAC.map(p => ({ codigo: p.codigo, nombre: p.puesto, categoria: p.categoria }));
+  });
+  const [cargandoLista, setCargandoLista] = useState(true);
   const inputRef = useRef(null);
   const listaRef = useRef(null);
+
+  // Cargar lista desde Supabase al montar (con fallback silencioso a la constante embebida)
+  useEffect(() => {
+    let cancelado = false;
+    (async () => {
+      try {
+        const data = await listarPuestosCoac();
+        if (cancelado) return;
+        if (Array.isArray(data) && data.length > 0) {
+          // Normalizar a {codigo, nombre, categoria}
+          setPuestosLista(data.map(p => ({
+            codigo: p.codigo,
+            nombre: p.nombre,
+            categoria: p.categoria,
+          })));
+        }
+        // Si data está vacío, se queda con el fallback embebido
+      } catch (e) {
+        // Si Supabase falla, mantenemos la constante embebida (no rompemos la app)
+        console.warn("listarPuestosCoac falló, usando lista embebida:", e.message);
+      } finally {
+        if (!cancelado) setCargandoLista(false);
+      }
+    })();
+    return () => { cancelado = true; };
+  }, []);
 
   // Sincronizar búsqueda cuando cambia el puesto externamente (ej. al cargar perfil)
   useEffect(() => {
@@ -461,8 +492,8 @@ function PuestoSelector({ puesto, codigoContable, onPuesto, onCodigoContable }) 
     .normalize("NFD").replace(/[\u0300-\u036f]/g, ""); // sin acentos
   const q = norm(busqueda);
   const puestosFiltrados = q
-    ? PUESTOS_COAC.filter(p => norm(p.puesto).includes(q) || norm(p.codigo).includes(q) || norm(p.categoria).includes(q))
-    : PUESTOS_COAC;
+    ? puestosLista.filter(p => norm(p.nombre).includes(q) || norm(p.codigo).includes(q) || norm(p.categoria).includes(q))
+    : puestosLista;
 
   // Agrupar por categoría
   const grupos = {};
@@ -472,17 +503,17 @@ function PuestoSelector({ puesto, codigoContable, onPuesto, onCodigoContable }) 
   }
 
   const seleccionar = (p) => {
-    onPuesto(p.puesto);
+    onPuesto(p.nombre);
     onCodigoContable(p.codigo);
-    setBusqueda(p.puesto);
+    setBusqueda(p.nombre);
     setMostrarLista(false);
   };
 
   const onInputChange = (val) => {
     setBusqueda(val);
     onPuesto(val);
-    // Si lo que escribe no coincide con ningún puesto exactamente, limpiar código
-    const match = PUESTOS_COAC.find(p => p.puesto === val);
+    // Si lo que escribe coincide exactamente con algún puesto, asignar su código
+    const match = puestosLista.find(p => p.nombre === val);
     if (match) onCodigoContable(match.codigo);
     else onCodigoContable(""); // texto libre = sin código
   };
@@ -541,12 +572,12 @@ function PuestoSelector({ puesto, codigoContable, onPuesto, onCodigoContable }) 
                     style={{
                       padding: "7px 14px", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center",
                       borderBottom: "1px solid #f0ede8", fontSize: 11,
-                      background: p.puesto === puesto ? "rgba(184,134,74,0.1)" : "transparent",
+                      background: p.nombre === puesto ? "rgba(184,134,74,0.1)" : "transparent",
                     }}
                     onMouseEnter={e => e.currentTarget.style.background = "rgba(184,134,74,0.15)"}
-                    onMouseLeave={e => e.currentTarget.style.background = p.puesto === puesto ? "rgba(184,134,74,0.1)" : "transparent"}
+                    onMouseLeave={e => e.currentTarget.style.background = p.nombre === puesto ? "rgba(184,134,74,0.1)" : "transparent"}
                   >
-                    <span style={{ color: "#1a1a1a", fontWeight: p.puesto === puesto ? 700 : 400 }}>{p.puesto}</span>
+                    <span style={{ color: "#1a1a1a", fontWeight: p.nombre === puesto ? 700 : 400 }}>{p.nombre}</span>
                     <span style={{ color: "#888", fontSize: 10, fontFamily: "'Courier New',monospace" }}>{p.codigo}</span>
                   </div>
                 ))}
@@ -3640,6 +3671,124 @@ async function registrarLog(usuarioNombre, tipo, detalle = "") {
   }
 }
 
+// --- PUESTOS COAC (catálogo en Supabase) ---
+// Listar todos los puestos (público, no requiere admin)
+async function listarPuestosCoac() {
+  const data = await supabaseFetch(`puestos_coac?select=*&order=orden.asc,nombre.asc`);
+  return data || [];
+}
+
+// Crear puesto manualmente
+async function crearPuestoCoac(adminPin, { codigo, nombre, categoria, orden = 0 }) {
+  return supabaseFetch(`puestos_coac`, {
+    method: "POST",
+    headers: { "x-admin-pin": adminPin, "Prefer": "return=representation" },
+    body: JSON.stringify({ codigo, nombre, categoria, orden }),
+  });
+}
+
+// Actualizar puesto
+async function actualizarPuestoCoac(adminPin, id, cambios) {
+  return supabaseFetch(`puestos_coac?id=eq.${id}`, {
+    method: "PATCH",
+    headers: { "x-admin-pin": adminPin, "Prefer": "return=representation" },
+    body: JSON.stringify(cambios),
+  });
+}
+
+// Borrar puesto
+async function borrarPuestoCoac(adminPin, id) {
+  return supabaseFetch(`puestos_coac?id=eq.${id}`, {
+    method: "DELETE",
+    headers: { "x-admin-pin": adminPin },
+  });
+}
+
+// Reemplazar TODOS los puestos: borra todos y carga los nuevos (usado por importador Excel)
+async function reemplazarTodosPuestos(adminPin, nuevosPuestos) {
+  // 1. Borrar todos
+  // Usamos id=gte.0 que matchea todos
+  await supabaseFetch(`puestos_coac?id=gte.0`, {
+    method: "DELETE",
+    headers: { "x-admin-pin": adminPin },
+  });
+  // 2. Insertar nuevos en lotes (Supabase tiene límite de payload, 200 a la vez es seguro)
+  const BATCH = 200;
+  for (let i = 0; i < nuevosPuestos.length; i += BATCH) {
+    const lote = nuevosPuestos.slice(i, i + BATCH);
+    await supabaseFetch(`puestos_coac`, {
+      method: "POST",
+      headers: { "x-admin-pin": adminPin, "Prefer": "return=minimal" },
+      body: JSON.stringify(lote),
+    });
+  }
+  return { ok: true, total: nuevosPuestos.length };
+}
+
+// --- SheetJS (xlsx) cargado dinámicamente desde CDN solo cuando se necesite ---
+let _xlsxPromise = null;
+function cargarXLSX() {
+  if (typeof window === "undefined") return Promise.reject(new Error("No window"));
+  if (window.XLSX) return Promise.resolve(window.XLSX);
+  if (_xlsxPromise) return _xlsxPromise;
+  _xlsxPromise = new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = "https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js";
+    s.onload = () => {
+      if (window.XLSX) resolve(window.XLSX);
+      else reject(new Error("XLSX no cargado"));
+    };
+    s.onerror = () => reject(new Error("No se pudo cargar SheetJS desde CDN"));
+    document.head.appendChild(s);
+  });
+  return _xlsxPromise;
+}
+
+// Parsear archivo Excel con el formato original del COAC
+// Devuelve { puestos: [{codigo, nombre, categoria, orden}], avisos: [] }
+async function parsearExcelPuestos(archivo) {
+  const XLSX = await cargarXLSX();
+  const buf = await archivo.arrayBuffer();
+  const wb = XLSX.read(buf, { type: "array" });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const filas = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+
+  let categoriaActual = "";
+  const puestos = [];
+  const avisos = [];
+  let orden = 0;
+
+  for (let i = 0; i < filas.length; i++) {
+    const fila = filas[i];
+    if (!fila || fila.length < 2) continue;
+    const codigo = (fila[0] != null ? String(fila[0]).trim() : "");
+    const nombre = (fila[1] != null ? String(fila[1]).trim() : "");
+
+    // Header
+    if (codigo === "CODIGO CONTABLE" && nombre === "EQUIPO TECNICO") continue;
+
+    // Fila totalmente vacía
+    if (!codigo && !nombre) continue;
+
+    // Fila de categoría (código vacío, nombre con texto)
+    if (!codigo && nombre) {
+      categoriaActual = nombre;
+      continue;
+    }
+
+    // Fila de puesto
+    if (codigo && nombre) {
+      if (!categoriaActual) {
+        avisos.push(`Fila ${i + 1}: puesto "${nombre}" sin categoría previa, se asigna "SIN CATEGORÍA"`);
+        categoriaActual = "SIN CATEGORÍA";
+      }
+      puestos.push({ codigo, nombre, categoria: categoriaActual, orden: orden++ });
+    }
+  }
+  return { puestos, avisos };
+}
+
+
 // Listar logs (solo admin). Permite filtros y limit
 async function listarLogs(adminPin, { usuario, tipo, limit = 200 } = {}) {
   const params = new URLSearchParams();
@@ -4176,6 +4325,359 @@ function PanelLogs({ usuarioActual, onCerrar }) {
 
         <div style={{ marginTop: 12, fontSize: 9, color: "#888", fontFamily: "'Courier New',monospace", letterSpacing: "0.05em", textAlign: "center" }}>
           Mostrando {logs.length} registro{logs.length !== 1 ? "s" : ""}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════
+// PANEL ADMIN: GESTIÓN DE PUESTOS COAC
+// ═══════════════════════════════════════════════════════════════════════
+function PanelPuestos({ usuarioActual, onCerrar }) {
+  const [puestos, setPuestos] = useState([]);
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState(null);
+  const [mensaje, setMensaje] = useState(null);
+  const [busqueda, setBusqueda] = useState("");
+  const [filtroCategoria, setFiltroCategoria] = useState("");
+  const [editandoId, setEditandoId] = useState(null);
+  const [formEdit, setFormEdit] = useState({ codigo: "", nombre: "", categoria: "" });
+  const [mostrarFormNuevo, setMostrarFormNuevo] = useState(false);
+  const [formNuevo, setFormNuevo] = useState({ codigo: "", nombre: "", categoria: "" });
+  const [importando, setImportando] = useState(false);
+  const [previewImport, setPreviewImport] = useState(null); // {puestos, avisos}
+  const fileInputRef = useRef(null);
+
+  const adminPin = usuarioActual?.pin;
+
+  const recargar = async () => {
+    setCargando(true);
+    setError(null);
+    try {
+      const lista = await listarPuestosCoac();
+      setPuestos(lista || []);
+    } catch (e) {
+      setError("Error al cargar puestos: " + e.message);
+    } finally {
+      setCargando(false);
+    }
+  };
+
+  useEffect(() => { recargar(); }, []);
+
+  const showMsg = (texto, tipo = "ok") => {
+    setMensaje({ texto, tipo });
+    setTimeout(() => setMensaje(null), 4000);
+  };
+
+  // Filtrado por búsqueda y categoría
+  const norm = (s) => (s || "").toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const q = norm(busqueda);
+  const puestosFiltrados = puestos.filter(p => {
+    if (filtroCategoria && p.categoria !== filtroCategoria) return false;
+    if (!q) return true;
+    return norm(p.nombre).includes(q) || norm(p.codigo).includes(q) || norm(p.categoria).includes(q);
+  });
+
+  // Categorías únicas
+  const categorias = [...new Set(puestos.map(p => p.categoria))].sort();
+
+  // Editar
+  const empezarEditar = (p) => {
+    setEditandoId(p.id);
+    setFormEdit({ codigo: p.codigo, nombre: p.nombre, categoria: p.categoria });
+  };
+  const cancelarEditar = () => {
+    setEditandoId(null);
+    setFormEdit({ codigo: "", nombre: "", categoria: "" });
+  };
+  const guardarEdicion = async () => {
+    if (!formEdit.codigo.trim() || !formEdit.nombre.trim() || !formEdit.categoria.trim()) {
+      showMsg("Todos los campos son obligatorios", "err");
+      return;
+    }
+    try {
+      await actualizarPuestoCoac(adminPin, editandoId, {
+        codigo: formEdit.codigo.trim(),
+        nombre: formEdit.nombre.trim(),
+        categoria: formEdit.categoria.trim(),
+      });
+      showMsg("Puesto actualizado", "ok");
+      cancelarEditar();
+      await recargar();
+    } catch (e) {
+      showMsg("Error: " + e.message, "err");
+    }
+  };
+
+  // Borrar
+  const borrar = async (p) => {
+    if (!confirm(`¿Borrar "${p.nombre}" (${p.codigo})?`)) return;
+    try {
+      await borrarPuestoCoac(adminPin, p.id);
+      showMsg("Puesto borrado", "ok");
+      await recargar();
+    } catch (e) {
+      showMsg("Error: " + e.message, "err");
+    }
+  };
+
+  // Añadir manual
+  const crearManual = async () => {
+    if (!formNuevo.codigo.trim() || !formNuevo.nombre.trim() || !formNuevo.categoria.trim()) {
+      showMsg("Todos los campos son obligatorios", "err");
+      return;
+    }
+    try {
+      const maxOrden = puestos.reduce((m, p) => Math.max(m, p.orden || 0), 0);
+      await crearPuestoCoac(adminPin, {
+        codigo: formNuevo.codigo.trim(),
+        nombre: formNuevo.nombre.trim(),
+        categoria: formNuevo.categoria.trim(),
+        orden: maxOrden + 1,
+      });
+      showMsg("Puesto añadido", "ok");
+      setFormNuevo({ codigo: "", nombre: "", categoria: "" });
+      setMostrarFormNuevo(false);
+      await recargar();
+    } catch (e) {
+      showMsg("Error: " + e.message, "err");
+    }
+  };
+
+  // Importar Excel — paso 1: parsear y mostrar preview
+  const onArchivoSeleccionado = async (e) => {
+    const archivo = e.target.files?.[0];
+    if (!archivo) return;
+    if (!archivo.name.toLowerCase().endsWith(".xlsx") && !archivo.name.toLowerCase().endsWith(".xls")) {
+      showMsg("Solo archivos .xlsx o .xls", "err");
+      return;
+    }
+    setImportando(true);
+    try {
+      const { puestos: pst, avisos } = await parsearExcelPuestos(archivo);
+      if (pst.length === 0) {
+        showMsg("El archivo no contiene puestos válidos", "err");
+        setImportando(false);
+        return;
+      }
+      setPreviewImport({ puestos: pst, avisos, nombreArchivo: archivo.name });
+    } catch (e) {
+      showMsg("Error parseando Excel: " + e.message, "err");
+    } finally {
+      setImportando(false);
+      // Limpiar el input para poder volver a importar el mismo archivo
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  // Importar Excel — paso 2: confirmar y reemplazar todos
+  const confirmarImportacion = async () => {
+    if (!previewImport) return;
+    setImportando(true);
+    try {
+      await reemplazarTodosPuestos(adminPin, previewImport.puestos);
+      // Registrar log
+      try { registrarLog(usuarioActual.nombre, "import_puestos", `Importados ${previewImport.puestos.length} puestos de ${previewImport.nombreArchivo}`); } catch {}
+      showMsg(`${previewImport.puestos.length} puestos cargados`, "ok");
+      setPreviewImport(null);
+      await recargar();
+    } catch (e) {
+      showMsg("Error importando: " + e.message, "err");
+    } finally {
+      setImportando(false);
+    }
+  };
+
+  // Exportar Excel (backup)
+  const exportarExcel = async () => {
+    try {
+      const XLSX = await cargarXLSX();
+      // Recrear el formato original: filas de categoría intercaladas
+      const filas = [["CODIGO CONTABLE", "EQUIPO TECNICO"]];
+      let catActual = "";
+      const ordenado = [...puestos].sort((a, b) => (a.orden || 0) - (b.orden || 0));
+      for (const p of ordenado) {
+        if (p.categoria !== catActual) {
+          filas.push(["", p.categoria]);
+          catActual = p.categoria;
+        }
+        filas.push([p.codigo, p.nombre]);
+      }
+      const ws = XLSX.utils.aoa_to_sheet(filas);
+      ws["!cols"] = [{ wch: 18 }, { wch: 50 }];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Puestos COAC");
+      const fecha = new Date().toISOString().slice(0, 10);
+      XLSX.writeFile(wb, `Backup_Puestos_COAC_${fecha}.xlsx`);
+    } catch (e) {
+      showMsg("Error exportando: " + e.message, "err");
+    }
+  };
+
+  // Estilos
+  const overlayStyle = {
+    position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+    background: "rgba(0,0,0,0.7)", zIndex: 1000, display: "flex",
+    alignItems: "flex-start", justifyContent: "center", padding: "30px 16px", overflowY: "auto",
+  };
+  const modalStyle = {
+    background: "#f0ede8", borderRadius: 8, maxWidth: 1100, width: "100%",
+    fontFamily: "'Courier New',monospace", color: "#1a1a1a",
+    boxShadow: "0 10px 40px rgba(0,0,0,0.5)",
+  };
+  const headerStyle = {
+    background: "#1a1a1a", color: "#f0e6d0", padding: "14px 18px",
+    display: "flex", justifyContent: "space-between", alignItems: "center",
+    borderRadius: "8px 8px 0 0",
+  };
+  const btnStyle = {
+    background: "transparent", color: "#c8a96e", border: "1px solid #c8a96e",
+    padding: "5px 12px", borderRadius: 4, cursor: "pointer",
+    fontSize: 10, fontFamily: "'Courier New',monospace",
+    fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase",
+  };
+  const btnDanger = { ...btnStyle, color: "#c85050", borderColor: "#c85050" };
+  const btnOk = { ...btnStyle, color: "#5a8a5a", borderColor: "#5a8a5a" };
+  const inp = {
+    padding: "7px 10px", border: "1px solid #c0bcb5", borderRadius: 4,
+    fontFamily: "'Courier New',monospace", fontSize: 11, background: "#fff",
+  };
+
+  return (
+    <div style={overlayStyle} onClick={(e) => { if (e.target === e.currentTarget) onCerrar(); }}>
+      <div style={modalStyle}>
+        <div style={headerStyle}>
+          <div>
+            <div style={{ fontSize: 9, color: "#c8a96e", letterSpacing: "0.2em", textTransform: "uppercase" }}>Panel admin</div>
+            <div style={{ fontSize: 14, fontWeight: 700, marginTop: 2 }}>📋 Puestos COAC</div>
+          </div>
+          <button onClick={onCerrar} style={{ background: "transparent", color: "#aaa", border: "1px solid #444", padding: "6px 14px", borderRadius: 4, cursor: "pointer", fontSize: 10, fontFamily: "'Courier New',monospace", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>Cerrar</button>
+        </div>
+
+        <div style={{ padding: 20 }}>
+          {error && <div style={{ background: "#fde6e6", border: "1px solid #d8a0a0", color: "#7a2020", padding: "10px 14px", borderRadius: 4, marginBottom: 14, fontSize: 11 }}>{error}</div>}
+          {mensaje && <div style={{ background: mensaje.tipo === "ok" ? "#e6f4e6" : "#fde6e6", border: `1px solid ${mensaje.tipo === "ok" ? "#a0d0a0" : "#d8a0a0"}`, color: mensaje.tipo === "ok" ? "#2a5a2a" : "#7a2020", padding: "10px 14px", borderRadius: 4, marginBottom: 14, fontSize: 11 }}>{mensaje.texto}</div>}
+
+          {/* Preview de importación */}
+          {previewImport && (
+            <div style={{ background: "#fff3d6", border: "2px solid #c8a96e", borderRadius: 6, padding: 16, marginBottom: 18 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#7a5a2a", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 10 }}>⚠ Confirmar importación</div>
+              <div style={{ fontSize: 12, marginBottom: 10 }}>
+                Archivo: <strong>{previewImport.nombreArchivo}</strong><br/>
+                Puestos a cargar: <strong>{previewImport.puestos.length}</strong><br/>
+                Esto <strong style={{ color: "#a04545" }}>BORRARÁ los {puestos.length} puestos actuales</strong> y los reemplazará por los nuevos del Excel.
+              </div>
+              {previewImport.avisos.length > 0 && (
+                <div style={{ background: "#fff", padding: "8px 10px", borderRadius: 4, marginBottom: 10, fontSize: 10, maxHeight: 100, overflowY: "auto" }}>
+                  <strong>Avisos:</strong>
+                  <ul style={{ margin: "4px 0 0 16px", padding: 0 }}>
+                    {previewImport.avisos.map((a, i) => <li key={i}>{a}</li>)}
+                  </ul>
+                </div>
+              )}
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={confirmarImportacion} disabled={importando} style={{ ...btnDanger, padding: "8px 16px" }}>
+                  {importando ? "Importando..." : "✓ Confirmar y reemplazar todo"}
+                </button>
+                <button onClick={() => setPreviewImport(null)} disabled={importando} style={btnStyle}>Cancelar</button>
+              </div>
+            </div>
+          )}
+
+          {/* Barra de acciones */}
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16, alignItems: "center" }}>
+            <input
+              type="text"
+              placeholder="🔍 Buscar nombre, código o categoría..."
+              value={busqueda}
+              onChange={e => setBusqueda(e.target.value)}
+              style={{ ...inp, flex: 1, minWidth: 220 }}
+            />
+            <select value={filtroCategoria} onChange={e => setFiltroCategoria(e.target.value)} style={inp}>
+              <option value="">Todas las categorías</option>
+              {categorias.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".xlsx,.xls"
+              onChange={onArchivoSeleccionado}
+              style={{ display: "none" }}
+            />
+            <button onClick={() => fileInputRef.current?.click()} disabled={importando} style={btnStyle}>📥 Importar Excel</button>
+            <button onClick={exportarExcel} style={btnStyle}>📤 Exportar Excel</button>
+            <button onClick={() => setMostrarFormNuevo(!mostrarFormNuevo)} style={btnOk}>+ Añadir</button>
+          </div>
+
+          {/* Formulario nuevo */}
+          {mostrarFormNuevo && (
+            <div style={{ background: "#fff", border: "1px solid #c8a96e", borderRadius: 6, padding: 14, marginBottom: 14 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: "#7a5a2a", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 8 }}>Nuevo puesto</div>
+              <div style={{ display: "grid", gridTemplateColumns: "150px 1fr 1fr auto", gap: 8 }}>
+                <input type="text" placeholder="Código" value={formNuevo.codigo} onChange={e => setFormNuevo({ ...formNuevo, codigo: e.target.value })} style={inp} />
+                <input type="text" placeholder="Nombre" value={formNuevo.nombre} onChange={e => setFormNuevo({ ...formNuevo, nombre: e.target.value })} style={inp} />
+                <input type="text" placeholder="Categoría" value={formNuevo.categoria} onChange={e => setFormNuevo({ ...formNuevo, categoria: e.target.value })} list="cats-nuevo" style={inp} />
+                <datalist id="cats-nuevo">
+                  {categorias.map(c => <option key={c} value={c} />)}
+                </datalist>
+                <button onClick={crearManual} style={btnOk}>✓ Crear</button>
+              </div>
+            </div>
+          )}
+
+          {/* Lista */}
+          {cargando ? (
+            <div style={{ textAlign: "center", padding: 30, color: "#888", fontSize: 11 }}>Cargando puestos...</div>
+          ) : (
+            <div style={{ background: "#fff", border: "1px solid #e0ddd8", borderRadius: 6, maxHeight: 500, overflowY: "auto" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "130px 1fr 1fr 110px", gap: 8, padding: "8px 12px", background: "#f0ede8", borderBottom: "1px solid #d0ccc6", fontSize: 9, letterSpacing: "0.1em", textTransform: "uppercase", color: "#666", fontWeight: 700, position: "sticky", top: 0 }}>
+                <div>Código</div><div>Nombre</div><div>Categoría</div><div style={{ textAlign: "right" }}>Acciones</div>
+              </div>
+              {puestosFiltrados.length === 0 ? (
+                <div style={{ padding: 24, textAlign: "center", color: "#888", fontSize: 11, fontStyle: "italic" }}>
+                  {puestos.length === 0 ? "No hay puestos. Importa un Excel o añade manualmente." : "Sin resultados con los filtros aplicados."}
+                </div>
+              ) : (
+                puestosFiltrados.map(p => editandoId === p.id ? (
+                  <div key={p.id} style={{ display: "grid", gridTemplateColumns: "130px 1fr 1fr 110px", gap: 8, padding: "7px 12px", borderBottom: "1px solid #eae7e2", background: "#fff8e6", alignItems: "center" }}>
+                    <input type="text" value={formEdit.codigo} onChange={e => setFormEdit({ ...formEdit, codigo: e.target.value })} style={{ ...inp, padding: "4px 6px" }} />
+                    <input type="text" value={formEdit.nombre} onChange={e => setFormEdit({ ...formEdit, nombre: e.target.value })} style={{ ...inp, padding: "4px 6px" }} />
+                    <input type="text" value={formEdit.categoria} onChange={e => setFormEdit({ ...formEdit, categoria: e.target.value })} list="cats-edit" style={{ ...inp, padding: "4px 6px" }} />
+                    <datalist id="cats-edit">
+                      {categorias.map(c => <option key={c} value={c} />)}
+                    </datalist>
+                    <div style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}>
+                      <button onClick={guardarEdicion} title="Guardar" style={{ ...btnOk, padding: "3px 8px", fontSize: 9 }}>✓</button>
+                      <button onClick={cancelarEditar} title="Cancelar" style={{ ...btnStyle, padding: "3px 8px", fontSize: 9 }}>✗</button>
+                    </div>
+                  </div>
+                ) : (
+                  <div key={p.id} style={{ display: "grid", gridTemplateColumns: "130px 1fr 1fr 110px", gap: 8, padding: "7px 12px", borderBottom: "1px solid #eae7e2", fontSize: 11, alignItems: "center" }}>
+                    <div style={{ color: "#888", fontFamily: "'Courier New',monospace" }}>{p.codigo}</div>
+                    <div style={{ fontWeight: 700 }}>{p.nombre}</div>
+                    <div style={{ color: "#666", fontSize: 10 }}>{p.categoria}</div>
+                    <div style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}>
+                      <button onClick={() => empezarEditar(p)} title="Editar" style={{ ...btnStyle, padding: "3px 8px", fontSize: 9 }}>✏</button>
+                      <button onClick={() => borrar(p)} title="Borrar" style={{ ...btnDanger, padding: "3px 8px", fontSize: 9 }}>🗑</button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+
+          <div style={{ marginTop: 12, fontSize: 10, color: "#888", textAlign: "center" }}>
+            {puestosFiltrados.length} de {puestos.length} puesto{puestos.length !== 1 ? "s" : ""}
+            {categorias.length > 0 && ` · ${categorias.length} categorías`}
+          </div>
+
+          <div style={{ marginTop: 14, padding: "10px 14px", background: "#fafaf7", borderRadius: 4, border: "1px solid #e0ddd8", fontSize: 10, color: "#666", lineHeight: 1.6 }}>
+            <strong style={{ color: "#444" }}>Formato Excel:</strong> El importador acepta el formato original del Listado COAC: columna A "CODIGO CONTABLE", columna B "EQUIPO TECNICO", con filas de categoría intercaladas (código vacío, nombre = categoría).<br/>
+            <strong style={{ color: "#a04545" }}>⚠ Importar REEMPLAZA todos los puestos existentes.</strong> Exporta primero un backup si quieres conservarlos.
+          </div>
         </div>
       </div>
     </div>
@@ -5123,7 +5625,7 @@ function CosteEmpresa() {
 // BANNER SUPERIOR (sesión actual)
 // ═══════════════════════════════════════════════════════════════════════
 
-function BannerSesion({ usuario, onLogout, onAdmin, onLogs, tab, onChangeTab }) {
+function BannerSesion({ usuario, onLogout, onAdmin, onLogs, onPuestos, tab, onChangeTab }) {
   const tabBtn = (id, label) => {
     const activa = tab === id;
     return (
@@ -5211,6 +5713,7 @@ function BannerSesion({ usuario, onLogout, onAdmin, onLogs, tab, onChangeTab }) 
           <>
             <button onClick={onAdmin} style={{ background: "transparent", color: "#c8a96e", border: "1px solid #c8a96e", padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontSize: 10, fontFamily: "'Courier New',monospace", fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" }}>⚙ Usuarios</button>
             <button onClick={onLogs} style={{ background: "transparent", color: "#c8a96e", border: "1px solid #c8a96e", padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontSize: 10, fontFamily: "'Courier New',monospace", fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" }}>📊 Logs</button>
+            <button onClick={onPuestos} style={{ background: "transparent", color: "#c8a96e", border: "1px solid #c8a96e", padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontSize: 10, fontFamily: "'Courier New',monospace", fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" }}>📋 Puestos</button>
           </>
         )}
         <button onClick={onLogout} style={{ background: "transparent", color: "#aaa", border: "1px solid #444", padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontSize: 10, fontFamily: "'Courier New',monospace", letterSpacing: "0.1em", textTransform: "uppercase" }}>Cerrar sesión</button>
@@ -5229,6 +5732,7 @@ export default function App() {
   const [comprobando, setComprobando] = useState(true);
   const [mostrarAdmin, setMostrarAdmin] = useState(false);
   const [mostrarLogs, setMostrarLogs] = useState(false);
+  const [mostrarPuestos, setMostrarPuestos] = useState(false);
   const [tab, setTab] = useState("iruna45"); // "iruna45" | "tab40"
 
   // ── Carga inicial: lee sesión, comprueba si ha expirado, entra directo si vale
@@ -5349,6 +5853,7 @@ export default function App() {
           onLogout={cerrarSesion}
           onAdmin={() => setMostrarAdmin(true)}
           onLogs={() => setMostrarLogs(true)}
+          onPuestos={() => setMostrarPuestos(true)}
           tab={tab}
           onChangeTab={setTab}
         />
@@ -5361,6 +5866,9 @@ export default function App() {
         )}
         {mostrarLogs && usuario.es_admin && (
           <PanelLogs usuarioActual={usuario} onCerrar={() => setMostrarLogs(false)} />
+        )}
+        {mostrarPuestos && usuario.es_admin && (
+          <PanelPuestos usuarioActual={usuario} onCerrar={() => setMostrarPuestos(false)} />
         )}
       </div>
     </UsuarioContext.Provider>
