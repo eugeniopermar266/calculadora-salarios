@@ -3786,6 +3786,429 @@ function CosteEmpresa() {
     }
   };
 
+  // ═══════════════════════════════════════════════════════════════════
+  // EXPORTAR CSV / PDF de Coste Empresa
+  // ═══════════════════════════════════════════════════════════════════
+
+  // Genera filename base (proyecto_productora_trabajador_costeempresa)
+  const generarFilename = () => {
+    if (!perfilCargado) return "costeempresa";
+    const d = perfilCargado.datos || {};
+    const partes = [d.proyecto, d.productora, d.nombre, "costeempresa"]
+      .filter(Boolean)
+      .map(s => String(s).replace(/[^a-zA-Z0-9]/g, "_"));
+    return partes.join("_") || "costeempresa";
+  };
+
+  // Calcula todas las filas de coste empresa (reutilizable)
+  const calcularFilas = () => {
+    if (!perfilCargado) return { filas: [], totales: null, totalBruto: 0 };
+    const d = perfilCargado.datos || {};
+    const desglose = d._calculado?.desglose45 || d.desglose45 || d.desglose || [];
+    const complementos = d._calculado?.complementos45 || d.complementos45 || d.complementos || [];
+    const esT40 = perfilCargado.tabId === "tab40";
+    const pctIRPFNum = parseFloat(pctIRPF) || 0;
+
+    const filas = desglose.map((mes, i) => {
+      const c = complementos[i] || {};
+      const plusAct = esT40 ? 0 : (mes.plusAct || 0);
+      const total = (mes.base40 || 0) + (mes.vac40 || 0) + (mes.indem40 || 0) + (mes.cobroHx || 0) + plusAct + (c.herramienta || 0) + (c.coche || 0) + (c.vivienda || 0) + (c.seguroVida || 0) + (c.comida || 0);
+      const ce = calcularCosteEmpresaMes({
+        total,
+        vacaciones: mes.vac40 || 0,
+        indem: mes.indem40 || 0,
+        horasExtraEur: mes.cobroHx || 0,
+        plusVivienda: c.vivienda || 0,
+        irpfActivo,
+        pctIRPF: pctIRPFNum,
+        esPrimerMes: i === 0,
+      });
+      return {
+        mes: mes.mes,
+        esCompleto: mes.esCompleto,
+        desde: mes.desde,
+        hasta: mes.hasta,
+        // Importes percibe trabajador
+        base: mes.base40 || 0,
+        vac: mes.vac40 || 0,
+        indem: mes.indem40 || 0,
+        hx: mes.cobroHx || 0,
+        plusAct,
+        coche: c.coche || 0,
+        vivienda: c.vivienda || 0,
+        seguroVida: c.seguroVida || 0,
+        comida: c.comida || 0,
+        total,
+        // Coste empresa
+        ...ce,
+      };
+    });
+
+    const totales = filas.reduce((acc, f) => ({
+      base: acc.base + f.base,
+      vac: acc.vac + f.vac,
+      indem: acc.indem + f.indem,
+      hx: acc.hx + f.hx,
+      plusAct: acc.plusAct + f.plusAct,
+      coche: acc.coche + f.coche,
+      vivienda: acc.vivienda + f.vivienda,
+      seguroVida: acc.seguroVida + f.seguroVida,
+      comida: acc.comida + f.comida,
+      total: acc.total + f.total,
+      ssPrincipal: acc.ssPrincipal + f.ssPrincipal,
+      ssVacaciones: acc.ssVacaciones + f.ssVacaciones,
+      ssHorasExtra: acc.ssHorasExtra + f.ssHorasExtra,
+      imei: acc.imei + f.imei,
+      solidaridad: acc.solidaridad + f.solidaridad,
+      irpfVivienda: acc.irpfVivienda + f.irpfVivienda,
+      gestoria: acc.gestoria + f.gestoria,
+      totalCosteEmpresa: acc.totalCosteEmpresa + f.totalCosteEmpresa,
+    }), { base: 0, vac: 0, indem: 0, hx: 0, plusAct: 0, coche: 0, vivienda: 0, seguroVida: 0, comida: 0, total: 0, ssPrincipal: 0, ssVacaciones: 0, ssHorasExtra: 0, imei: 0, solidaridad: 0, irpfVivienda: 0, gestoria: 0, totalCosteEmpresa: 0 });
+
+    return { filas, totales, totalBruto: totales.total };
+  };
+
+  const exportarCSV = () => {
+    if (!perfilCargado) { alert("Carga un perfil primero"); return; }
+    const { filas, totales } = calcularFilas();
+    if (filas.length === 0) { alert("Este perfil no tiene datos mensuales"); return; }
+
+    const d = perfilCargado.datos || {};
+    const tipo = perfilCargado.tabId === "tab40" ? "40H" : "45H";
+    const sep = ";";
+    const dec = (n) => (typeof n === "number" && !isNaN(n)) ? n.toFixed(2).replace(".", ",") : "0,00";
+    const lines = [];
+
+    lines.push([`COSTE EMPRESA · ${tipo}`].join(sep));
+    if (usuarioCtx) lines.push(["Generado por", `${usuarioCtx.nombre} · ${new Date().toLocaleString("es-ES")}`].join(sep));
+    lines.push([""].join(sep));
+    lines.push(["Perfil", perfilCargado.nombre || "—"].join(sep));
+    lines.push(["Proyecto", d.proyecto || "—"].join(sep));
+    lines.push(["Productora", d.productora || "—"].join(sep));
+    lines.push(["Trabajador", d.nombre || "—"].join(sep));
+    lines.push(["Puesto", d.puesto || "—"].join(sep));
+    lines.push(["Salario pactado", dec(Number(d.salario45) || 0) + " EUR"].join(sep));
+    lines.push(["Periodo", (d.fechaInicio && d.fechaFin) ? `${d.fechaInicio} a ${d.fechaFin}` : "—"].join(sep));
+    lines.push(["Modo vacaciones", d.vacAcumulada ? "Al final" : "Prorrateadas"].join(sep));
+    lines.push(["Modo indemnizacion", d.indemAcumulada ? "Al final" : "Prorrateada"].join(sep));
+    lines.push(["IRPF Plus Vivienda", irpfActivo ? `Empresa asume (${parseFloat(pctIRPF) || 0}%)` : "Trabajador"].join(sep));
+    lines.push([""].join(sep));
+
+    lines.push(["LO QUE PERCIBE EL TRABAJADOR (mensual)"].join(sep));
+    lines.push(["Mes","Salario Base","Vacaciones","Indemnizacion","H.Extra EUR","Plus Actividad","Coche","Vivienda","Seguro Vida","Comida","TOTAL"].join(sep));
+    filas.forEach(f => {
+      lines.push([
+        f.mes + (f.esCompleto ? "" : ` (${f.desde}-${f.hasta})`),
+        dec(f.base), dec(f.vac), dec(f.indem), dec(f.hx), dec(f.plusAct),
+        dec(f.coche), dec(f.vivienda), dec(f.seguroVida), dec(f.comida), dec(f.total),
+      ].join(sep));
+    });
+    lines.push([
+      "TOTAL", dec(totales.base), dec(totales.vac), dec(totales.indem), dec(totales.hx),
+      dec(totales.plusAct), dec(totales.coche), dec(totales.vivienda),
+      dec(totales.seguroVida), dec(totales.comida), dec(totales.total)
+    ].join(sep));
+    lines.push([""].join(sep));
+
+    lines.push(["COSTE EMPRESA (mensual)"].join(sep));
+    lines.push(["Mes","SS Principal (33,35%)","SS Vacaciones (33,35%)","SS H.Extra (27%)","IMEI (0,75%)","Solidaridad","IRPF Vivienda","Gestoria","TOTAL Coste Empresa"].join(sep));
+    filas.forEach(f => {
+      lines.push([
+        f.mes + (f.esCompleto ? "" : ` (${f.desde}-${f.hasta})`),
+        dec(f.ssPrincipal), dec(f.ssVacaciones), dec(f.ssHorasExtra),
+        dec(f.imei), dec(f.solidaridad), dec(f.irpfVivienda),
+        dec(f.gestoria), dec(f.totalCosteEmpresa),
+      ].join(sep));
+    });
+    lines.push([
+      "TOTAL", dec(totales.ssPrincipal), dec(totales.ssVacaciones), dec(totales.ssHorasExtra),
+      dec(totales.imei), dec(totales.solidaridad), dec(totales.irpfVivienda),
+      dec(totales.gestoria), dec(totales.totalCosteEmpresa),
+    ].join(sep));
+    lines.push([""].join(sep));
+
+    lines.push(["RESUMEN"].join(sep));
+    lines.push(["Bruto trabajador", dec(totales.total) + " EUR"].join(sep));
+    lines.push(["Coste empresa", dec(totales.totalCosteEmpresa) + " EUR"].join(sep));
+    lines.push(["Coste total", dec(totales.total + totales.totalCosteEmpresa) + " EUR"].join(sep));
+    const pct = totales.total > 0 ? (totales.totalCosteEmpresa / totales.total * 100) : 0;
+    lines.push(["% s/salario", pct.toFixed(2).replace(".", ",") + " %"].join(sep));
+
+    const csv = "\uFEFF" + lines.join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = generarFilename() + ".csv";
+    a.style.display = "none";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+    if (usuarioCtx) {
+      try { registrarLog(usuarioCtx.nombre, "export_csv", `[Coste Empresa] ${generarFilename()}.csv · ${d.nombre || "—"}`); } catch {}
+    }
+  };
+
+  const exportarPDF = () => {
+    if (!perfilCargado) { alert("Carga un perfil primero"); return; }
+    const { filas, totales } = calcularFilas();
+    if (filas.length === 0) { alert("Este perfil no tiene datos mensuales"); return; }
+
+    const d = perfilCargado.datos || {};
+    const tipo = perfilCargado.tabId === "tab40" ? "40H" : "45H";
+    const titulo = [d.proyecto, d.productora, d.nombre].filter(Boolean).join(" - ") || "Coste Empresa";
+    const pctIRPFNum = parseFloat(pctIRPF) || 0;
+    const totalConCE = totales.total + totales.totalCosteEmpresa;
+    const pctSobre = totales.total > 0 ? (totales.totalCosteEmpresa / totales.total * 100) : 0;
+    const generadoEl = new Date().toLocaleString("es-ES");
+
+    const filasPerc = filas.map(f => `
+      <tr>
+        <td class="m">${f.mes}${f.esCompleto ? "" : ` <span class="small">(${f.desde}-${f.hasta})</span>`}</td>
+        <td class="n">${fmt(f.base)}</td>
+        <td class="n ${f.vac === 0 ? 'z' : ''}">${f.vac === 0 ? "—" : fmt(f.vac)}</td>
+        <td class="n ${f.indem === 0 ? 'z' : ''}">${f.indem === 0 ? "—" : fmt(f.indem)}</td>
+        <td class="n ${f.hx === 0 ? 'z' : 'b'}">${f.hx === 0 ? "—" : fmt(f.hx)}</td>
+        <td class="n ${f.plusAct === 0 ? 'z' : 'o'}">${f.plusAct === 0 ? "—" : fmt(f.plusAct)}</td>
+        <td class="n ${f.coche === 0 ? 'z' : 'g'}">${f.coche === 0 ? "—" : fmt(f.coche)}</td>
+        <td class="n ${f.vivienda === 0 ? 'z' : 'g'}">${f.vivienda === 0 ? "—" : fmt(f.vivienda)}</td>
+        <td class="n ${f.seguroVida === 0 ? 'z' : 'g'}">${f.seguroVida === 0 ? "—" : fmt(f.seguroVida)}</td>
+        <td class="n ${f.comida === 0 ? 'z' : 'g'}">${f.comida === 0 ? "—" : fmt(f.comida)}</td>
+        <td class="n gold"><b>${fmt(f.total)}</b></td>
+      </tr>
+    `).join("");
+
+    const filasCE = filas.map(f => `
+      <tr>
+        <td class="m">${f.mes}</td>
+        <td class="n ${f.ssPrincipal === 0 ? 'z' : ''}">${f.ssPrincipal === 0 ? "—" : fmt(f.ssPrincipal)}</td>
+        <td class="n ${f.ssVacaciones === 0 ? 'z' : ''}">${f.ssVacaciones === 0 ? "—" : fmt(f.ssVacaciones)}</td>
+        <td class="n ${f.ssHorasExtra === 0 ? 'z' : 'b'}">${f.ssHorasExtra === 0 ? "—" : fmt(f.ssHorasExtra)}</td>
+        <td class="n ${f.imei === 0 ? 'z' : ''}">${f.imei === 0 ? "—" : fmt(f.imei)}</td>
+        <td class="n ${f.solidaridad === 0 ? 'z' : 'p'}">${f.solidaridad === 0 ? "—" : fmt(f.solidaridad)}</td>
+        <td class="n ${f.irpfVivienda === 0 ? 'z' : 'o'}">${f.irpfVivienda === 0 ? "—" : fmt(f.irpfVivienda)}</td>
+        <td class="n g">${fmt(f.gestoria)}</td>
+        <td class="n red"><b>${fmt(f.totalCosteEmpresa)}</b></td>
+      </tr>
+    `).join("");
+
+    const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>${titulo} · Coste Empresa</title>
+<style>
+  @page { size: A4 landscape; margin: 12mm; }
+  body { font-family: 'Courier New', monospace; color: #1a1a1a; font-size: 9px; margin: 0; padding: 0; position: relative; }
+  .watermark { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-28deg); font-size: 100px; font-weight: 900; color: rgba(160, 69, 69, 0.07); letter-spacing: 0.15em; z-index: 0; pointer-events: none; white-space: nowrap; line-height: 0.9; text-align: center; }
+  .content { position: relative; z-index: 1; }
+  .banner { background: #1a1a1a; color: #f0e6d0; padding: 12px 18px; display: flex; justify-content: space-between; align-items: center; border-radius: 4px; margin-bottom: 14px; }
+  .logo { background: #c8a96e; color: #1a1a1a; padding: 6px 10px; font-weight: 700; letter-spacing: 0.1em; border-radius: 3px; font-size: 10px; }
+  .title-right { text-align: right; }
+  .subtitle { font-size: 8px; color: #c8a96e; letter-spacing: 0.25em; text-transform: uppercase; }
+  .title { font-size: 14px; font-weight: 700; letter-spacing: 0.07em; }
+  .meta { font-size: 8px; color: #aaa; margin-top: 2px; }
+  .section { margin-bottom: 14px; }
+  h2 { font-size: 9px; letter-spacing: 0.18em; color: #b8864a; text-transform: uppercase; margin: 0 0 8px; padding-bottom: 6px; border-bottom: 1px solid #e0ddd8; }
+  h2.red { color: #a04545; }
+  .datos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .datos > div { background: #fafaf7; border: 1px solid #e0ddd8; border-radius: 3px; padding: 6px 8px; }
+  .datos .l { font-size: 7px; color: #888; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 2px; }
+  .datos .v { font-size: 10px; font-weight: 700; }
+  table { width: 100%; border-collapse: collapse; font-size: 8.5px; }
+  th { background: #f0ede8; color: #666; font-size: 7.5px; letter-spacing: 0.05em; text-transform: uppercase; font-weight: 700; padding: 5px 4px; border-bottom: 1px solid #d0ccc6; text-align: right; }
+  th.first { text-align: left; }
+  th.gold { color: #b8864a; }
+  th.red { color: #a04545; }
+  th .pct { display: block; font-weight: 400; font-size: 7px; color: #999; margin-top: 1px; }
+  td { padding: 4px 4px; border-bottom: 1px solid #eae7e2; }
+  td.m { font-weight: 600; text-transform: capitalize; }
+  td.n { text-align: right; }
+  td.b { color: #3a6898; }
+  td.o { color: #b07030; }
+  td.g { color: #5a8a5a; }
+  td.p { color: #6a3a9a; }
+  td.gold { color: #b8864a; }
+  td.red { color: #a04545; }
+  td.z { color: #ccc; }
+  .small { font-size: 7px; color: #888; }
+  tr.total td { background: #fdf8f0; font-weight: 700; border-top: 1.5px solid #d8a8a8; }
+  tr.total td.first { color: #6a2020; text-transform: uppercase; letter-spacing: 0.1em; font-size: 8px; }
+  .ce table tr.total td { background: #fdf0f0; }
+  .resumen { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 10px; }
+  .resumen > div { background: #f0ede8; border: 1px solid #e0ddd8; border-radius: 3px; padding: 7px; text-align: center; }
+  .resumen .l { font-size: 7px; color: #666; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 3px; }
+  .resumen .v { font-size: 11px; font-weight: 700; }
+  .resumen .vL { font-size: 13px; font-weight: 700; }
+  .reglas { margin-top: 10px; padding: 8px 10px; background: #fafaf7; border: 1px solid #e0ddd8; border-radius: 3px; font-size: 7.5px; color: #666; line-height: 1.5; }
+  .reglas b { color: #444; }
+  .legal { margin-top: 14px; padding: 10px 12px; background: #fafaf7; border: 1px solid #e8e4de; border-radius: 3px; }
+  .legal h3 { font-size: 8px; color: #888; letter-spacing: 0.18em; text-transform: uppercase; margin: 0 0 6px; }
+  .legal .brand { font-size: 9px; font-weight: 700; letter-spacing: 0.05em; margin-bottom: 4px; }
+  .legal p { font-size: 7.5px; color: #666; line-height: 1.4; margin: 0 0 4px; }
+  .legal .en { font-size: 7px; color: #888; font-style: italic; }
+  .legal .footer { font-size: 7px; color: #888; font-style: italic; }
+  .footer-pdf { margin-top: 10px; text-align: center; font-size: 7px; color: #aaa; letter-spacing: 0.05em; }
+  @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } .no-print { display: none; } }
+  .no-print { background: #faf6ee; border: 1px solid #d8c8a0; border-radius: 4px; padding: 10px 14px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
+  .no-print button { background: #1a1a1a; color: #fff; border: none; padding: 8px 16px; border-radius: 4px; font-family: 'Courier New', monospace; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; font-size: 10px; cursor: pointer; }
+</style>
+</head>
+<body>
+<div class="watermark">COSTE EMPRESA · CONFIDENCIAL</div>
+<div class="content">
+
+<div class="no-print">
+  <span style="font-size:11px;color:#7a5a2a">Pulsa imprimir o "Guardar como PDF" para descargar este documento.</span>
+  <button onclick="window.print()">📄 Imprimir / Guardar PDF</button>
+</div>
+
+<div class="banner">
+  <div class="logo">BUENDÍA ESTUDIOS</div>
+  <div class="title-right">
+    <div class="subtitle">Coste Empresa · ${tipo}</div>
+    <div class="title">CALCULADORA DE SALARIOS</div>
+    <div class="meta">${[d.nombre, d.puesto].filter(Boolean).join(" · ")}</div>
+  </div>
+</div>
+
+<div class="section">
+  <h2>▸ Datos del Trabajador</h2>
+  <div class="datos">
+    <div><div class="l">Perfil</div><div class="v">${perfilCargado.nombre || "—"}</div></div>
+    <div><div class="l">Proyecto</div><div class="v">${d.proyecto || "—"}</div></div>
+    <div><div class="l">Productora</div><div class="v">${d.productora || "—"}</div></div>
+    <div><div class="l">Trabajador</div><div class="v">${d.nombre || "—"}</div></div>
+    <div><div class="l">Puesto</div><div class="v">${d.puesto || "—"}</div></div>
+    <div><div class="l">Salario pactado</div><div class="v">${d.salario45 ? fmt(Number(d.salario45)) + " €" : "—"}</div></div>
+    <div><div class="l">Período</div><div class="v">${(d.fechaInicio && d.fechaFin) ? `${d.fechaInicio} → ${d.fechaFin}` : "—"}</div></div>
+    <div><div class="l">Vacaciones</div><div class="v">${d.vacAcumulada ? "Al final" : "Prorrateadas"}</div></div>
+    <div><div class="l">IRPF Vivienda</div><div class="v">${irpfActivo ? `Empresa (${pctIRPFNum}%)` : "Trabajador"}</div></div>
+  </div>
+</div>
+
+<div class="section">
+  <h2>▸ Lo que Percibe el Trabajador (Mensual · Brutos)</h2>
+  <table>
+    <thead>
+      <tr>
+        <th class="first">Mes</th>
+        <th>Salario Base</th>
+        <th>Vacaciones</th>
+        <th>Indem.</th>
+        <th>H.Extra €</th>
+        <th>Plus Act.</th>
+        <th>Coche</th>
+        <th>Vivienda</th>
+        <th>Seguro V.</th>
+        <th>Comida</th>
+        <th class="gold">TOTAL</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${filasPerc}
+      <tr class="total">
+        <td class="first">TOTAL</td>
+        <td class="n">${fmt(totales.base)}</td>
+        <td class="n">${fmt(totales.vac)}</td>
+        <td class="n">${fmt(totales.indem)}</td>
+        <td class="n b">${fmt(totales.hx)}</td>
+        <td class="n o">${totales.plusAct === 0 ? "—" : fmt(totales.plusAct)}</td>
+        <td class="n g">${fmt(totales.coche)}</td>
+        <td class="n g">${fmt(totales.vivienda)}</td>
+        <td class="n g">${fmt(totales.seguroVida)}</td>
+        <td class="n g">${fmt(totales.comida)}</td>
+        <td class="n gold">${fmt(totales.total)}</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="section ce">
+  <h2 class="red">▸ Coste Empresa (Mensual)</h2>
+  <table>
+    <thead>
+      <tr>
+        <th class="first">Mes</th>
+        <th>SS Principal<span class="pct">33,35%</span></th>
+        <th>SS Vac<span class="pct">33,35%</span></th>
+        <th>SS H.Ex<span class="pct">27%</span></th>
+        <th>IMEI<span class="pct">0,75%</span></th>
+        <th>Solidaridad</th>
+        <th>IRPF Viv<span class="pct">${irpfActivo && pctIRPFNum > 0 ? pctIRPFNum + "%" : "—"}</span></th>
+        <th>Gestoría</th>
+        <th class="red">TOTAL</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${filasCE}
+      <tr class="total">
+        <td class="first">TOTAL</td>
+        <td class="n">${fmt(totales.ssPrincipal)}</td>
+        <td class="n">${fmt(totales.ssVacaciones)}</td>
+        <td class="n b">${fmt(totales.ssHorasExtra)}</td>
+        <td class="n">${fmt(totales.imei)}</td>
+        <td class="n p">${totales.solidaridad === 0 ? "—" : fmt(totales.solidaridad)}</td>
+        <td class="n o">${totales.irpfVivienda === 0 ? "—" : fmt(totales.irpfVivienda)}</td>
+        <td class="n g">${fmt(totales.gestoria)}</td>
+        <td class="n red">${fmt(totales.totalCosteEmpresa)}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="reglas">
+    <b>Reglas aplicadas:</b><br/>
+    · <b>SS Principal</b> (33,35%): sobre TOTAL del mes − vacaciones − indemnización. Topada a 1.701,25 € si base &gt; 5.101,20 €.<br/>
+    · <b>SS Vacaciones</b> (33,35%) y <b>SS H.Extra</b> (27%): siempre se suman aparte, independientes del tope.<br/>
+    · <b>IMEI</b> (0,75%): sobre TOTAL del mes − indemnización. Topado a 38,26 € si base &gt; 5.101,20 €.<br/>
+    · <b>Solidaridad</b> (tramos 0,97% / 1,15% / 1,33%): sobre exceso de (TOTAL − indemnización − vacaciones − horas extra) sobre 5.101,20 €.<br/>
+    · <b>Indemnización</b>: NO genera SS ni IMEI.<br/>
+    · <b>Gestoría</b>: primer mes 32 € (alta + nómina), resto 26 €.
+  </div>
+
+  <div class="resumen">
+    <div><div class="l">Bruto trabajador</div><div class="v">${fmt(totales.total)} €</div></div>
+    <div><div class="l">Coste empresa</div><div class="v" style="color:#a04545">${fmt(totales.totalCosteEmpresa)} €</div></div>
+    <div><div class="l">Coste total</div><div class="vL" style="color:#b8864a">${fmt(totalConCE)} €</div></div>
+    <div><div class="l">% s/salario</div><div class="v" style="color:#6a3a9a">${pctSobre.toFixed(2)} %</div></div>
+  </div>
+</div>
+
+<div class="legal">
+  <h3>▸ Aviso Legal</h3>
+  <div class="brand">BD PROD TOOLS</div>
+  <p>${DISCLAIMER_ES}</p>
+  <p class="en">${DISCLAIMER_EN}</p>
+  <p class="footer">G &amp; G Enterprises LLC</p>
+</div>
+
+<div class="footer-pdf">
+  Generado por ${usuarioCtx?.nombre || "—"} · ${generadoEl} · ${DISCLAIMER_PDF}
+</div>
+
+</div>
+</body>
+</html>`;
+
+    // Descargar HTML
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = generarFilename() + ".html";
+    a.style.display = "none";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+    if (usuarioCtx) {
+      try { registrarLog(usuarioCtx.nombre, "export_pdf", `[Coste Empresa] ${generarFilename()}.html · ${d.nombre || "—"}`); } catch {}
+    }
+  };
+
   // Estilo común
   const P = { background: "#ffffff", border: "1px solid #e0ddd8", borderRadius: 8, padding: 24, marginBottom: 20, minWidth: 0 };
   const ST = { fontSize: 10, letterSpacing: "0.2em", color: "#b8864a", textTransform: "uppercase", marginBottom: 20, paddingBottom: 12, borderBottom: "1px solid #e0ddd8" };
@@ -4054,9 +4477,24 @@ function CosteEmpresa() {
 
           return (
             <div style={{ ...P, borderColor: "#d8c0c0" }}>
-              <div style={{ fontSize: 10, letterSpacing: "0.2em", color: "#a04545", textTransform: "uppercase", marginBottom: 14, paddingBottom: 12, borderBottom: "1px solid #e8d0d0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ fontSize: 10, letterSpacing: "0.2em", color: "#a04545", textTransform: "uppercase", marginBottom: 14, paddingBottom: 12, borderBottom: "1px solid #e8d0d0", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
                 <span>▸ Coste Empresa (Mensual)</span>
-                <span style={{ fontSize: 9, color: "#888", textTransform: "none", letterSpacing: "0.05em" }}>Importes que paga la empresa</span>
+                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                  <button
+                    onClick={exportarCSV}
+                    style={{ background: "#fff", color: "#1a7a58", border: "1px solid #1a7a58", padding: "5px 12px", borderRadius: 4, cursor: "pointer", fontSize: 10, fontFamily: "'Courier New',monospace", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}
+                    title="Descargar CSV"
+                  >
+                    📊 CSV
+                  </button>
+                  <button
+                    onClick={exportarPDF}
+                    style={{ background: "#fff", color: "#a04545", border: "1px solid #a04545", padding: "5px 12px", borderRadius: 4, cursor: "pointer", fontSize: 10, fontFamily: "'Courier New',monospace", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}
+                    title="Generar PDF (se abre en otra ventana para imprimir o guardar como PDF)"
+                  >
+                    📄 PDF
+                  </button>
+                </div>
               </div>
 
               <div style={{ overflowX: "auto" }}>
@@ -4143,6 +4581,23 @@ function CosteEmpresa() {
             </div>
           );
         })()}
+
+        {/* Aviso Legal (solo visible cuando hay perfil cargado) */}
+        <div style={{ ...P, background: "#fafaf7", border: "1px solid #e8e4de" }}>
+          <div style={{ ...ST, color: "#888", marginBottom: 10 }}>▸ Aviso Legal</div>
+          <div style={{ fontSize: 10, fontWeight: 700, color: "#1a1a1a", fontFamily: "'Courier New',monospace", marginBottom: 8, letterSpacing: "0.05em" }}>
+            BD PROD TOOLS
+          </div>
+          <div style={{ fontSize: 9, color: "#666", fontFamily: "'Courier New',monospace", lineHeight: 1.5, marginBottom: 8 }}>
+            {DISCLAIMER_ES}
+          </div>
+          <div style={{ fontSize: 8, color: "#888", fontFamily: "'Courier New',monospace", lineHeight: 1.5, fontStyle: "italic", marginBottom: 8 }}>
+            {DISCLAIMER_EN}
+          </div>
+          <div style={{ fontSize: 8, color: "#888", fontFamily: "'Courier New',monospace", lineHeight: 1.5, fontStyle: "italic" }}>
+            G &amp; G Enterprises LLC
+          </div>
+        </div>
       </div>
     </div>
   );
