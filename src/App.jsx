@@ -92,6 +92,88 @@ const FACTOR_INDEM_DIA = 0.98632;
 // Base * 1,119996 = Salario_pactado
 const DIVISOR_40H_BASE = 1 + 1/DIVISOR_VAC + FACTOR_INDEM_DIA/30; // = 1.119996
 
+// ═══════════════════════════════════════════════════════════════════
+// CONSTANTES COSTE EMPRESA
+// ═══════════════════════════════════════════════════════════════════
+const CE_TOPE_BASE       = 5101.20;            // Tope mensual base máxima cotización
+const CE_PCT_SS          = 0.3335;             // 33,35% empresa SS
+const CE_SS_TOPADA       = CE_TOPE_BASE * CE_PCT_SS; // 1.701,25 €
+const CE_PCT_SS_HEXTRA   = 0.27;               // 27% sobre horas extra
+const CE_PCT_IMEI        = 0.0075;             // 0,75% IMEI (MEI)
+const CE_IMEI_TOPADO     = CE_TOPE_BASE * CE_PCT_IMEI; // 38,26 €
+// Cuota Solidaridad sobre el exceso de la base máxima:
+const CE_PCT_SOL_T1      = 0.0097;             // 0-10% exceso (primeros 510,12 €)
+const CE_PCT_SOL_T2      = 0.0115;             // 10-50% exceso (siguientes 2.040,48 €)
+const CE_PCT_SOL_T3      = 0.0133;             // >50% exceso (resto)
+const CE_SOL_T1_HASTA    = CE_TOPE_BASE * 0.10; // 510,12 €
+const CE_SOL_T2_HASTA    = CE_TOPE_BASE * 0.50; // 2.550,60 €
+// Gestoría
+const CE_GESTORIA_ALTA   = 6;
+const CE_GESTORIA_MES    = 26;
+
+// Cálculo del coste empresa para un mes
+// Recibe los importes brutos del mes y devuelve un objeto con cada concepto
+function calcularCosteEmpresaMes({
+  total,         // TOTAL del mes (lo que percibe el trabajador)
+  vacaciones,    // importe vacaciones del mes
+  indem,         // importe indemnización del mes
+  horasExtraEur, // importe h.extra en euros del mes
+  plusVivienda,  // importe plus vivienda del mes
+  irpfActivo,    // boolean: ¿empresa asume IRPF?
+  pctIRPF,       // 0-100: % IRPF del trabajador
+  esPrimerMes,   // boolean: ¿es el primer mes del contrato?
+}) {
+  // Base SS principal: TOTAL - vacaciones - indemnización
+  // (las vacaciones tienen su propia SS aparte)
+  const baseSSPrincipal = Math.max(0, (total || 0) - (vacaciones || 0) - (indem || 0));
+  const ssPrincipal     = baseSSPrincipal > CE_TOPE_BASE ? CE_SS_TOPADA : baseSSPrincipal * CE_PCT_SS;
+
+  // SS Vacaciones: siempre 33,35% × vacaciones (suma aparte)
+  const ssVacaciones    = (vacaciones || 0) * CE_PCT_SS;
+
+  // SS H.Extra: siempre 27% × h.extra (suma aparte)
+  const ssHorasExtra    = (horasExtraEur || 0) * CE_PCT_SS_HEXTRA;
+
+  // Base IMEI: TOTAL - indemnización (vacaciones SÍ cuentan)
+  const baseIMEI        = Math.max(0, (total || 0) - (indem || 0));
+  const imeiCalc        = baseIMEI > CE_TOPE_BASE ? CE_IMEI_TOPADO : baseIMEI * CE_PCT_IMEI;
+
+  // Base Solidaridad: TOTAL - indemnización (igual que IMEI)
+  // Solo si supera 5.101,20 € — calcula por tramos sobre el exceso
+  const baseSolidaridad = baseIMEI; // mismo importe
+  let solidaridad = 0;
+  if (baseSolidaridad > CE_TOPE_BASE) {
+    const exc = baseSolidaridad - CE_TOPE_BASE;
+    solidaridad += Math.min(exc, CE_SOL_T1_HASTA) * CE_PCT_SOL_T1;
+    if (exc > CE_SOL_T1_HASTA) {
+      solidaridad += Math.min(exc - CE_SOL_T1_HASTA, CE_SOL_T2_HASTA - CE_SOL_T1_HASTA) * CE_PCT_SOL_T2;
+    }
+    if (exc > CE_SOL_T2_HASTA) {
+      solidaridad += (exc - CE_SOL_T2_HASTA) * CE_PCT_SOL_T3;
+    }
+  }
+
+  // IRPF Plus Vivienda (solo si empresa lo asume)
+  const irpfVivienda = (irpfActivo && pctIRPF > 0)
+    ? (plusVivienda || 0) * (pctIRPF / 100)
+    : 0;
+
+  // Gestoría: primer mes = 32 € (6 alta + 26 nómina), resto = 26 €
+  const gestoria = esPrimerMes ? (CE_GESTORIA_ALTA + CE_GESTORIA_MES) : CE_GESTORIA_MES;
+
+  const totalCosteEmpresa = ssPrincipal + ssVacaciones + ssHorasExtra + imeiCalc + solidaridad + irpfVivienda + gestoria;
+
+  return {
+    baseSSPrincipal, ssPrincipal,
+    ssVacaciones, ssHorasExtra,
+    baseIMEI, imei: imeiCalc,
+    baseSolidaridad, solidaridad,
+    irpfVivienda,
+    gestoria,
+    totalCosteEmpresa,
+  };
+}
+
 // ─── LÓGICA DE FECHAS ────────────────────────────────────────────────────────
 function calcularPeriodo(fechaInicio, fechaFin) {
   if (!fechaInicio || !fechaFin) return null;
@@ -3604,6 +3686,10 @@ function CosteEmpresa() {
   const [busqueda, setBusqueda] = useState("");
   const [filtroTipo, setFiltroTipo] = useState("todos"); // "todos" | "45h" | "40h"
 
+  // IRPF Plus Vivienda (empresa lo asume?)
+  const [irpfActivo, setIrpfActivo] = useState(false);
+  const [pctIRPF, setPctIRPF] = useState("");
+
   // Adaptador de storage (igual que en GestorPerfiles)
   const storage = (() => {
     if (typeof window !== "undefined" && window.storage) return window.storage;
@@ -3846,6 +3932,35 @@ function CosteEmpresa() {
               </div>
             ))}
           </div>
+
+          {/* Toggle IRPF Plus Vivienda (cuando empresa lo asume) */}
+          <div style={{ background: "#faf6ee", border: "1px solid #d8c8a0", borderRadius: 6, padding: "10px 14px", marginTop: 12, display: "flex", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", flex: "0 0 auto" }}>
+              <span style={{ position: "relative", display: "inline-block", width: 38, height: 20, background: irpfActivo ? "#2a6e2a" : "#bbb", borderRadius: 10, transition: "background 0.15s" }}>
+                <span style={{ position: "absolute", top: 2, left: irpfActivo ? 20 : 2, width: 16, height: 16, background: "#fff", borderRadius: "50%", transition: "left 0.15s" }} />
+              </span>
+              <input type="checkbox" checked={irpfActivo} onChange={e => setIrpfActivo(e.target.checked)} style={{ display: "none" }} />
+              <span style={{ fontSize: 11, fontWeight: 700, color: "#555", letterSpacing: "0.05em" }}>
+                La empresa asume el IRPF del Plus Vivienda
+              </span>
+            </label>
+            {irpfActivo && (
+              <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: "auto" }}>
+                <label style={{ fontSize: 9, color: "#666", textTransform: "uppercase", letterSpacing: "0.1em" }}>% IRPF trabajador:</label>
+                <input
+                  type="text"
+                  value={pctIRPF}
+                  onChange={e => {
+                    const v = e.target.value.replace(",", ".");
+                    if (v === "" || /^\d*\.?\d*$/.test(v)) setPctIRPF(v);
+                  }}
+                  placeholder="ej: 18"
+                  style={{ width: 60, padding: "5px 8px", border: "1px solid #c0bcb5", borderRadius: 4, fontFamily: "'Courier New',monospace", fontSize: 11, fontWeight: 700, textAlign: "right" }}
+                />
+                <span style={{ fontSize: 11, color: "#666", fontWeight: 700 }}>%</span>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Tabla mensual "Lo que percibe el trabajador" */}
@@ -3898,11 +4013,135 @@ function CosteEmpresa() {
           )}
         </div>
 
-        {/* Placeholder informativo */}
-        <div style={{ padding: 20, background: "rgba(184,134,74,0.08)", borderRadius: 8, border: "1px dashed #c8a96e", textAlign: "center", fontSize: 11, color: "#7a5a2a", lineHeight: 1.6 }}>
-          <strong>FASE 1:</strong> Solo se muestra lo que percibe el trabajador. Los cálculos de coste empresa<br/>
-          (Seguridad Social, IMEI, Cuota de Solidaridad, IRPF Vivienda, Gestoría) se añadirán en la FASE 2.
-        </div>
+        {/* ════════ TABLA COSTE EMPRESA ════════ */}
+        {desgloseGuardado.length > 0 && (() => {
+          const pctIRPFNum = parseFloat(pctIRPF) || 0;
+          // Calcular coste empresa para cada mes
+          const filas = desgloseGuardado.map((mes, i) => {
+            const c = complementosGuardado[i] || {};
+            const plusAct = esTab40 ? 0 : (mes.plusAct || 0);
+            const total = (mes.base40 || 0) + (mes.vac40 || 0) + (mes.indem40 || 0) + (mes.cobroHx || 0) + plusAct + (c.herramienta || 0) + (c.coche || 0) + (c.vivienda || 0) + (c.seguroVida || 0) + (c.comida || 0);
+            const ce = calcularCosteEmpresaMes({
+              total,
+              vacaciones: mes.vac40 || 0,
+              indem: mes.indem40 || 0,
+              horasExtraEur: mes.cobroHx || 0,
+              plusVivienda: c.vivienda || 0,
+              irpfActivo,
+              pctIRPF: pctIRPFNum,
+              esPrimerMes: i === 0,
+            });
+            return { mes: mes.mes, ...ce, total };
+          });
+
+          // Totales
+          const T = filas.reduce((acc, f) => ({
+            ssPrincipal: acc.ssPrincipal + f.ssPrincipal,
+            ssVacaciones: acc.ssVacaciones + f.ssVacaciones,
+            ssHorasExtra: acc.ssHorasExtra + f.ssHorasExtra,
+            imei: acc.imei + f.imei,
+            solidaridad: acc.solidaridad + f.solidaridad,
+            irpfVivienda: acc.irpfVivienda + f.irpfVivienda,
+            gestoria: acc.gestoria + f.gestoria,
+            totalCosteEmpresa: acc.totalCosteEmpresa + f.totalCosteEmpresa,
+          }), { ssPrincipal: 0, ssVacaciones: 0, ssHorasExtra: 0, imei: 0, solidaridad: 0, irpfVivienda: 0, gestoria: 0, totalCosteEmpresa: 0 });
+
+          const cellNum = (v, color) => (
+            <td style={{ padding: "7px 5px", textAlign: "right", color: v === 0 ? "#ccc" : (color || "#1a1a1a"), fontFamily: "'Courier New',monospace" }}>
+              {v === 0 ? "—" : fmt(v)}
+            </td>
+          );
+
+          return (
+            <div style={{ ...P, borderColor: "#d8c0c0" }}>
+              <div style={{ fontSize: 10, letterSpacing: "0.2em", color: "#a04545", textTransform: "uppercase", marginBottom: 14, paddingBottom: 12, borderBottom: "1px solid #e8d0d0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span>▸ Coste Empresa (Mensual)</span>
+                <span style={{ fontSize: 9, color: "#888", textTransform: "none", letterSpacing: "0.05em" }}>Importes que paga la empresa</span>
+              </div>
+
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 10 }}>
+                  <thead>
+                    <tr style={{ background: "#f5e9e9" }}>
+                      <th style={{ padding: "8px 5px", textAlign: "left", fontSize: 9, letterSpacing: "0.05em", textTransform: "uppercase", color: "#6a2020", fontWeight: 700, borderBottom: "1px solid #d8b0b0", whiteSpace: "nowrap" }}>Mes</th>
+                      <th style={{ padding: "8px 5px", textAlign: "right", fontSize: 9, letterSpacing: "0.04em", textTransform: "uppercase", color: "#6a2020", fontWeight: 700, borderBottom: "1px solid #d8b0b0", whiteSpace: "nowrap" }}>SS Principal<br/><span style={{ fontWeight: 400, fontSize: 8, color: "#a04545" }}>33,35%</span></th>
+                      <th style={{ padding: "8px 5px", textAlign: "right", fontSize: 9, letterSpacing: "0.04em", textTransform: "uppercase", color: "#6a2020", fontWeight: 700, borderBottom: "1px solid #d8b0b0", whiteSpace: "nowrap" }}>SS Vac<br/><span style={{ fontWeight: 400, fontSize: 8, color: "#a04545" }}>33,35%</span></th>
+                      <th style={{ padding: "8px 5px", textAlign: "right", fontSize: 9, letterSpacing: "0.04em", textTransform: "uppercase", color: "#6a2020", fontWeight: 700, borderBottom: "1px solid #d8b0b0", whiteSpace: "nowrap" }}>SS H.Ex<br/><span style={{ fontWeight: 400, fontSize: 8, color: "#a04545" }}>27%</span></th>
+                      <th style={{ padding: "8px 5px", textAlign: "right", fontSize: 9, letterSpacing: "0.04em", textTransform: "uppercase", color: "#6a2020", fontWeight: 700, borderBottom: "1px solid #d8b0b0", whiteSpace: "nowrap" }}>IMEI<br/><span style={{ fontWeight: 400, fontSize: 8, color: "#a04545" }}>0,75%</span></th>
+                      <th style={{ padding: "8px 5px", textAlign: "right", fontSize: 9, letterSpacing: "0.04em", textTransform: "uppercase", color: "#6a2020", fontWeight: 700, borderBottom: "1px solid #d8b0b0", whiteSpace: "nowrap" }}>Solidaridad</th>
+                      <th style={{ padding: "8px 5px", textAlign: "right", fontSize: 9, letterSpacing: "0.04em", textTransform: "uppercase", color: "#6a2020", fontWeight: 700, borderBottom: "1px solid #d8b0b0", whiteSpace: "nowrap" }}>IRPF Viv<br/><span style={{ fontWeight: 400, fontSize: 8, color: "#a04545" }}>{irpfActivo && pctIRPFNum > 0 ? `${pctIRPFNum}%` : "—"}</span></th>
+                      <th style={{ padding: "8px 5px", textAlign: "right", fontSize: 9, letterSpacing: "0.04em", textTransform: "uppercase", color: "#6a2020", fontWeight: 700, borderBottom: "1px solid #d8b0b0", whiteSpace: "nowrap" }}>Gestoría</th>
+                      <th style={{ padding: "8px 5px", textAlign: "right", fontSize: 9, letterSpacing: "0.04em", textTransform: "uppercase", color: "#a04545", fontWeight: 700, borderBottom: "1px solid #d8b0b0", whiteSpace: "nowrap" }}>TOTAL</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filas.map((f, i) => (
+                      <tr key={i} style={{ borderBottom: "1px solid #eae7e2" }}>
+                        <td style={{ padding: "7px 5px", fontWeight: 600, textTransform: "capitalize" }}>{f.mes}</td>
+                        {cellNum(f.ssPrincipal)}
+                        {cellNum(f.ssVacaciones)}
+                        {cellNum(f.ssHorasExtra, "#3a6898")}
+                        {cellNum(f.imei)}
+                        {cellNum(f.solidaridad, "#6a3a9a")}
+                        {cellNum(f.irpfVivienda, "#b07030")}
+                        <td style={{ padding: "7px 5px", textAlign: "right", color: "#5a8a5a", fontFamily: "'Courier New',monospace" }}>{fmt(f.gestoria)}</td>
+                        <td style={{ padding: "7px 5px", textAlign: "right", fontWeight: 700, color: "#a04545", fontFamily: "'Courier New',monospace" }}>{fmt(f.totalCosteEmpresa)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr style={{ background: "#fdf0f0", borderTop: "2px solid #d8a8a8" }}>
+                      <td style={{ padding: "9px 5px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", fontSize: 9, color: "#6a2020" }}>TOTAL</td>
+                      {cellNum(T.ssPrincipal)}
+                      {cellNum(T.ssVacaciones)}
+                      {cellNum(T.ssHorasExtra, "#3a6898")}
+                      {cellNum(T.imei)}
+                      {cellNum(T.solidaridad, "#6a3a9a")}
+                      {cellNum(T.irpfVivienda, "#b07030")}
+                      <td style={{ padding: "9px 5px", textAlign: "right", fontWeight: 700, color: "#5a8a5a", fontFamily: "'Courier New',monospace" }}>{fmt(T.gestoria)}</td>
+                      <td style={{ padding: "9px 5px", textAlign: "right", fontWeight: 700, color: "#a04545", fontSize: 12, fontFamily: "'Courier New',monospace" }}>{fmt(T.totalCosteEmpresa)}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+
+              {/* Notas explicativas */}
+              <div style={{ marginTop: 12, padding: "10px 14px", background: "#fafaf7", borderRadius: 4, border: "1px solid #e0ddd8", fontSize: 9.5, color: "#666", lineHeight: 1.6 }}>
+                <strong style={{ color: "#444" }}>Reglas aplicadas:</strong><br/>
+                · <strong>SS Principal</strong> (33,35%): sobre TOTAL del mes − vacaciones − indemnización. Topada a 1.701,25 € si base &gt; 5.101,20 €.<br/>
+                · <strong>SS Vacaciones</strong> (33,35%) y <strong>SS H.Extra</strong> (27%): siempre se suman aparte, independientes del tope.<br/>
+                · <strong>IMEI</strong> (0,75%) y <strong>Solidaridad</strong> (tramos 0,97% / 1,15% / 1,33%): sobre TOTAL del mes − indemnización. IMEI topado a 38,26 €.<br/>
+                · <strong>Indemnización</strong>: NO genera SS ni IMEI.<br/>
+                · <strong>Gestoría</strong>: primer mes 32 € (alta + nómina), resto 26 €.
+              </div>
+
+              {/* Comparativa rápida */}
+              <div style={{ marginTop: 14, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
+                {(() => {
+                  // Total bruto trabajador
+                  const totalBruto = desgloseGuardado.reduce((sum, mes, i) => {
+                    const c = complementosGuardado[i] || {};
+                    const plusAct = esTab40 ? 0 : (mes.plusAct || 0);
+                    return sum + (mes.base40 || 0) + (mes.vac40 || 0) + (mes.indem40 || 0) + (mes.cobroHx || 0) + plusAct + (c.herramienta || 0) + (c.coche || 0) + (c.vivienda || 0) + (c.seguroVida || 0) + (c.comida || 0);
+                  }, 0);
+                  const totalConCE = totalBruto + T.totalCosteEmpresa;
+                  const pctSobreSalario = totalBruto > 0 ? (T.totalCosteEmpresa / totalBruto * 100) : 0;
+                  return [
+                    { l: "Bruto trabajador", v: fmt(totalBruto) + " €", color: "#1a1a1a" },
+                    { l: "Coste empresa", v: fmt(T.totalCosteEmpresa) + " €", color: "#a04545" },
+                    { l: "Coste total", v: fmt(totalConCE) + " €", color: "#b8864a", bold: true },
+                    { l: "% s/salario", v: pctSobreSalario.toFixed(2) + " %", color: "#6a3a9a" },
+                  ].map(it => (
+                    <div key={it.l} style={{ background: "#f0ede8", borderRadius: 6, padding: "10px 14px", border: "1px solid #e0ddd8", textAlign: "center" }}>
+                      <div style={{ fontSize: 9, color: "#666", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 4 }}>{it.l}</div>
+                      <div style={{ fontSize: it.bold ? 16 : 14, fontWeight: 700, color: it.color, fontFamily: "'Courier New',monospace" }}>{it.v}</div>
+                    </div>
+                  ));
+                })()}
+              </div>
+            </div>
+          );
+        })()}
       </div>
     </div>
   );
