@@ -2718,20 +2718,31 @@ function App45({ modoTab = "iruna45" }) {
 </div>
 ${usuarioSesion ? `<div class="autor-box">Generado por <b>${usuarioSesion.nombre}</b> · ${new Date().toLocaleString("es-ES")}</div>` : ""}
 ${docHTML}
+<script>
+  // Auto-lanzar el diálogo de impresión al cargar
+  window.addEventListener("load", function() {
+    setTimeout(function() { window.print(); }, 400);
+  });
+</script>
 </body>
 </html>`;
 
-      // Descargar el archivo HTML
+      // Abrir en nueva ventana y auto-imprimir
       const blob = new Blob([html], { type: "text/html;charset=utf-8" });
       const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = baseFilename + (es40h ? "_40h.html" : "_45h.html");
-      a.style.display = "none";
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      const nuevaVentana = window.open(url, "_blank");
+      if (!nuevaVentana) {
+        // Bloqueado por popup: fallback a descarga
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = baseFilename + (es40h ? "_40h.html" : "_45h.html");
+        a.style.display = "none";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setExportError({ tipo: "aviso", mensaje: "⚠ El navegador bloqueó la ventana emergente. Se ha descargado el HTML. Permite ventanas emergentes para esta web y el PDF se abrirá directamente." });
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 30000);
 
       // Confirmación visual breve
       setExportError({ tipo: "ok", mensaje: `✓ Descargando: ${baseFilename}${es40h ? "_40h.html" : "_45h.html"}` });
@@ -5489,20 +5500,31 @@ function CosteEmpresa() {
 </div>
 
 </div>
+<script>
+  // Auto-lanzar el diálogo de impresión al cargar
+  window.addEventListener("load", function() {
+    setTimeout(function() { window.print(); }, 400);
+  });
+</script>
 </body>
 </html>`;
 
-    // Descargar HTML
+    // Abrir en nueva ventana y auto-imprimir
     const blob = new Blob([html], { type: "text/html;charset=utf-8" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = generarFilename() + ".html";
-    a.style.display = "none";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    const nuevaVentana = window.open(url, "_blank");
+    if (!nuevaVentana) {
+      // Bloqueado por popup: fallback a descarga
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = generarFilename() + ".html";
+      a.style.display = "none";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      alert("⚠ El navegador bloqueó la ventana emergente. Se ha descargado el HTML. Permite ventanas emergentes para esta web y el PDF se abrirá directamente.");
+    }
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
 
     if (usuarioCtx) {
       try { registrarLog(usuarioCtx.nombre, "export_pdf", `[Coste Empresa] ${generarFilename()}.html · ${d.nombre || "—"}`); } catch {}
@@ -6318,7 +6340,7 @@ function BannerSesion({ usuario, onLogout, onAdmin, onLogs, onPuestos, tab, onCh
         <span style={{ color: "#888", textTransform: "uppercase", fontSize: 9, letterSpacing: "0.18em" }}>Sesión:</span>
         <span style={{ fontWeight: 700, color: "#f0ede8" }}>{usuario.nombre}</span>
         {usuario.es_admin && <span style={{ background: "#c8a96e", color: "#1a1a1a", padding: "2px 6px", borderRadius: 3, fontSize: 8, fontWeight: 700, letterSpacing: "0.1em" }}>ADMIN</span>}
-        <span style={{ color: "#ffffff", fontSize: 13, letterSpacing: "0.08em", fontWeight: 700, marginLeft: 6 }} title="Versión de la app">v41</span>
+        <span style={{ color: "#ffffff", fontSize: 13, letterSpacing: "0.08em", fontWeight: 700, marginLeft: 6 }} title="Versión de la app">v42</span>
       </div>
 
       {/* Pestañas centrales */}
