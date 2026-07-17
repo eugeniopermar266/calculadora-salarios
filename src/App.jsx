@@ -1031,8 +1031,20 @@ function GestorPerfiles({ tabId, datosActuales, onCargarPerfil }) {
   };
 
   const guardarPerfil = async () => {
-    const nombre = nombrePerfil.trim();
-    if (!nombre) { showMsg("Introduce un nombre", "error"); return; }
+    // Si el usuario no escribió nada, usar el placeholder sugerido como nombre
+    let nombre = nombrePerfil.trim();
+    if (!nombre) {
+      // Reconstruir el mismo texto del placeholder
+      const sugerido = datosActuales.nombre
+        ? `${datosActuales.nombre} · ${datosActuales.puesto || ""}`.trim().replace(/·\s*$/,"").trim()
+        : "";
+      if (sugerido && sugerido !== "·") {
+        nombre = sugerido;
+      } else {
+        showMsg("Introduce un nombre o rellena los datos del trabajador", "error");
+        return;
+      }
+    }
     const key = `${STORAGE_PREFIX}${Date.now()}_${nombre.replace(/[^a-zA-Z0-9]/g,"_").slice(0,40)}`;
     const payload = {
       nombre,
@@ -1986,10 +1998,12 @@ function DocumentoImprimible({
             <td style={tdLabel}><strong>Nombre:</strong> {nombre || "—"}</td>
             <td style={tdValue}><strong>Puesto:</strong> {puesto || "—"}{codigoContable ? <span style={{ color: "#888", marginLeft: 6, fontWeight: 400, fontSize: 10 }}>· {codigoContable}</span> : null}</td>
           </tr>
-          <tr>
-            <td style={tdLabel}><strong>Salario pactado 45h:</strong> <span style={{ color: "#b8864a", fontWeight: 700 }}>{fmtE(salario45efectivo)}</span></td>
-            <td style={tdValue}><strong>Horas referencia:</strong> {horasRef}h/mes</td>
-          </tr>
+          {!es40h && (
+            <tr>
+              <td style={tdLabel}><strong>Salario pactado 45h:</strong> <span style={{ color: "#b8864a", fontWeight: 700 }}>{fmtE(salario45efectivo)}</span></td>
+              <td style={tdValue}><strong>Horas referencia:</strong> {horasRef}h/mes</td>
+            </tr>
+          )}
         </tbody>
       </table>
 
@@ -2612,7 +2626,7 @@ function App45({ modoTab = "iruna45" }) {
       const partes = [proyecto, productora, nombre].filter(Boolean).map(s => s.replace(/[^a-zA-Z0-9]/g, "_"));
       const baseFilename = partes.length ? partes.join("_") : "calculadora";
       const titulo = [proyecto, productora, nombre].filter(Boolean).join(" - ") || "Calculadora 45h";
-      // Nombre para el diálogo "Guardar como PDF" (Chrome usa document.title como sugerencia)
+      // Nombre para el diálogo "Guardar como PDF" (el navegador usa document.title como sugerencia)
       const tituloPDF = baseFilename + (es40h ? "_40h" : "_45h");
 
       // Plantilla HTML completa
@@ -2710,26 +2724,39 @@ function App45({ modoTab = "iruna45" }) {
 </head>
 <body>
 <div class="toolbar">
+  <button onclick="guardarHTML()">💾 Guardar HTML</button>
   <button onclick="window.print()">⎙ Imprimir / Guardar PDF</button>
   <button onclick="window.close()">✕ Cerrar</button>
 </div>
 <div class="info">
   <b>📄 Versión imprimible — ${titulo}</b><br>
-  Pulsa <b>"Imprimir / Guardar PDF"</b> y, en el diálogo del navegador, elige <b>"Guardar como PDF"</b> como destino.<br>
+  <b>Guardar HTML</b>: descarga esta página como archivo <code>.html</code> (para archivar o compartir).<br>
+  <b>Imprimir / Guardar PDF</b>: abre el diálogo del navegador; elige "Guardar como PDF" como destino.<br>
   <b>Ajustes recomendados:</b> Márgenes Por defecto · Escala Predeterminado · Activa "Gráficos en segundo plano".
 </div>
 ${usuarioSesion ? `<div class="autor-box">Generado por <b>${usuarioSesion.nombre}</b> · ${new Date().toLocaleString("es-ES")}</div>` : ""}
 ${docHTML}
 <script>
-  // Auto-lanzar el diálogo de impresión al cargar
-  window.addEventListener("load", function() {
-    setTimeout(function() { window.print(); }, 400);
-  });
+  // Guardar la página actual como archivo HTML
+  function guardarHTML() {
+    try {
+      var html = "<!DOCTYPE html>\\n" + document.documentElement.outerHTML;
+      var blob = new Blob([html], { type: "text/html;charset=utf-8" });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement("a");
+      a.href = url;
+      a.download = ${JSON.stringify(baseFilename + (es40h ? "_40h.html" : "_45h.html"))};
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(function(){ URL.revokeObjectURL(url); }, 2000);
+    } catch(e) { alert("No se pudo guardar el HTML: " + e.message); }
+  }
 </script>
 </body>
 </html>`;
 
-      // Abrir en nueva ventana y auto-imprimir
+      // Abrir en nueva ventana (SIN auto-print, el usuario elige con los botones)
       const blob = new Blob([html], { type: "text/html;charset=utf-8" });
       const url = URL.createObjectURL(blob);
       const nuevaVentana = window.open(url, "_blank");
@@ -3625,6 +3652,74 @@ async function listarUsuariosAdmin(adminPin) {
   });
   return data;
 }
+
+// ═══════════════════════════════════════════════════════════════════════
+// PROYECTOS (v43)
+// ═══════════════════════════════════════════════════════════════════════
+
+// Listar proyectos activos (para admin: todos; para usuario normal: solo los asignados)
+async function listarProyectos({ adminPin, usuarioId, esAdmin }) {
+  if (esAdmin && adminPin) {
+    // Admin: ve todos los proyectos
+    const data = await supabaseFetch(`proyectos?select=*&order=nombre.asc`, {
+      headers: { "x-admin-pin": adminPin },
+    });
+    return data || [];
+  }
+  // Usuario normal: solo los proyectos asignados y activos
+  const rel = await supabaseFetch(`usuario_proyectos?usuario_id=eq.${usuarioId}&select=proyecto_id`);
+  if (!Array.isArray(rel) || rel.length === 0) return [];
+  const ids = rel.map(r => r.proyecto_id).join(",");
+  const data = await supabaseFetch(`proyectos?id=in.(${ids})&activo=eq.true&select=*&order=nombre.asc`);
+  return data || [];
+}
+
+async function crearProyecto(adminPin, nombre, productora) {
+  return supabaseFetch(`proyectos`, {
+    method: "POST",
+    headers: { "x-admin-pin": adminPin, "Prefer": "return=representation" },
+    body: JSON.stringify({ nombre, productora, activo: true }),
+  });
+}
+
+async function actualizarProyecto(adminPin, id, cambios) {
+  return supabaseFetch(`proyectos?id=eq.${id}`, {
+    method: "PATCH",
+    headers: { "x-admin-pin": adminPin, "Prefer": "return=representation" },
+    body: JSON.stringify(cambios),
+  });
+}
+
+async function borrarProyecto(adminPin, id) {
+  return supabaseFetch(`proyectos?id=eq.${id}`, {
+    method: "DELETE",
+    headers: { "x-admin-pin": adminPin },
+  });
+}
+
+// Relaciones usuario_proyectos
+async function listarAsignaciones(adminPin) {
+  const data = await supabaseFetch(`usuario_proyectos?select=*`, {
+    headers: { "x-admin-pin": adminPin },
+  });
+  return data || [];
+}
+
+async function asignarUsuarioProyecto(adminPin, usuarioId, proyectoId) {
+  return supabaseFetch(`usuario_proyectos`, {
+    method: "POST",
+    headers: { "x-admin-pin": adminPin, "Prefer": "return=representation" },
+    body: JSON.stringify({ usuario_id: usuarioId, proyecto_id: proyectoId }),
+  });
+}
+
+async function desasignarUsuarioProyecto(adminPin, usuarioId, proyectoId) {
+  return supabaseFetch(`usuario_proyectos?usuario_id=eq.${usuarioId}&proyecto_id=eq.${proyectoId}`, {
+    method: "DELETE",
+    headers: { "x-admin-pin": adminPin },
+  });
+}
+
 
 async function crearUsuario(adminPin, nombre, pin, esAdmin) {
   return supabaseFetch(`usuarios`, {
@@ -6265,10 +6360,212 @@ function CosteEmpresa() {
 
 
 // ═══════════════════════════════════════════════════════════════════════
+// PANEL ADMIN: GESTIÓN DE PROYECTOS (v43)
+// ═══════════════════════════════════════════════════════════════════════
+
+function PanelProyectos({ usuarioActual, onCerrar }) {
+  const [proyectos, setProyectos] = useState([]);
+  const [usuarios, setUsuarios] = useState([]);
+  const [asignaciones, setAsignaciones] = useState([]); // [{usuario_id, proyecto_id}]
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState(null);
+  const [nuevoForm, setNuevoForm] = useState({ nombre: "", productora: "" });
+  const [mostrarNuevo, setMostrarNuevo] = useState(false);
+  const [editando, setEditando] = useState(null); // {id, nombre, productora, activo}
+  const [proyectoAsignar, setProyectoAsignar] = useState(null); // proyecto en edición de usuarios
+
+  const recargar = async () => {
+    setCargando(true); setError(null);
+    try {
+      const [proys, usrs, asigs] = await Promise.all([
+        listarProyectos({ adminPin: usuarioActual.pin, esAdmin: true }),
+        listarUsuariosAdmin(usuarioActual.pin),
+        listarAsignaciones(usuarioActual.pin),
+      ]);
+      setProyectos(proys);
+      setUsuarios(usrs);
+      setAsignaciones(asigs);
+    } catch (err) { setError(err.message); }
+    setCargando(false);
+  };
+
+  useEffect(() => { recargar(); }, []);
+
+  const onAdd = async () => {
+    if (!nuevoForm.nombre.trim() || !nuevoForm.productora.trim()) {
+      alert("Nombre y Productora son obligatorios"); return;
+    }
+    try {
+      await crearProyecto(usuarioActual.pin, nuevoForm.nombre.trim(), nuevoForm.productora.trim());
+      setNuevoForm({ nombre: "", productora: "" });
+      setMostrarNuevo(false);
+      recargar();
+    } catch (err) { alert("Error al crear: " + err.message); }
+  };
+
+  const onGuardarEdit = async () => {
+    try {
+      await actualizarProyecto(usuarioActual.pin, editando.id, {
+        nombre: editando.nombre.trim(),
+        productora: editando.productora.trim(),
+        activo: editando.activo,
+      });
+      setEditando(null);
+      recargar();
+    } catch (err) { alert("Error al guardar: " + err.message); }
+  };
+
+  const onBorrar = async (p) => {
+    if (!confirm(`¿Borrar el proyecto "${p.nombre}"?\n\nSe perderán todas las asignaciones. Los perfiles asociados quedarán huérfanos.`)) return;
+    try {
+      await borrarProyecto(usuarioActual.pin, p.id);
+      recargar();
+    } catch (err) { alert("Error al borrar: " + err.message); }
+  };
+
+  // Asignar/desasignar usuario a proyecto
+  const estaAsignado = (usuarioId, proyectoId) =>
+    asignaciones.some(a => a.usuario_id === usuarioId && a.proyecto_id === proyectoId);
+
+  const toggleAsignacion = async (usuarioId, proyectoId) => {
+    try {
+      if (estaAsignado(usuarioId, proyectoId)) {
+        await desasignarUsuarioProyecto(usuarioActual.pin, usuarioId, proyectoId);
+      } else {
+        await asignarUsuarioProyecto(usuarioActual.pin, usuarioId, proyectoId);
+      }
+      // Recargar solo asignaciones (más rápido)
+      const asigs = await listarAsignaciones(usuarioActual.pin);
+      setAsignaciones(asigs);
+    } catch (err) { alert("Error: " + err.message); }
+  };
+
+  const overlay = {
+    position: "fixed", inset: 0, background: "rgba(20,20,20,0.75)",
+    display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000,
+  };
+  const modal = {
+    background: "#faf7f2", padding: 20, borderRadius: 6, maxWidth: 850, width: "90%",
+    maxHeight: "88vh", overflowY: "auto", color: "#1a1a1a",
+    fontFamily: "'Courier New',monospace", border: "1px solid #b8864a",
+  };
+  const btnGold = {
+    background: "#b8864a", color: "#fff", border: "none",
+    padding: "6px 12px", borderRadius: 4, cursor: "pointer",
+    fontFamily: "'Courier New',monospace", fontSize: 11, fontWeight: 700,
+    letterSpacing: "0.1em", textTransform: "uppercase",
+  };
+  const btnGhost = {
+    background: "transparent", color: "#b8864a", border: "1px solid #b8864a",
+    padding: "6px 12px", borderRadius: 4, cursor: "pointer",
+    fontFamily: "'Courier New',monospace", fontSize: 10, fontWeight: 700,
+    letterSpacing: "0.1em", textTransform: "uppercase",
+  };
+  const inp = {
+    padding: "6px 8px", border: "1px solid #d0ccc6", borderRadius: 4,
+    fontFamily: "'Courier New',monospace", fontSize: 12, background: "#fff",
+    color: "#1a1a1a", colorScheme: "light",
+  };
+
+  return (
+    <div style={overlay} onClick={onCerrar}>
+      <div style={modal} onClick={e => e.stopPropagation()}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, borderBottom: "1px solid #e0ddd8", paddingBottom: 10 }}>
+          <h2 style={{ margin: 0, fontSize: 14, letterSpacing: "0.15em", textTransform: "uppercase", color: "#1a1a1a" }}>📁 Gestión de Proyectos</h2>
+          <button onClick={onCerrar} style={{ background: "transparent", color: "#888", border: "1px solid #ccc", padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontFamily: "'Courier New',monospace" }}>Cerrar</button>
+        </div>
+
+        {error && <div style={{ background: "#fee", color: "#900", padding: 8, borderRadius: 4, marginBottom: 10, fontSize: 11 }}>Error: {error}</div>}
+
+        {/* Botón nuevo */}
+        {!mostrarNuevo && (
+          <button onClick={() => setMostrarNuevo(true)} style={{ ...btnGold, marginBottom: 12 }}>+ Nuevo proyecto</button>
+        )}
+
+        {/* Formulario nuevo */}
+        {mostrarNuevo && (
+          <div style={{ background: "#fff", padding: 12, borderRadius: 4, marginBottom: 14, border: "1px solid #e0ddd8" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto auto", gap: 8, alignItems: "center" }}>
+              <input placeholder="Nombre del proyecto" value={nuevoForm.nombre} onChange={e => setNuevoForm({...nuevoForm, nombre: e.target.value})} style={inp} />
+              <input placeholder="Productora" value={nuevoForm.productora} onChange={e => setNuevoForm({...nuevoForm, productora: e.target.value})} style={inp} />
+              <button onClick={onAdd} style={btnGold}>Crear</button>
+              <button onClick={() => { setMostrarNuevo(false); setNuevoForm({ nombre: "", productora: "" }); }} style={btnGhost}>Cancelar</button>
+            </div>
+          </div>
+        )}
+
+        {cargando && <div style={{ padding: 20, textAlign: "center", color: "#888" }}>Cargando...</div>}
+
+        {/* Lista de proyectos */}
+        {!cargando && proyectos.length === 0 && (
+          <div style={{ padding: 20, textAlign: "center", color: "#888", fontSize: 12 }}>No hay proyectos. Crea el primero.</div>
+        )}
+
+        {!cargando && proyectos.map(p => (
+          <div key={p.id} style={{ background: "#fff", padding: 12, borderRadius: 4, marginBottom: 8, border: "1px solid #e0ddd8" }}>
+            {editando?.id === p.id ? (
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto auto auto", gap: 8, alignItems: "center" }}>
+                <input value={editando.nombre} onChange={e => setEditando({...editando, nombre: e.target.value})} style={inp} />
+                <input value={editando.productora} onChange={e => setEditando({...editando, productora: e.target.value})} style={inp} />
+                <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11 }}>
+                  <input type="checkbox" checked={editando.activo} onChange={e => setEditando({...editando, activo: e.target.checked})} /> Activo
+                </label>
+                <button onClick={onGuardarEdit} style={btnGold}>Guardar</button>
+                <button onClick={() => setEditando(null)} style={btnGhost}>Cancelar</button>
+              </div>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto auto auto auto", gap: 8, alignItems: "center" }}>
+                <div style={{ fontWeight: 700, color: p.activo ? "#1a1a1a" : "#999" }}>
+                  {p.nombre} {!p.activo && <span style={{ fontSize: 9, color: "#c00" }}>(inactivo)</span>}
+                </div>
+                <div style={{ fontSize: 11, color: "#666" }}>{p.productora}</div>
+                <div style={{ fontSize: 10, color: "#888" }}>
+                  {asignaciones.filter(a => a.proyecto_id === p.id).length} usuarios
+                </div>
+                <button onClick={() => setProyectoAsignar(proyectoAsignar?.id === p.id ? null : p)} style={btnGhost}>👥 Usuarios</button>
+                <button onClick={() => setEditando({ id: p.id, nombre: p.nombre, productora: p.productora, activo: p.activo })} style={btnGhost}>Editar</button>
+                <button onClick={() => onBorrar(p)} style={{ ...btnGhost, borderColor: "#c00", color: "#c00" }}>🗑</button>
+              </div>
+            )}
+
+            {/* Sub-panel asignación usuarios */}
+            {proyectoAsignar?.id === p.id && (
+              <div style={{ marginTop: 12, padding: 10, background: "#f0ede8", borderRadius: 4, border: "1px solid #d0ccc6" }}>
+                <div style={{ fontSize: 10, color: "#666", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.1em" }}>
+                  Marca los usuarios que pueden acceder a este proyecto:
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 6 }}>
+                  {usuarios.filter(u => !u.es_admin && u.activo).map(u => (
+                    <label key={u.id} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, padding: "4px 6px", background: "#fff", borderRadius: 3, cursor: "pointer" }}>
+                      <input
+                        type="checkbox"
+                        checked={estaAsignado(u.id, p.id)}
+                        onChange={() => toggleAsignacion(u.id, p.id)}
+                      />
+                      {u.nombre}
+                    </label>
+                  ))}
+                  {usuarios.filter(u => !u.es_admin && u.activo).length === 0 && (
+                    <div style={{ fontSize: 11, color: "#888", fontStyle: "italic" }}>
+                      No hay usuarios normales activos. Los admins ven todos los proyectos automáticamente.
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════
 // BANNER SUPERIOR (sesión actual)
 // ═══════════════════════════════════════════════════════════════════════
 
-function BannerSesion({ usuario, onLogout, onAdmin, onLogs, onPuestos, tab, onChangeTab }) {
+function BannerSesion({ usuario, onLogout, onAdmin, onLogs, onPuestos, onProyectos, tab, onChangeTab }) {
   const tabBtn = (id, label) => {
     const activa = tab === id;
     return (
@@ -6342,7 +6639,7 @@ function BannerSesion({ usuario, onLogout, onAdmin, onLogs, onPuestos, tab, onCh
         <span style={{ color: "#888", textTransform: "uppercase", fontSize: 9, letterSpacing: "0.18em" }}>Sesión:</span>
         <span style={{ fontWeight: 700, color: "#f0ede8" }}>{usuario.nombre}</span>
         {usuario.es_admin && <span style={{ background: "#c8a96e", color: "#1a1a1a", padding: "2px 6px", borderRadius: 3, fontSize: 8, fontWeight: 700, letterSpacing: "0.1em" }}>ADMIN</span>}
-        <span style={{ color: "#ffffff", fontSize: 13, letterSpacing: "0.08em", fontWeight: 700, marginLeft: 6 }} title="Versión de la app">v43</span>
+        <span style={{ color: "#ffffff", fontSize: 13, letterSpacing: "0.08em", fontWeight: 700, marginLeft: 6 }} title="Versión de la app">v44</span>
       </div>
 
       {/* Pestañas centrales */}
@@ -6356,6 +6653,7 @@ function BannerSesion({ usuario, onLogout, onAdmin, onLogs, onPuestos, tab, onCh
         {usuario.es_admin && (
           <>
             <button onClick={onAdmin} style={{ background: "transparent", color: "#c8a96e", border: "1px solid #c8a96e", padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontSize: 10, fontFamily: "'Courier New',monospace", fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" }}>⚙ Usuarios</button>
+            <button onClick={onProyectos} style={{ background: "transparent", color: "#c8a96e", border: "1px solid #c8a96e", padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontSize: 10, fontFamily: "'Courier New',monospace", fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" }}>📁 Proyectos</button>
             <button onClick={onLogs} style={{ background: "transparent", color: "#c8a96e", border: "1px solid #c8a96e", padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontSize: 10, fontFamily: "'Courier New',monospace", fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" }}>📊 Logs</button>
             <button onClick={onPuestos} style={{ background: "transparent", color: "#c8a96e", border: "1px solid #c8a96e", padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontSize: 10, fontFamily: "'Courier New',monospace", fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" }}>📋 Puestos</button>
           </>
@@ -6377,6 +6675,7 @@ export default function App() {
   const [mostrarAdmin, setMostrarAdmin] = useState(false);
   const [mostrarLogs, setMostrarLogs] = useState(false);
   const [mostrarPuestos, setMostrarPuestos] = useState(false);
+  const [mostrarProyectos, setMostrarProyectos] = useState(false);
   const [tab, setTab] = useState("iruna45"); // "iruna45" | "tab40"
 
   // ── Carga inicial: lee sesión, comprueba si ha expirado, entra directo si vale
@@ -6498,6 +6797,7 @@ export default function App() {
           onAdmin={() => setMostrarAdmin(true)}
           onLogs={() => setMostrarLogs(true)}
           onPuestos={() => setMostrarPuestos(true)}
+          onProyectos={() => setMostrarProyectos(true)}
           tab={tab}
           onChangeTab={setTab}
         />
@@ -6513,6 +6813,9 @@ export default function App() {
         )}
         {mostrarPuestos && usuario.es_admin && (
           <PanelPuestos usuarioActual={usuario} onCerrar={() => setMostrarPuestos(false)} />
+        )}
+        {mostrarProyectos && usuario.es_admin && (
+          <PanelProyectos usuarioActual={usuario} onCerrar={() => setMostrarProyectos(false)} />
         )}
       </div>
     </UsuarioContext.Provider>
