@@ -63,6 +63,8 @@ const DISCLAIMER_PDF = "(c) Eugenio Perez - All Rights Reserved - Uso no autoriz
 const FACTOR_BASE      = 0.89286;
 const DIVISOR_VAC      = 11.478452;
 const FACTOR_INDEM_DIA = 0.98632;
+// v47: Factor indemnización cuando el trabajador es FIJO DISCONTINUO (solo aplica en 40H)
+const FACTOR_INDEM_FIJO_DISC = 1.6433333;
 
 // 40H: el salario pactado se descompone en Base + Vac + Indem (suman = pactado)
 // Base + Base/11,478452 + (Base/30)*0,98632 = Salario_pactado
@@ -2211,6 +2213,7 @@ function DocumentoImprimible({
   plusHerramienta, plusCoche, plusVivienda, plusSeguroVida, plusComida,
   es40h = false,
   codigoContable = "",
+  esFijoDiscontinuo = false, // v47: solo 40H
 }) {
   // Estilos reutilizables
   const sectionTitle = {
@@ -2336,6 +2339,27 @@ function DocumentoImprimible({
             <tr>
               <td style={tdLabel}><strong>Salario pactado 45h:</strong> <span style={{ color: "#b8864a", fontWeight: 700 }}>{fmtE(salario45efectivo)}</span></td>
               <td style={tdValue}><strong>Horas referencia:</strong> {horasRef}h/mes</td>
+            </tr>
+          )}
+          {/* v47: fila fijo discontinuo (solo 40H) */}
+          {es40h && esFijoDiscontinuo && (
+            <tr>
+              <td colSpan={2} style={{ ...tdLabel, background: "#faf1e0" }}>
+                <span style={{
+                  display: "inline-block",
+                  padding: "2px 8px",
+                  background: "#c8963a",
+                  color: "#fff",
+                  fontSize: 9,
+                  fontWeight: 700,
+                  letterSpacing: "0.12em",
+                  borderRadius: 3,
+                  marginRight: 8,
+                }}>FIJO DISCONTINUO</span>
+                <span style={{ color: "#7a5a2a", fontSize: 10 }}>
+                  Indemnización calculada con factor 1,6433333 (en vez del 0,98632 estándar)
+                </span>
+              </td>
             </tr>
           )}
         </tbody>
@@ -2669,6 +2693,7 @@ function App45({ modoTab = "iruna45" }) {
   const [nombre,           setNombre]          = useState("");
   const [puesto,           setPuesto]          = useState("");
   const [codigoContable,   setCodigoContable]  = useState("");
+  const [esFijoDiscontinuo, setEsFijoDiscontinuo] = useState(false); // v47: solo 40H
   const [salario45,        setSalario45]       = useState("");
   const [horasRef,         setHorasRef]        = useState(22);
   const [modoInverso45,    setModoInverso45]   = useState(false);
@@ -2736,11 +2761,15 @@ function App45({ modoTab = "iruna45" }) {
   // ===== CÁLCULO BASE / VAC / INDEM =====
   // En 45H: Base = P40 × 0,89286 (factor jornada 40/45)
   // En 40H: Base = Salario_pactado / 1,119996 (descomposición directa)
+  // v47: en 40H con fijo discontinuo, cambia el factor de indemnización (1,6433333 en vez de 0,98632)
+  // y también el divisor 40H para que Base + Vac + Indem siga dando el salario pactado
+  const factorIndemActivo = (es40h && esFijoDiscontinuo) ? FACTOR_INDEM_FIJO_DISC : FACTOR_INDEM_DIA;
+  const DIVISOR_40H_ACTIVO = 1 + 1/DIVISOR_VAC + factorIndemActivo/30;
   const baseRef    = es40h
-    ? (Number(salario45) || 0) / DIVISOR_40H_BASE
+    ? (Number(salario45) || 0) / DIVISOR_40H_ACTIVO
     : p40ref * FACTOR_BASE;
   const vacRef     = baseRef / DIVISOR_VAC;
-  const indemRef   = (baseRef / 30) * FACTOR_INDEM_DIA;
+  const indemRef   = (baseRef / 30) * factorIndemActivo;
   const vHora      = (baseRef / 30 * 7) / 40;
   const vHoraEx    = vHora * 1.5;
   const hxRef      = vHoraEx * (horasRef || 0);
@@ -3183,7 +3212,7 @@ ${docHTML}
           <GestorPerfiles
             tabId={modoTab === "tab40" ? "40h" : "45h"}
             datosActuales={{
-              proyecto, productora, nombre, puesto, codigoContable, salario45, horasRef, modoInverso45, objetivoSemanal45,
+              proyecto, productora, nombre, puesto, codigoContable, esFijoDiscontinuo, salario45, horasRef, modoInverso45, objetivoSemanal45,
               fechaInicio, fechaFin, vacAcumulada, indemAcumulada,
               horasPorMes, vacDiasPorMes, festivosPorMes, festivosActivos, comidaDiasPorMes,
               plusHerramienta, plusCoche, plusVivienda, plusSeguroVida, plusComida,
@@ -3210,6 +3239,7 @@ ${docHTML}
               if (d.nombre !== undefined) setNombre(d.nombre);
               if (d.puesto !== undefined) setPuesto(d.puesto);
               if (d.codigoContable !== undefined) setCodigoContable(d.codigoContable);
+              if (d.esFijoDiscontinuo !== undefined) setEsFijoDiscontinuo(d.esFijoDiscontinuo);
               if (d.salario45 !== undefined) setSalario45(d.salario45);
               if (d.horasRef !== undefined) setHorasRef(d.horasRef);
               if (d.modoInverso45 !== undefined) setModoInverso45(d.modoInverso45);
@@ -3242,6 +3272,33 @@ ${docHTML}
               onPuesto={setPuesto}
               onCodigoContable={setCodigoContable}
             />
+            {/* v47: Toggle Fijo Discontinuo — solo 40H */}
+            {es40h && (
+              <div
+                onClick={() => setEsFijoDiscontinuo(v => !v)}
+                style={{
+                  display: "flex", justifyContent: "space-between", alignItems: "center",
+                  padding: "11px 13px",
+                  background: esFijoDiscontinuo ? "#faf1e0" : "#f0ede8",
+                  borderRadius: 6,
+                  border: `1px solid ${esFijoDiscontinuo ? "#c8963a" : "#e0ddd8"}`,
+                  marginTop: 10, cursor: "pointer",
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: 11, color: esFijoDiscontinuo ? "#7a5a2a" : "#999", fontFamily: "'Courier New', monospace", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 700 }}>
+                    Fijo discontinuo
+                  </div>
+                  <div style={{ fontSize: 9, color: "#777", marginTop: 2, fontFamily: "'Courier New', monospace" }}>
+                    {esFijoDiscontinuo ? "Indemnización × 1,6433333" : "Indemnización estándar × 0,98632"}
+                  </div>
+                </div>
+                <div style={{ position: "relative", width: 38, height: 20, flexShrink: 0, marginLeft: 12 }}>
+                  <div style={{ width: "100%", height: "100%", borderRadius: 10, background: esFijoDiscontinuo ? "#c8a96e" : "#222", transition: "background 0.25s" }} />
+                  <div style={{ position: "absolute", top: 3, left: esFijoDiscontinuo ? 19 : 3, width: 14, height: 14, borderRadius: "50%", background: esFijoDiscontinuo ? "#fff" : "#aaa", transition: "left 0.25s", boxShadow: "0 1px 3px rgba(0,0,0,0.5)" }} />
+                </div>
+              </div>
+            )}
           </div>
 
           <div style={P}>
@@ -3892,6 +3949,7 @@ ${docHTML}
               plusComida={plusComida}
               es40h={es40h}
               codigoContable={codigoContable}
+              esFijoDiscontinuo={esFijoDiscontinuo}
             />
           }
         />
@@ -3923,6 +3981,7 @@ ${docHTML}
             plusComida={plusComida}
             es40h={es40h}
             codigoContable={codigoContable}
+            esFijoDiscontinuo={esFijoDiscontinuo}
           />
         </div>
       )}
@@ -7199,7 +7258,7 @@ function BannerSesion({ usuario, proyectoActivo, onLogout, onAdmin, onLogs, onPu
         <span style={{ color: "#888", textTransform: "uppercase", fontSize: 9, letterSpacing: "0.18em" }}>Sesión:</span>
         <span style={{ fontWeight: 700, color: "#f0ede8" }}>{usuario.nombre}</span>
         {usuario.es_admin && <span style={{ background: "#c8a96e", color: "#1a1a1a", padding: "2px 6px", borderRadius: 3, fontSize: 8, fontWeight: 700, letterSpacing: "0.1em" }}>ADMIN</span>}
-        <span style={{ color: "#ffffff", fontSize: 13, letterSpacing: "0.08em", fontWeight: 700, marginLeft: 6 }} title="Versión de la app">v46</span>
+        <span style={{ color: "#ffffff", fontSize: 13, letterSpacing: "0.08em", fontWeight: 700, marginLeft: 6 }} title="Versión de la app">v47</span>
       </div>
 
       {/* Pestañas centrales */}
