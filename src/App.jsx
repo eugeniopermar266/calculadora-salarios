@@ -2371,9 +2371,9 @@ function DocumentoImprimible({
         <tbody>
           <tr>
             {[
-              { l: "BASE 40H",      v: baseRef,  s: "× 0,89286" },
+              { l: "BASE 40H",      v: baseRef,  s: (es40h && esFijoDiscontinuo) ? "Salario ÷ 1,14190" : "× 0,89286" },
               { l: "VACACIONES",    v: vacRef,   s: "Base ÷ 11,478452" },
-              { l: "INDEMNIZACIÓN", v: indemRef, s: "(Base/30) × 0,98632" },
+              { l: "INDEMNIZACIÓN", v: indemRef, s: (es40h && esFijoDiscontinuo) ? "(Base/30) × 1,6433333" : "(Base/30) × 0,98632" },
               ...(es40h ? [] : [{ l: `H.EXTRA (${horasRef}H)`, v: hxRef, s: `${horasRef}h × ${fmt(vHoraEx)} €`, blue: true }]),
             ].map((it, idx, arr) => (
               <td key={idx} style={{
@@ -3338,9 +3338,9 @@ ${docHTML}
               <div style={{ fontSize:9, color:"#666", letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:8 }}>Desglose mensual referencia</div>
               <div style={{ display:"grid", gridTemplateColumns: es40h ? "1fr 1fr 1fr" : "1fr 1fr", gap:6 }}>
                 {[
-                  { l:"Base 40h",     v:baseRef,  s:"×0,89286" },
+                  { l:"Base 40h",     v:baseRef,  s:(es40h && esFijoDiscontinuo) ? "Salario÷1,14190" : "×0,89286" },
                   { l:"Vacaciones",   v:vacRef,   s:"Base÷11,478" },
-                  { l:"Indemnización",v:indemRef, s:"(Base/30)×0,986" },
+                  { l:"Indemnización",v:indemRef, s:(es40h && esFijoDiscontinuo) ? "(Base/30)×1,6433" : "(Base/30)×0,986" },
                   ...(es40h ? [] : [{ l:`H.Extra (${horasRef}h)`,v:hxRef,s:`${horasRef}h×${fmt(vHoraEx)}€`, blue:true }]),
                 ].map(it=>(
                   <div key={it.l} style={{ background:"#fff", borderRadius:4, padding:"7px", border:"1px solid #e8e4de", textAlign:"center" }}>
@@ -3588,9 +3588,9 @@ ${docHTML}
                 <div style={ST}>▸ Desglose Mensual Referencia <BadgeBrutos /></div>
                 <div style={{ display:"grid", gridTemplateColumns: es40h ? "repeat(3,1fr)" : "repeat(4,1fr)", gap:10 }}>
                   {[
-                    { l:"Base 40h",     v:baseRef,  s:"× 0,89286" },
+                    { l:"Base 40h",     v:baseRef,  s:(es40h && esFijoDiscontinuo) ? "Salario ÷ 1,14190" : "× 0,89286" },
                     { l:"Vacaciones",   v:vacRef,   s:"Base ÷ 11,478" },
-                    { l:"Indemnización",v:indemRef, s:"(Base/30) × 0,986" },
+                    { l:"Indemnización",v:indemRef, s:(es40h && esFijoDiscontinuo) ? "(Base/30) × 1,6433" : "(Base/30) × 0,986" },
                     ...(es40h ? [] : [{ l:`H.Extra (${horasRef}h)`, v:hxRef, s:`${horasRef}h × ${fmt(vHoraEx)}€`, blue:true }]),
                   ].map(it=>(
                     <div key={it.l} style={{ background:"#f0ede8", borderRadius:6, padding:"12px 10px", border:"1px solid #e0ddd8", textAlign:"center" }}>
@@ -7258,7 +7258,7 @@ function BannerSesion({ usuario, proyectoActivo, onLogout, onAdmin, onLogs, onPu
         <span style={{ color: "#888", textTransform: "uppercase", fontSize: 9, letterSpacing: "0.18em" }}>Sesión:</span>
         <span style={{ fontWeight: 700, color: "#f0ede8" }}>{usuario.nombre}</span>
         {usuario.es_admin && <span style={{ background: "#c8a96e", color: "#1a1a1a", padding: "2px 6px", borderRadius: 3, fontSize: 8, fontWeight: 700, letterSpacing: "0.1em" }}>ADMIN</span>}
-        <span style={{ color: "#ffffff", fontSize: 13, letterSpacing: "0.08em", fontWeight: 700, marginLeft: 6 }} title="Versión de la app">v47</span>
+        <span style={{ color: "#ffffff", fontSize: 13, letterSpacing: "0.08em", fontWeight: 700, marginLeft: 6 }} title="Versión de la app">v48</span>
       </div>
 
       {/* Pestañas centrales */}
