@@ -2354,11 +2354,7 @@ function DocumentoImprimible({
                   fontWeight: 700,
                   letterSpacing: "0.12em",
                   borderRadius: 3,
-                  marginRight: 8,
                 }}>FIJO DISCONTINUO</span>
-                <span style={{ color: "#7a5a2a", fontSize: 10 }}>
-                  Indemnización calculada con factor 1,6433333 (en vez del 0,98632 estándar)
-                </span>
               </td>
             </tr>
           )}
@@ -7258,7 +7254,7 @@ function BannerSesion({ usuario, proyectoActivo, onLogout, onAdmin, onLogs, onPu
         <span style={{ color: "#888", textTransform: "uppercase", fontSize: 9, letterSpacing: "0.18em" }}>Sesión:</span>
         <span style={{ fontWeight: 700, color: "#f0ede8" }}>{usuario.nombre}</span>
         {usuario.es_admin && <span style={{ background: "#c8a96e", color: "#1a1a1a", padding: "2px 6px", borderRadius: 3, fontSize: 8, fontWeight: 700, letterSpacing: "0.1em" }}>ADMIN</span>}
-        <span style={{ color: "#ffffff", fontSize: 13, letterSpacing: "0.08em", fontWeight: 700, marginLeft: 6 }} title="Versión de la app">v48</span>
+        <span style={{ color: "#ffffff", fontSize: 13, letterSpacing: "0.08em", fontWeight: 700, marginLeft: 6 }} title="Versión de la app">v49</span>
       </div>
 
       {/* Pestañas centrales */}
