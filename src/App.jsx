@@ -960,15 +960,193 @@ function Row({ label, value, sub, highlight, green, muted }) {
 
 function Div() { return <div style={{ height: 1, background: "#e8e4de", margin: "8px 0" }} />; }
 
+// ═══════════════════════════════════════════════════════════════════════
+// IMPORTADOR DE PERFILES ANTIGUOS (v46) — solo admin
+// Lista los perfiles de localStorage y permite migrarlos a Supabase
+// asignándoles un proyecto. NO borra el original de localStorage.
+// ═══════════════════════════════════════════════════════════════════════
+function ImportadorAntiguos({ usuarioActual, tabId, onCerrar, onImportado }) {
+  const [locales, setLocales] = useState([]);
+  const [proyectos, setProyectos] = useState([]);
+  const [seleccion, setSeleccion] = useState({}); // { key: proyectoId }
+  const [cargando, setCargando] = useState(true);
+  const [importando, setImportando] = useState(false);
+  const [mensaje, setMensaje] = useState(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        // Leer todos los perfiles locales (todos los prefijos)
+        const prefijos = ["perfil_unif_", "perfil_45h_", "perfil_40h_"];
+        const keys = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && prefijos.some(p => k.startsWith(p))) keys.push(k);
+        }
+        const lista = keys.map(k => {
+          try {
+            const v = localStorage.getItem(k);
+            const data = JSON.parse(v);
+            return { key: k, ...data };
+          } catch { return null; }
+        }).filter(Boolean).filter(p => {
+          // Filtrar por tabId actual (o antiguos sin tabId → 45H)
+          if (p.tabId === tabId) return true;
+          if (!p.tabId && tabId === "45h") return true;
+          if (!p.tabId && tabId === "40h" && p.key && p.key.startsWith("perfil_40h_")) return true;
+          return false;
+        });
+        setLocales(lista.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)));
+
+        // Cargar proyectos disponibles (admin ve todos)
+        const proys = await listarProyectos({
+          adminPin: usuarioActual.pin,
+          esAdmin: true,
+        });
+        setProyectos((proys || []).filter(p => p.activo));
+      } catch (e) {
+        setMensaje({ tipo: "error", texto: "Error al cargar: " + e.message });
+      }
+      setCargando(false);
+    })();
+  }, []);
+
+  const importarSeleccionados = async () => {
+    const aImportar = Object.entries(seleccion).filter(([_, pid]) => pid);
+    if (aImportar.length === 0) {
+      alert("Selecciona un proyecto para al menos un perfil");
+      return;
+    }
+    setImportando(true);
+    let ok = 0, fallos = 0;
+    for (const [key, proyectoId] of aImportar) {
+      const p = locales.find(x => x.key === key);
+      if (!p) continue;
+      try {
+        await crearPerfilSupabase({
+          proyectoId: Number(proyectoId),
+          tabId: p.tabId || tabId,
+          nombre: p.nombre,
+          autor: p.autor || usuarioActual.nombre,
+          datos: p.datos,
+        });
+        ok++;
+      } catch (e) {
+        console.error("Error importando", p.nombre, e);
+        fallos++;
+      }
+    }
+    setImportando(false);
+    setMensaje({
+      tipo: fallos === 0 ? "ok" : "warn",
+      texto: `Importados: ${ok}${fallos > 0 ? ` · Fallidos: ${fallos}` : ""}. Los originales locales se conservan.`,
+    });
+    if (ok > 0) setTimeout(() => { onImportado(); }, 1500);
+  };
+
+  const overlay = {
+    position: "fixed", inset: 0, background: "rgba(20,20,20,0.75)",
+    display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100,
+  };
+  const modal = {
+    background: "#faf7f2", padding: 20, borderRadius: 6, maxWidth: 750, width: "92%",
+    maxHeight: "88vh", overflowY: "auto", color: "#1a1a1a",
+    fontFamily: "'Courier New',monospace", border: "1px solid #b8864a",
+  };
+
+  return (
+    <div style={overlay} onClick={onCerrar}>
+      <div style={modal} onClick={e => e.stopPropagation()}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, borderBottom: "1px solid #e0ddd8", paddingBottom: 10 }}>
+          <h2 style={{ margin: 0, fontSize: 14, letterSpacing: "0.15em", textTransform: "uppercase", color: "#1a1a1a" }}>📥 Importar Perfiles Antiguos</h2>
+          <button onClick={onCerrar} style={{ background: "transparent", color: "#888", border: "1px solid #ccc", padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontFamily: "'Courier New',monospace" }}>Cerrar</button>
+        </div>
+
+        <div style={{ fontSize: 11, color: "#666", marginBottom: 12, lineHeight: 1.5 }}>
+          Los perfiles antiguos guardados en este navegador (localStorage) se pueden migrar a la nube asignándoles un proyecto.
+          <br /><b>Los originales locales NO se borran</b>, se copian.
+        </div>
+
+        {mensaje && (
+          <div style={{
+            padding: 10, borderRadius: 4, marginBottom: 12, fontSize: 11,
+            background: mensaje.tipo === "ok" ? "#e8f5e8" : mensaje.tipo === "warn" ? "#fdf0e0" : "#fdf0f0",
+            border: `1px solid ${mensaje.tipo === "ok" ? "#c0e0c0" : mensaje.tipo === "warn" ? "#e8b878" : "#e8c0c0"}`,
+            color: mensaje.tipo === "ok" ? "#2a7a50" : mensaje.tipo === "warn" ? "#7a5a2a" : "#b02020",
+          }}>{mensaje.texto}</div>
+        )}
+
+        {cargando ? (
+          <div style={{ padding: 20, textAlign: "center", color: "#888" }}>Cargando...</div>
+        ) : locales.length === 0 ? (
+          <div style={{ padding: 20, textAlign: "center", color: "#888", fontSize: 12 }}>
+            No hay perfiles antiguos en este navegador para la pestaña {tabId?.toUpperCase()}.
+          </div>
+        ) : (
+          <>
+            {/* Tabla perfiles */}
+            <div style={{ maxHeight: "50vh", overflowY: "auto", marginBottom: 12 }}>
+              {locales.map(p => (
+                <div key={p.key} style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 8, padding: 10, background: "#fff", borderRadius: 4, marginBottom: 6, border: "1px solid #e8e4de", alignItems: "center" }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a" }}>{p.nombre}</div>
+                    <div style={{ fontSize: 9, color: "#888", marginTop: 2 }}>
+                      {p.datos?.proyecto && <><span style={{ color: "#b8864a" }}>{p.datos.proyecto}</span>{p.datos?.productora && ` · ${p.datos.productora}`} · </>}
+                      {p.datos?.nombre || "—"} · {p.datos?.puesto || "—"}
+                      {p.datos?.fechaInicio && ` · ${p.datos.fechaInicio}→${p.datos.fechaFin}`}
+                    </div>
+                    <div style={{ fontSize: 9, color: "#aaa", marginTop: 2 }}>
+                      {p.timestamp ? new Date(p.timestamp).toLocaleString("es-ES") : "—"}
+                    </div>
+                  </div>
+                  <select
+                    value={seleccion[p.key] || ""}
+                    onChange={e => setSeleccion({ ...seleccion, [p.key]: e.target.value })}
+                    style={{ padding: "6px 8px", border: "1px solid #d0ccc6", borderRadius: 4, fontFamily: "'Courier New',monospace", fontSize: 11, background: "#fff", color: "#1a1a1a", minWidth: 180 }}
+                  >
+                    <option value="">— No importar —</option>
+                    {proyectos.map(pr => (
+                      <option key={pr.id} value={pr.id}>{pr.nombre}</option>
+                    ))}
+                  </select>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", borderTop: "1px solid #e0ddd8", paddingTop: 12 }}>
+              <button
+                onClick={onCerrar}
+                disabled={importando}
+                style={{ background: "transparent", color: "#666", border: "1px solid #ccc", padding: "8px 16px", borderRadius: 4, cursor: importando ? "wait" : "pointer", fontFamily: "'Courier New',monospace", fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}
+              >Cancelar</button>
+              <button
+                onClick={importarSeleccionados}
+                disabled={importando}
+                style={{ background: "#b8864a", color: "#fff", border: "none", padding: "8px 16px", borderRadius: 4, cursor: importando ? "wait" : "pointer", fontFamily: "'Courier New',monospace", fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}
+              >{importando ? "Importando..." : "Importar seleccionados"}</button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+
 // ─── GESTOR DE PERFILES ──────────────────────────────────────────────────────
 function GestorPerfiles({ tabId, datosActuales, onCargarPerfil }) {
   const usuarioCtx = useContext(UsuarioContext);
+  const proyectoActivoCtx = useContext(ProyectoContext); // v46
+  const esAdmin = !!usuarioCtx?.es_admin;
   const [perfiles, setPerfiles] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [mostrarLista, setMostrarLista] = useState(false);
   const [nombrePerfil, setNombrePerfil] = useState("");
   const [mensaje, setMensaje] = useState(null);
   const [mostrarGuardar, setMostrarGuardar] = useState(false);
+  const [verTodosProyectos, setVerTodosProyectos] = useState(false); // v46: toggle admin
+  const [huboFallbackSupabase, setHuboFallbackSupabase] = useState(false); // v46: para avisar
+  const [mostrarImportador, setMostrarImportador] = useState(false); // v46: modal importar antiguos
 
   const STORAGE_PREFIX = `perfil_unif_`;
   const STORAGE_PREFIXES_LEGACY = [`perfil_40h_`, `perfil_45h_`];
@@ -1005,40 +1183,91 @@ function GestorPerfiles({ tabId, datosActuales, onCargarPerfil }) {
   useEffect(() => {
     (async () => {
       try {
+        // v46: Cargar de Supabase (fuente principal) + localStorage (respaldo)
+        // Admin puede ver todos los proyectos con toggle
+        const supTabId = tabId === "45h" ? "45h" : tabId === "40h" ? "40h" : tabId;
+        const perfilesSup = await listarPerfilesSupabase({
+          tabId: supTabId,
+          proyectoId: proyectoActivoCtx?.id || null,
+          verTodos: esAdmin && verTodosProyectos,
+          adminPin: esAdmin ? usuarioCtx.pin : null,
+        });
+
+        let listaFinal = [];
+        let supOK = true;
+
+        if (perfilesSup === null) {
+          // Error de red → fallback a localStorage
+          supOK = false;
+          setHuboFallbackSupabase(true);
+        } else {
+          // Mapear perfiles Supabase al formato interno { key, nombre, tabId, timestamp, autor, datos, proyecto_id }
+          listaFinal = perfilesSup.map(p => ({
+            key: `sup_${p.id}`,           // prefijo "sup_" distingue Supabase
+            supabaseId: p.id,             // id real en Supabase
+            proyectoId: p.proyecto_id,
+            nombre: p.nombre,
+            tabId: p.tab_id,
+            timestamp: new Date(p.created_at).getTime(),
+            autor: p.autor,
+            datos: p.datos,
+            fuente: "supabase",
+          }));
+          setHuboFallbackSupabase(false);
+        }
+
+        // Cargar de localStorage (respaldo)
         const todosPrefijos = [STORAGE_PREFIX, ...STORAGE_PREFIXES_LEGACY];
         const todasLasKeys = [];
         for (const prefix of todosPrefijos) {
           try {
             const res = await storage.list(prefix);
             if (res && res.keys) todasLasKeys.push(...res.keys);
-          } catch (e) { /* ignorar errores parciales */ }
+          } catch (e) { /* ignorar */ }
         }
-        const lista = await Promise.all(todasLasKeys.map(async k => {
+        const listaLocal = await Promise.all(todasLasKeys.map(async k => {
           try {
             const d = await storage.get(k);
             const data = JSON.parse(d.value);
-            return { key: k, ...data };
+            return { key: k, fuente: "local", ...data };
           } catch { return null; }
         }));
-        // Filtrar por tabId actual de la pestaña.
-        // 45H ve: perfiles con tabId="45h" + antiguos sin tabId (los del prefijo perfil_45h_ o perfil_unif_ sin tabId)
-        // 40H ve: solo perfiles con tabId="40h" (los antiguos sin tabId NO van a 40H)
-        const lista2 = lista.filter(Boolean).filter(p => {
-          if (!tabId) return true; // sin tabId → no filtrar (no debería pasar)
+        const localFiltrado = listaLocal.filter(Boolean).filter(p => {
+          if (!tabId) return true;
           if (p.tabId === tabId) return true;
-          // Caso de perfiles antiguos sin tabId: van a 45H
           if (!p.tabId && tabId === "45h") return true;
-          // Perfiles legacy en prefijo perfil_45h_ sin tabId → 45H
-          if (!p.tabId && tabId === "45h" && p.key && p.key.startsWith("perfil_45h_")) return true;
-          // Perfiles legacy en prefijo perfil_40h_ sin tabId → 40H
           if (!p.tabId && tabId === "40h" && p.key && p.key.startsWith("perfil_40h_")) return true;
           return false;
         });
-        setPerfiles(lista2.sort((a,b) => (b.timestamp||0) - (a.timestamp||0)));
+
+        // v46: Decidir qué perfiles locales mostrar según rol
+        // - Si Supabase falló → mostrar todos los locales (respaldo)
+        // - Si Supabase OK y ADMIN → añadir locales sin proyecto_id (los "antiguos") solo si NO estamos en modo verTodos
+        //   (si verTodos, ya vemos los de Supabase; los antiguos son locales)
+        //   → siempre mostramos antiguos locales al admin
+        // - Si Supabase OK y USUARIO NORMAL → NO mostrar antiguos (solo los del proyecto activo)
+        let extrasLocal = [];
+        if (!supOK) {
+          extrasLocal = localFiltrado;
+        } else if (esAdmin) {
+          // Admin ve los antiguos locales (los que no están en Supabase = no tienen proyecto_id)
+          extrasLocal = localFiltrado;
+        }
+        // Evitar duplicados por nombre+timestamp (por si algún antiguo ya se migró)
+        const claves = new Set(listaFinal.map(p => `${p.nombre}::${p.timestamp}`));
+        for (const p of extrasLocal) {
+          const k = `${p.nombre}::${p.timestamp}`;
+          if (!claves.has(k)) {
+            listaFinal.push(p);
+            claves.add(k);
+          }
+        }
+
+        setPerfiles(listaFinal.sort((a,b) => (b.timestamp||0) - (a.timestamp||0)));
       } catch (e) { console.error("Error cargando perfiles:", e); }
       setCargando(false);
     })();
-  }, []);
+  }, [tabId, proyectoActivoCtx?.id, verTodosProyectos]);
 
   const showMsg = (texto, tipo = "ok") => {
     setMensaje({ texto, tipo });
@@ -1049,7 +1278,6 @@ function GestorPerfiles({ tabId, datosActuales, onCargarPerfil }) {
     // Si el usuario no escribió nada, usar el placeholder sugerido como nombre
     let nombre = nombrePerfil.trim();
     if (!nombre) {
-      // Reconstruir el mismo texto del placeholder
       const sugerido = datosActuales.nombre
         ? `${datosActuales.nombre} · ${datosActuales.puesto || ""}`.trim().replace(/·\s*$/,"").trim()
         : "";
@@ -1068,13 +1296,52 @@ function GestorPerfiles({ tabId, datosActuales, onCargarPerfil }) {
       autor: usuarioCtx?.nombre || null,
       datos: datosActuales,
     };
+    // v46: guardar en Supabase (principal) Y localStorage (respaldo)
+    let supabaseOK = false;
+    let supabaseId = null;
+    if (proyectoActivoCtx?.id) {
+      try {
+        const res = await crearPerfilSupabase({
+          proyectoId: proyectoActivoCtx.id,
+          tabId,
+          nombre,
+          autor: payload.autor,
+          datos: datosActuales,
+        });
+        if (Array.isArray(res) && res.length > 0) {
+          supabaseId = res[0].id;
+          supabaseOK = true;
+        }
+      } catch (e) {
+        console.warn("Fallo al guardar en Supabase:", e.message);
+      }
+    }
+    // Guardar SIEMPRE en localStorage como respaldo
     try {
       await storage.set(key, JSON.stringify(payload));
-      const nuevoPerfil = { key, ...payload };
-      setPerfiles(prev => [nuevoPerfil, ...prev.filter(p => p.key !== key)]);
+      // Añadir a la lista según origen
+      let nuevoPerfil;
+      if (supabaseOK) {
+        nuevoPerfil = {
+          key: `sup_${supabaseId}`,
+          supabaseId,
+          proyectoId: proyectoActivoCtx.id,
+          fuente: "supabase",
+          ...payload,
+        };
+      } else {
+        nuevoPerfil = { key, fuente: "local", ...payload };
+      }
+      setPerfiles(prev => [nuevoPerfil, ...prev.filter(p => p.key !== nuevoPerfil.key)]);
       setNombrePerfil("");
       setMostrarGuardar(false);
-      showMsg(`✓ Guardado: ${nombre}`);
+      if (supabaseOK) {
+        showMsg(`✓ Guardado en el proyecto: ${nombre}`);
+      } else if (proyectoActivoCtx?.id) {
+        showMsg(`⚠ Guardado solo local (sin conexión): ${nombre}`, "warn");
+      } else {
+        showMsg(`✓ Guardado (local): ${nombre}`);
+      }
     } catch (e) {
       showMsg("Error al guardar", "error");
       console.error(e);
@@ -1091,7 +1358,12 @@ function GestorPerfiles({ tabId, datosActuales, onCargarPerfil }) {
     e.stopPropagation();
     if (!confirm(`¿Eliminar "${perfil.nombre}"?`)) return;
     try {
-      await storage.delete(perfil.key);
+      if (perfil.fuente === "supabase" && perfil.supabaseId) {
+        // v46: borrar de Supabase
+        await borrarPerfilSupabase(perfil.supabaseId, esAdmin ? usuarioCtx.pin : null);
+      } else {
+        await storage.delete(perfil.key);
+      }
       setPerfiles(prev => prev.filter(p => p.key !== perfil.key));
       showMsg("✓ Eliminado");
     } catch (err) {
@@ -1182,7 +1454,31 @@ function GestorPerfiles({ tabId, datosActuales, onCargarPerfil }) {
       )}
 
       {mostrarLista && (
-        <div style={{ marginTop:10, padding:10, background:"#f0ede8", borderRadius:5, border:"1px solid #e0ddd8", maxHeight:300, overflowY:"auto" }}>
+        <div style={{ marginTop:10, padding:10, background:"#f0ede8", borderRadius:5, border:"1px solid #e0ddd8", maxHeight:340, overflowY:"auto" }}>
+          {/* v46: barra superior admin */}
+          {esAdmin && (
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8, paddingBottom:8, borderBottom:"1px solid #e0ddd8" }}>
+              <label style={{ display:"flex", alignItems:"center", gap:6, fontSize:10, color:"#666", fontFamily:"'Courier New',monospace", cursor:"pointer" }}>
+                <input
+                  type="checkbox"
+                  checked={verTodosProyectos}
+                  onChange={e => setVerTodosProyectos(e.target.checked)}
+                  style={{ cursor:"pointer" }}
+                />
+                Ver todos los proyectos (admin)
+              </label>
+              <button
+                onClick={() => setMostrarImportador(true)}
+                style={{ background:"transparent", color:"#b8864a", border:"1px solid #b8864a", padding:"3px 8px", borderRadius:3, cursor:"pointer", fontSize:9, fontFamily:"'Courier New',monospace", fontWeight:700, letterSpacing:"0.1em", textTransform:"uppercase" }}
+              >📥 Importar antiguos</button>
+            </div>
+          )}
+          {/* v46: aviso si Supabase falló */}
+          {huboFallbackSupabase && (
+            <div style={{ background:"#fdf0e0", border:"1px solid #e8b878", color:"#7a5a2a", padding:"6px 8px", borderRadius:3, marginBottom:8, fontSize:10, fontFamily:"'Courier New',monospace" }}>
+              ⚠ Sin conexión con la nube. Mostrando solo perfiles locales.
+            </div>
+          )}
           {perfiles.length === 0 ? (
             <div style={{ fontSize:10, color:"#888", textAlign:"center", padding:"12px 0", fontFamily:"'Courier New',monospace" }}>
               No hay perfiles guardados todavía
@@ -1202,6 +1498,12 @@ function GestorPerfiles({ tabId, datosActuales, onCargarPerfil }) {
                       {perfil.tabId}
                     </span>
                   )}
+                  {/* v46: badge fuente */}
+                  {perfil.fuente === "local" && (
+                    <span style={{ fontSize:8, padding:"1px 5px", borderRadius:2, background:"#e8e4de", color:"#888", letterSpacing:"0.05em", textTransform:"uppercase", fontWeight:700 }} title="Perfil antiguo (local)">
+                      LOCAL
+                    </span>
+                  )}
                 </div>
                 <div style={{ fontSize:9, color:"#888", fontFamily:"'Courier New',monospace" }}>
                   {perfil.datos?.proyecto && <><span style={{color:"#b8864a",fontWeight:700}}>📁 {perfil.datos.proyecto}</span>{perfil.datos?.productora ? <span style={{color:"#888"}}> · {perfil.datos.productora}</span> : ""} · </>}
@@ -1217,6 +1519,23 @@ function GestorPerfiles({ tabId, datosActuales, onCargarPerfil }) {
             </div>
           ))}
         </div>
+      )}
+      {/* v46: modal importador antiguos (solo admin) */}
+      {mostrarImportador && esAdmin && (
+        <ImportadorAntiguos
+          usuarioActual={usuarioCtx}
+          tabId={tabId}
+          onCerrar={() => setMostrarImportador(false)}
+          onImportado={() => {
+            // Refrescar lista tras importar
+            setMostrarImportador(false);
+            setCargando(true);
+            // Forzar re-run del efecto cambiando dependencia artificial no es limpio;
+            // más simple: cerrar y reabrir la lista dispara re-mount
+            setMostrarLista(false);
+            setTimeout(() => setMostrarLista(true), 100);
+          }}
+        />
       )}
     </div>
   );
@@ -3742,6 +4061,52 @@ async function desasignarUsuarioProyecto(adminPin, usuarioId, proyectoId) {
   });
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+// PERFILES en Supabase (v46)
+// ═══════════════════════════════════════════════════════════════════════
+
+// Listar perfiles con filtro por proyecto y tab_id
+// - Si proyectoId es null y verTodos=false → devuelve []
+// - Si verTodos=true (admin) → todos los perfiles
+async function listarPerfilesSupabase({ tabId, proyectoId, verTodos, adminPin }) {
+  let path = `perfiles?select=*&order=created_at.desc`;
+  if (tabId) path += `&tab_id=eq.${tabId}`;
+  if (!verTodos) {
+    if (!proyectoId) return [];
+    path += `&proyecto_id=eq.${proyectoId}`;
+  }
+  const headers = verTodos && adminPin ? { "x-admin-pin": adminPin } : {};
+  try {
+    const data = await supabaseFetch(path, { headers });
+    return data || [];
+  } catch (e) {
+    console.warn("Error cargando perfiles Supabase:", e.message);
+    return null; // null = error de red (para que caller sepa que debe usar fallback)
+  }
+}
+
+async function crearPerfilSupabase({ proyectoId, tabId, nombre, autor, datos }) {
+  return supabaseFetch(`perfiles`, {
+    method: "POST",
+    headers: { "Prefer": "return=representation" },
+    body: JSON.stringify({
+      proyecto_id: proyectoId,
+      tab_id: tabId,
+      nombre,
+      autor,
+      datos,
+    }),
+  });
+}
+
+async function borrarPerfilSupabase(perfilId, adminPin) {
+  const headers = adminPin ? { "x-admin-pin": adminPin } : {};
+  return supabaseFetch(`perfiles?id=eq.${perfilId}`, {
+    method: "DELETE",
+    headers,
+  });
+}
+
 
 async function crearUsuario(adminPin, nombre, pin, esAdmin) {
   return supabaseFetch(`usuarios`, {
@@ -5244,10 +5609,34 @@ function CosteEmpresa() {
     };
   })();
 
-  // Cargar todos los perfiles (de los 3 prefijos: unif + legacy 45h + legacy 40h)
+  // Cargar todos los perfiles (v46: Supabase + localStorage)
   useEffect(() => {
     (async () => {
       try {
+        // v46: Cargar de Supabase (admin ve por defecto proyecto activo, con toggle "ver todos")
+        // Como CosteEmpresa es solo admin, cargamos todos los tabs y todos los proyectos por defecto
+        // (más simple: mostrar todos, ya tienen el buscador y filtro por tipo)
+        const perfilesSup = await listarPerfilesSupabase({
+          tabId: null,
+          verTodos: true,
+          adminPin: usuarioCtx?.pin,
+        });
+        let listaFinal = [];
+        if (Array.isArray(perfilesSup)) {
+          listaFinal = perfilesSup.map(p => ({
+            key: `sup_${p.id}`,
+            supabaseId: p.id,
+            proyectoId: p.proyecto_id,
+            nombre: p.nombre,
+            tabId: p.tab_id === "45h" ? "iruna45" : p.tab_id === "40h" ? "tab40" : p.tab_id,
+            timestamp: new Date(p.created_at).getTime(),
+            autor: p.autor,
+            datos: p.datos,
+            fuente: "supabase",
+          }));
+        }
+
+        // localStorage (respaldo/antiguos)
         const prefijos = ["perfil_unif_", "perfil_40h_", "perfil_45h_"];
         const todasKeys = [];
         for (const prefix of prefijos) {
@@ -5260,16 +5649,24 @@ function CosteEmpresa() {
           try {
             const d = await storage.get(k);
             const data = JSON.parse(d.value);
-            // Si el perfil viene de un prefijo legacy, deducir tabId
             let tabId = data.tabId;
             if (!tabId) {
               if (k.startsWith("perfil_45h_")) tabId = "iruna45";
               else if (k.startsWith("perfil_40h_")) tabId = "tab40";
             }
-            return { key: k, ...data, tabId };
+            return { key: k, fuente: "local", ...data, tabId };
           } catch { return null; }
         }));
-        setPerfiles(lista.filter(Boolean).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)));
+        // Fusionar sin duplicados
+        const claves = new Set(listaFinal.map(p => `${p.nombre}::${p.timestamp}`));
+        for (const p of lista.filter(Boolean)) {
+          const k = `${p.nombre}::${p.timestamp}`;
+          if (!claves.has(k)) {
+            listaFinal.push(p);
+            claves.add(k);
+          }
+        }
+        setPerfiles(listaFinal.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)));
       } catch (e) {
         console.error("Error cargando perfiles:", e);
       }
@@ -6802,7 +7199,7 @@ function BannerSesion({ usuario, proyectoActivo, onLogout, onAdmin, onLogs, onPu
         <span style={{ color: "#888", textTransform: "uppercase", fontSize: 9, letterSpacing: "0.18em" }}>Sesión:</span>
         <span style={{ fontWeight: 700, color: "#f0ede8" }}>{usuario.nombre}</span>
         {usuario.es_admin && <span style={{ background: "#c8a96e", color: "#1a1a1a", padding: "2px 6px", borderRadius: 3, fontSize: 8, fontWeight: 700, letterSpacing: "0.1em" }}>ADMIN</span>}
-        <span style={{ color: "#ffffff", fontSize: 13, letterSpacing: "0.08em", fontWeight: 700, marginLeft: 6 }} title="Versión de la app">v45</span>
+        <span style={{ color: "#ffffff", fontSize: 13, letterSpacing: "0.08em", fontWeight: 700, marginLeft: 6 }} title="Versión de la app">v46</span>
       </div>
 
       {/* Pestañas centrales */}
