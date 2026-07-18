@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, createContext, useContext } from "react";
 
 // Context para que componentes anidados accedan al usuario actual
 const UsuarioContext = createContext(null);
+const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre, productora)
 
 // ─── LOGOS ───────────────────────────────────────────────────────────────────
 // Versión neutra: el logo se renderiza como texto "BD PROD TOOLS" inline,
@@ -877,28 +878,42 @@ const BadgeBrutos = ({ size = "normal" }) => {
 };
 const LS = { display: "block", fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#555", marginBottom: 6, fontFamily: "'Courier New', monospace" };
 
-function Field({ label, value, onChange, type = "number", prefix, hint, small }) {
+function Field({ label, value, onChange, type = "number", prefix, hint, small, readOnly, lockHint }) {
   return (
     <div style={{ marginBottom: small ? 8 : 14, minWidth: 0 }}>
-      {label && <label style={{ ...LS, fontSize: small ? 9 : 10 }}>{label}</label>}
+      {label && (
+        <label style={{ ...LS, fontSize: small ? 9 : 10 }}>
+          {label}{readOnly && <span style={{ marginLeft: 6, color: "#b8864a" }}>🔒</span>}
+        </label>
+      )}
       <div style={{ position: "relative", minWidth: 0 }}>
         {prefix && <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "#b8864a", fontWeight: 700, fontSize: 13, fontFamily: "'Courier New', monospace" }}>{prefix}</span>}
         <input
           type={type === "date" ? "date" : type === "text" ? "text" : "number"}
           value={value}
-          onChange={e => onChange(type === "text" || type === "date" ? e.target.value : parseFloat(e.target.value) || 0)}
+          onChange={e => readOnly ? null : onChange(type === "text" || type === "date" ? e.target.value : parseFloat(e.target.value) || 0)}
+          readOnly={!!readOnly}
+          tabIndex={readOnly ? -1 : undefined}
           step="any" min="0"
           style={{
-            width: "100%", background: "#f0ede8", border: "1px solid #d0ccc6", borderRadius: 4,
-            color: "#1a1a1a", fontFamily: "'Courier New', monospace", fontSize: small ? 13 : 14,
+            width: "100%",
+            background: readOnly ? "#e5e2dd" : "#f0ede8",
+            border: `1px solid ${readOnly ? "#c8a96e" : "#d0ccc6"}`,
+            borderRadius: 4,
+            color: readOnly ? "#666" : "#1a1a1a",
+            fontFamily: "'Courier New', monospace",
+            fontSize: small ? 13 : 14,
             padding: prefix ? (small ? "7px 8px 7px 22px" : "9px 10px 9px 26px") : (small ? "7px 10px" : "9px 12px"),
-            outline: "none", boxSizing: "border-box", transition: "border-color 0.2s", colorScheme: "light",
+            outline: "none", boxSizing: "border-box", transition: "border-color 0.2s",
+            colorScheme: "light",
+            cursor: readOnly ? "not-allowed" : "text",
           }}
-          onFocus={e => e.target.style.borderColor = "#c8a96e"}
-          onBlur={e  => e.target.style.borderColor = "#2a2a2a"}
+          onFocus={e => { if (!readOnly) e.target.style.borderColor = "#c8a96e"; }}
+          onBlur={e  => { if (!readOnly) e.target.style.borderColor = "#2a2a2a"; }}
         />
       </div>
       {hint && <p style={{ margin: "3px 0 0", fontSize: 9, color: "#777", fontFamily: "'Courier New', monospace" }}>{hint}</p>}
+      {readOnly && lockHint && <p style={{ margin: "3px 0 0", fontSize: 9, color: "#b8864a", fontFamily: "'Courier New', monospace", fontStyle: "italic" }}>{lockHint}</p>}
     </div>
   );
 }
@@ -2320,6 +2335,7 @@ function DocumentoImprimible({
 function App45({ modoTab = "iruna45" }) {
   // Usuario actual de la sesión (para mostrar autor en exports)
   const usuarioSesion = useContext(UsuarioContext);
+  const proyectoActivoCtx = useContext(ProyectoContext); // v45
 
   // === FLAG PESTAÑA 40H ===
   // Cuando es40h=true, varios textos y bloques cambian para reflejar la jornada de 40h
@@ -2328,8 +2344,8 @@ function App45({ modoTab = "iruna45" }) {
   const labelHorasUpper = es40h ? "40H" : "45h";
   const labelTotalRef = es40h ? "TOTAL ≈ 40" : "TOTAL ≈ P45";
 
-  const [proyecto,         setProyecto]       = useState("");
-  const [productora,       setProductora]     = useState("");
+  const [proyecto,         setProyecto]       = useState(proyectoActivoCtx?.nombre || "");
+  const [productora,       setProductora]     = useState(proyectoActivoCtx?.productora || "");
   const [logoEmpresa,      setLogoEmpresa]    = useState("bizkaia");
   const [nombre,           setNombre]          = useState("");
   const [puesto,           setPuesto]          = useState("");
@@ -2864,8 +2880,14 @@ ${docHTML}
               },
             }}
             onCargarPerfil={(d) => {
-              if (d.proyecto !== undefined) setProyecto(d.proyecto);
-              if (d.productora !== undefined) setProductora(d.productora);
+              // v45: si hay proyecto activo, los campos Proyecto/Productora se mantienen del activo (no del perfil cargado)
+              if (proyectoActivoCtx) {
+                setProyecto(proyectoActivoCtx.nombre);
+                setProductora(proyectoActivoCtx.productora);
+              } else {
+                if (d.proyecto !== undefined) setProyecto(d.proyecto);
+                if (d.productora !== undefined) setProductora(d.productora);
+              }
               if (d.nombre !== undefined) setNombre(d.nombre);
               if (d.puesto !== undefined) setPuesto(d.puesto);
               if (d.codigoContable !== undefined) setCodigoContable(d.codigoContable);
@@ -2892,8 +2914,8 @@ ${docHTML}
 
           <div style={P}>
             <div style={ST}>▸ Trabajador</div>
-            <Field label="Proyecto" value={proyecto} onChange={setProyecto} type="text" hint="Nombre del proyecto / producción" />
-            <Field label="Productora" value={productora} onChange={setProductora} type="text" hint="Empresa productora" />
+            <Field label="Proyecto" value={proyecto} onChange={setProyecto} type="text" hint="Nombre del proyecto / producción" readOnly={!!proyectoActivoCtx} lockHint="Del proyecto activo" />
+            <Field label="Productora" value={productora} onChange={setProductora} type="text" hint="Empresa productora" readOnly={!!proyectoActivoCtx} lockHint="Del proyecto activo" />
             <Field label="Nombre" value={nombre} onChange={setNombre} type="text" />
             <PuestoSelector
               puesto={puesto}
@@ -4153,6 +4175,146 @@ async function borrarLogsAntiguos(adminPin, dias = 30) {
 // PANTALLA DE LOGIN
 // ═══════════════════════════════════════════════════════════════════════
 
+// ═══════════════════════════════════════════════════════════════════════
+// PANTALLA SELECTOR DE PROYECTO (v45)
+// ═══════════════════════════════════════════════════════════════════════
+function PantallaSelectorProyecto({ usuario, onSeleccionar, onLogout, onGestionar }) {
+  const [proyectos, setProyectos] = useState([]);
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState(null);
+
+  const recargar = () => {
+    setCargando(true); setError(null);
+    listarProyectos({
+      adminPin: usuario.es_admin ? usuario.pin : null,
+      usuarioId: usuario.id,
+      esAdmin: usuario.es_admin,
+    })
+      .then(lista => {
+        // Filtrar solo activos (para admins también, la selección es de trabajo)
+        setProyectos((lista || []).filter(p => p.activo));
+        setCargando(false);
+      })
+      .catch(err => { setError(err.message); setCargando(false); });
+  };
+
+  useEffect(() => { recargar(); }, []);
+
+  return (
+    <div style={{
+      minHeight: "100vh",
+      background: "linear-gradient(135deg, #1a1a1a 0%, #2a2520 100%)",
+      display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
+      fontFamily: "'Courier New', monospace",
+    }}>
+      <div style={{
+        background: "#f0ede8", borderRadius: 12, padding: "40px 36px",
+        maxWidth: 480, width: "100%",
+        boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
+        border: "1px solid #c8a96e",
+      }}>
+        {/* Cabecera */}
+        <div style={{ textAlign: "center", marginBottom: 24 }}>
+          <div style={{
+            display: "inline-block", width: 56, height: 56,
+            background: "#c8a96e", borderRadius: 12,
+            color: "#1a1a1a", fontSize: 26, fontWeight: 700,
+            lineHeight: "56px", marginBottom: 14,
+          }}>📁</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", letterSpacing: "0.18em", textTransform: "uppercase" }}>
+            Selecciona Proyecto
+          </div>
+          <div style={{ fontSize: 10, color: "#888", marginTop: 4, letterSpacing: "0.12em", textTransform: "uppercase" }}>
+            {usuario.nombre}{usuario.es_admin ? " · Admin" : ""}
+          </div>
+        </div>
+
+        {cargando && (
+          <div style={{ textAlign: "center", padding: 20, color: "#888", fontSize: 11 }}>
+            Cargando proyectos...
+          </div>
+        )}
+
+        {error && (
+          <div style={{ padding: 12, background: "rgba(160,69,69,0.1)", border: "1px solid #a04545", borderRadius: 6, color: "#a04545", fontSize: 11, marginBottom: 12 }}>
+            ✕ {error}
+          </div>
+        )}
+
+        {/* Sin proyectos */}
+        {!cargando && !error && proyectos.length === 0 && (
+          <div style={{
+            padding: 20, background: "rgba(184,134,74,0.08)", border: "1px solid #d4b678",
+            borderRadius: 6, color: "#5a4a2a", fontSize: 12, textAlign: "center", lineHeight: 1.5, marginBottom: 14,
+          }}>
+            <div style={{ fontSize: 32, marginBottom: 8 }}>⚠</div>
+            <b>No tienes proyectos asignados</b>
+            <div style={{ marginTop: 6, fontSize: 11, color: "#888" }}>
+              Contacta con un administrador para que te asigne un proyecto.
+            </div>
+          </div>
+        )}
+
+        {/* Lista de proyectos */}
+        {!cargando && proyectos.length > 0 && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
+            {proyectos.map(p => (
+              <button
+                key={p.id}
+                onClick={() => onSeleccionar(p)}
+                style={{
+                  background: "#fff", border: "1px solid #d0ccc6",
+                  borderRadius: 6, padding: "14px 16px", cursor: "pointer",
+                  textAlign: "left", fontFamily: "'Courier New', monospace",
+                  transition: "all 0.15s", color: "#1a1a1a",
+                  display: "flex", justifyContent: "space-between", alignItems: "center",
+                }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = "#c8a96e"; e.currentTarget.style.background = "#faf6ee"; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = "#d0ccc6"; e.currentTarget.style.background = "#fff"; }}
+              >
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", letterSpacing: "0.05em" }}>
+                    {p.nombre}
+                  </div>
+                  <div style={{ fontSize: 10, color: "#888", marginTop: 2, letterSpacing: "0.1em", textTransform: "uppercase" }}>
+                    {p.productora}
+                  </div>
+                </div>
+                <div style={{ color: "#c8a96e", fontSize: 18 }}>→</div>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Botones inferiores */}
+        <div style={{ display: "flex", gap: 8, marginTop: 12, paddingTop: 14, borderTop: "1px solid #e0ddd8" }}>
+          {usuario.es_admin && (
+            <button
+              onClick={onGestionar}
+              style={{
+                flex: 1, background: "#c8a96e", color: "#1a1a1a", border: "none",
+                padding: "10px 14px", borderRadius: 5, cursor: "pointer",
+                fontFamily: "'Courier New', monospace", fontSize: 10, fontWeight: 700,
+                letterSpacing: "0.12em", textTransform: "uppercase",
+              }}
+            >⚙ Gestionar proyectos</button>
+          )}
+          <button
+            onClick={onLogout}
+            style={{
+              flex: 1, background: "transparent", color: "#888", border: "1px solid #ccc",
+              padding: "10px 14px", borderRadius: 5, cursor: "pointer",
+              fontFamily: "'Courier New', monospace", fontSize: 10, fontWeight: 700,
+              letterSpacing: "0.12em", textTransform: "uppercase",
+            }}
+          >Cerrar sesión</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
 function PantallaLogin({ onAcierto }) {
   const [nombres, setNombres] = useState([]);
   const [cargando, setCargando] = useState(true);
@@ -5029,6 +5191,7 @@ function PanelPuestos({ usuarioActual, onCerrar }) {
 
 function CosteEmpresa() {
   const usuarioCtx = useContext(UsuarioContext);
+  const proyectoActivoCtx = useContext(ProyectoContext); // v45
   const [perfiles, setPerfiles] = useState([]);
   const [cargandoPerfiles, setCargandoPerfiles] = useState(true);
   const [perfilCargado, setPerfilCargado] = useState(null);
@@ -6565,7 +6728,7 @@ function PanelProyectos({ usuarioActual, onCerrar }) {
 // BANNER SUPERIOR (sesión actual)
 // ═══════════════════════════════════════════════════════════════════════
 
-function BannerSesion({ usuario, onLogout, onAdmin, onLogs, onPuestos, onProyectos, tab, onChangeTab }) {
+function BannerSesion({ usuario, proyectoActivo, onLogout, onAdmin, onLogs, onPuestos, onProyectos, tab, onChangeTab }) {
   const tabBtn = (id, label) => {
     const activa = tab === id;
     return (
@@ -6639,7 +6802,7 @@ function BannerSesion({ usuario, onLogout, onAdmin, onLogs, onPuestos, onProyect
         <span style={{ color: "#888", textTransform: "uppercase", fontSize: 9, letterSpacing: "0.18em" }}>Sesión:</span>
         <span style={{ fontWeight: 700, color: "#f0ede8" }}>{usuario.nombre}</span>
         {usuario.es_admin && <span style={{ background: "#c8a96e", color: "#1a1a1a", padding: "2px 6px", borderRadius: 3, fontSize: 8, fontWeight: 700, letterSpacing: "0.1em" }}>ADMIN</span>}
-        <span style={{ color: "#ffffff", fontSize: 13, letterSpacing: "0.08em", fontWeight: 700, marginLeft: 6 }} title="Versión de la app">v44</span>
+        <span style={{ color: "#ffffff", fontSize: 13, letterSpacing: "0.08em", fontWeight: 700, marginLeft: 6 }} title="Versión de la app">v45</span>
       </div>
 
       {/* Pestañas centrales */}
@@ -6650,10 +6813,20 @@ function BannerSesion({ usuario, onLogout, onAdmin, onLogs, onPuestos, onProyect
       </div>
 
       <div style={{ display: "flex", gap: 8 }}>
+        {/* Botón proyectos: TODOS lo ven, muestra el proyecto activo y al pulsar sale al selector */}
+        <button
+          onClick={onProyectos}
+          title="Cambiar de proyecto"
+          style={{
+            background: "#c8a96e", color: "#1a1a1a", border: "1px solid #c8a96e",
+            padding: "4px 12px", borderRadius: 4, cursor: "pointer", fontSize: 10,
+            fontFamily: "'Courier New',monospace", fontWeight: 700,
+            letterSpacing: "0.12em", textTransform: "uppercase",
+          }}
+        >📁 {proyectoActivo?.nombre || "Proyectos"}</button>
         {usuario.es_admin && (
           <>
             <button onClick={onAdmin} style={{ background: "transparent", color: "#c8a96e", border: "1px solid #c8a96e", padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontSize: 10, fontFamily: "'Courier New',monospace", fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" }}>⚙ Usuarios</button>
-            <button onClick={onProyectos} style={{ background: "transparent", color: "#c8a96e", border: "1px solid #c8a96e", padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontSize: 10, fontFamily: "'Courier New',monospace", fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" }}>📁 Proyectos</button>
             <button onClick={onLogs} style={{ background: "transparent", color: "#c8a96e", border: "1px solid #c8a96e", padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontSize: 10, fontFamily: "'Courier New',monospace", fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" }}>📊 Logs</button>
             <button onClick={onPuestos} style={{ background: "transparent", color: "#c8a96e", border: "1px solid #c8a96e", padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontSize: 10, fontFamily: "'Courier New',monospace", fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" }}>📋 Puestos</button>
           </>
@@ -6676,6 +6849,7 @@ export default function App() {
   const [mostrarLogs, setMostrarLogs] = useState(false);
   const [mostrarPuestos, setMostrarPuestos] = useState(false);
   const [mostrarProyectos, setMostrarProyectos] = useState(false);
+  const [proyectoActivo, setProyectoActivo] = useState(null); // v45: proyecto seleccionado
   const [tab, setTab] = useState("iruna45"); // "iruna45" | "tab40"
 
   // ── Carga inicial: lee sesión, comprueba si ha expirado, entra directo si vale
@@ -6703,6 +6877,10 @@ export default function App() {
         es_admin: parsed.es_admin,
         pin: parsed.pin,
       });
+      // Restaurar proyecto activo si lo tenía seleccionado (v45)
+      if (parsed.proyecto_activo) {
+        setProyectoActivo(parsed.proyecto_activo);
+      }
       // Renovar timestamp
       localStorage.setItem(AUTH_KEY, JSON.stringify({ ...parsed, ultima_actividad: ahora }));
       setComprobando(false);
@@ -6778,26 +6956,74 @@ export default function App() {
   // Wrapper para el setUsuario que recibe PantallaLogin (incluye ultima_actividad)
   const onLoginAcierto = (u) => {
     setUsuario(u);
+    // Al hacer login siempre pasamos por el selector de proyecto
+    setProyectoActivo(null);
   };
 
   const cerrarSesion = () => {
     try { localStorage.removeItem(AUTH_KEY); } catch {}
     setUsuario(null);
+    setProyectoActivo(null);
+  };
+
+  // v45: Seleccionar un proyecto y persistir en localStorage
+  const seleccionarProyecto = (p) => {
+    setProyectoActivo(p);
+    try {
+      const guardado = localStorage.getItem(AUTH_KEY);
+      if (guardado) {
+        const parsed = JSON.parse(guardado);
+        parsed.proyecto_activo = p;
+        localStorage.setItem(AUTH_KEY, JSON.stringify(parsed));
+      }
+    } catch {}
+  };
+
+  // v45: Salir del proyecto activo → volver al selector
+  const salirDelProyecto = () => {
+    setProyectoActivo(null);
+    try {
+      const guardado = localStorage.getItem(AUTH_KEY);
+      if (guardado) {
+        const parsed = JSON.parse(guardado);
+        delete parsed.proyecto_activo;
+        localStorage.setItem(AUTH_KEY, JSON.stringify(parsed));
+      }
+    } catch {}
   };
 
   if (comprobando) return <div style={{ minHeight: "100vh", background: "#1a1a1a" }} />;
   if (!usuario) return <PantallaLogin onAcierto={onLoginAcierto} />;
 
+  // v45: Si hay usuario pero no ha elegido proyecto, mostrar selector
+  if (!proyectoActivo) {
+    return (
+      <>
+        <PantallaSelectorProyecto
+          usuario={usuario}
+          onSeleccionar={seleccionarProyecto}
+          onLogout={cerrarSesion}
+          onGestionar={() => setMostrarProyectos(true)}
+        />
+        {mostrarProyectos && usuario.es_admin && (
+          <PanelProyectos usuarioActual={usuario} onCerrar={() => setMostrarProyectos(false)} />
+        )}
+      </>
+    );
+  }
+
   return (
     <UsuarioContext.Provider value={usuario}>
+      <ProyectoContext.Provider value={proyectoActivo}>
       <div style={{ minHeight: "100vh", background: "#f0ede8" }}>
         <BannerSesion
           usuario={usuario}
+          proyectoActivo={proyectoActivo}
           onLogout={cerrarSesion}
           onAdmin={() => setMostrarAdmin(true)}
           onLogs={() => setMostrarLogs(true)}
           onPuestos={() => setMostrarPuestos(true)}
-          onProyectos={() => setMostrarProyectos(true)}
+          onProyectos={salirDelProyecto}
           tab={tab}
           onChangeTab={setTab}
         />
@@ -6818,6 +7044,7 @@ export default function App() {
           <PanelProyectos usuarioActual={usuario} onCerrar={() => setMostrarProyectos(false)} />
         )}
       </div>
+      </ProyectoContext.Provider>
     </UsuarioContext.Provider>
   );
 }
