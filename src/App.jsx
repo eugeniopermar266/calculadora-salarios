@@ -2806,11 +2806,14 @@ function App45({ modoTab = "iruna45" }) {
     const plusAct      = Math.max(0, objetivo - cobroNatural);
     const vdShow   = vacAcumulada ? (esUltimo ? totalVdImporte : 0) : (importeVdMes[i]||0);
     const totalMes = base40 + vac40 + indem40 + cobroHx + plusAct - vdShow;
+    // v50: Vacación mostrada en pantalla = prorrateada − días disfrutados (para tabla Nómina por mes)
+    // El PDF sigue mostrando vac40 tal cual. Puede ser negativa si disfrutó más de lo prorrateado ese mes.
+    const vacMostrar = vac40 - vdShow;
     return {
       mes: d.mes, desde: d.desde, hasta: d.hasta,
       esCompleto: d.esCompleto, fraccion: d.fraccion,
       semanasLab: d.semanasLaborables,
-      hMes, base40, vac40, indem40, cobroHx, plusAct,
+      hMes, base40, vac40, vacMostrar, indem40, cobroHx, plusAct,
       vdDias: vacDiasPorMes[i]||0, vdShow,
       objetivo, totalMes,
     };
@@ -2818,6 +2821,7 @@ function App45({ modoTab = "iruna45" }) {
 
   const totBase   = desglose45.reduce((s,d)=>s+d.base40,   0);
   const totVac    = desglose45.reduce((s,d)=>s+d.vac40,    0);
+  const totVacMostrar = desglose45.reduce((s,d)=>s+d.vacMostrar, 0); // v50: total real percibido
   const totIndem  = desglose45.reduce((s,d)=>s+d.indem40,  0);
   const totHx     = desglose45.reduce((s,d)=>s+d.cobroHx,  0);
   const totPlus   = desglose45.reduce((s,d)=>s+d.plusAct,  0);
@@ -3698,7 +3702,7 @@ ${docHTML}
                           </td>
                           <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Courier New',monospace",color:"#888",borderBottom:"1px solid #eae7e2"}}>{fmtM(d.fraccion)}</td>
                           <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Courier New',monospace",color:"#1a1a1a",borderBottom:"1px solid #eae7e2"}}>{fmt(d.base40)}</td>
-                          <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Courier New',monospace",color:d.vac40===0?"#ccc":"#1a1a1a",borderBottom:"1px solid #eae7e2"}}>{d.vac40===0?"—":fmt(d.vac40)}</td>
+                          <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Courier New',monospace",color: d.vacMostrar === 0 ? "#ccc" : (d.vacMostrar < 0 ? "#c04040" : "#1a1a1a"),borderBottom:"1px solid #eae7e2"}}>{d.vacMostrar === 0 ? "—" : fmt(d.vacMostrar)}</td>
                           <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Courier New',monospace",color:d.indem40===0?"#ccc":"#1a1a1a",borderBottom:"1px solid #eae7e2"}}>{d.indem40===0?"—":fmt(d.indem40)}</td>
                           <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Courier New',monospace",color:"#3a6898",borderBottom:"1px solid #eae7e2"}}>{d.hMes}h</td>
                           <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Courier New',monospace",color:"#3a6898",borderBottom:"1px solid #eae7e2"}}>{fmt(d.cobroHx)}</td>
@@ -3713,7 +3717,7 @@ ${docHTML}
                       <tr style={{ background:"rgba(184,134,74,0.06)" }}>
                         <td colSpan={2} style={{padding:"8px",fontSize:10,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,fontFamily:"'Courier New',monospace",color:"#b8864a",borderTop:"1px solid #d8d4ce"}}>TOTAL</td>
                         <td style={{padding:"8px",fontSize:11,textAlign:"right",fontFamily:"'Courier New',monospace",color:"#666",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{fmt(totBase)}</td>
-                        <td style={{padding:"8px",fontSize:11,textAlign:"right",fontFamily:"'Courier New',monospace",color:"#666",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{fmt(totVac)}</td>
+                        <td style={{padding:"8px",fontSize:11,textAlign:"right",fontFamily:"'Courier New',monospace",color: totVacMostrar < 0 ? "#c04040" : "#666",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{fmt(totVacMostrar)}</td>
                         <td style={{padding:"8px",fontSize:11,textAlign:"right",fontFamily:"'Courier New',monospace",color:"#666",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{fmt(totIndem)}</td>
                         <td style={{padding:"8px",fontSize:11,textAlign:"right",fontFamily:"'Courier New',monospace",color:"#3a6898",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{horasPorMes.reduce((s,v,i)=>{if (v === undefined || v === null || v === "") return s + Math.round((p.desglose[i]?.semanasLaborables||0)*5);return s + (v || 0);},0)}h</td>
                         <td style={{padding:"8px",fontSize:11,textAlign:"right",fontFamily:"'Courier New',monospace",color:"#3a6898",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{fmt(totHx)}</td>
@@ -7254,7 +7258,7 @@ function BannerSesion({ usuario, proyectoActivo, onLogout, onAdmin, onLogs, onPu
         <span style={{ color: "#888", textTransform: "uppercase", fontSize: 9, letterSpacing: "0.18em" }}>Sesión:</span>
         <span style={{ fontWeight: 700, color: "#f0ede8" }}>{usuario.nombre}</span>
         {usuario.es_admin && <span style={{ background: "#c8a96e", color: "#1a1a1a", padding: "2px 6px", borderRadius: 3, fontSize: 8, fontWeight: 700, letterSpacing: "0.1em" }}>ADMIN</span>}
-        <span style={{ color: "#ffffff", fontSize: 13, letterSpacing: "0.08em", fontWeight: 700, marginLeft: 6 }} title="Versión de la app">v49</span>
+        <span style={{ color: "#ffffff", fontSize: 13, letterSpacing: "0.08em", fontWeight: 700, marginLeft: 6 }} title="Versión de la app">v50</span>
       </div>
 
       {/* Pestañas centrales */}
