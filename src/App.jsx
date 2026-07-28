@@ -1149,6 +1149,7 @@ function GestorPerfiles({ tabId, datosActuales, onCargarPerfil }) {
   const [verTodosProyectos, setVerTodosProyectos] = useState(false); // v46: toggle admin
   const [huboFallbackSupabase, setHuboFallbackSupabase] = useState(false); // v46: para avisar
   const [mostrarImportador, setMostrarImportador] = useState(false); // v46: modal importar antiguos
+  const [perfilEnEdicion, setPerfilEnEdicion] = useState(null); // v53: perfil cargado que se puede modificar
 
   const STORAGE_PREFIX = `perfil_unif_`;
   const STORAGE_PREFIXES_LEGACY = [`perfil_40h_`, `perfil_45h_`];
@@ -1352,6 +1353,7 @@ function GestorPerfiles({ tabId, datosActuales, onCargarPerfil }) {
 
   const cargarPerfil = (perfil) => {
     onCargarPerfil(perfil.datos);
+    setPerfilEnEdicion(perfil); // v53: guardamos referencia para poder modificar
     setMostrarLista(false);
     showMsg(`✓ Cargado: ${perfil.nombre}`);
   };
@@ -1370,6 +1372,123 @@ function GestorPerfiles({ tabId, datosActuales, onCargarPerfil }) {
       showMsg("✓ Eliminado");
     } catch (err) {
       showMsg("Error al eliminar", "error");
+      console.error(err);
+    }
+  };
+
+  // v51: renombrar perfil (Supabase o local). Admin puede renombrar de otros proyectos.
+  const renombrarPerfil = async (perfil, e) => {
+    e.stopPropagation();
+    const nuevo = prompt(`Renombrar "${perfil.nombre}":`, perfil.nombre);
+    if (!nuevo || !nuevo.trim() || nuevo.trim() === perfil.nombre) return;
+    const nombreNuevo = nuevo.trim();
+    try {
+      if (perfil.fuente === "supabase" && perfil.supabaseId) {
+        await actualizarPerfilSupabase(perfil.supabaseId, { nombre: nombreNuevo }, esAdmin ? usuarioCtx.pin : null);
+      } else {
+        // Local: reescribir el objeto en su misma key
+        const nuevoPayload = { ...perfil, nombre: nombreNuevo };
+        // Quitar campos internos que no queremos persistir
+        delete nuevoPayload.key;
+        delete nuevoPayload.fuente;
+        delete nuevoPayload.supabaseId;
+        delete nuevoPayload.proyectoId;
+        await storage.set(perfil.key, JSON.stringify(nuevoPayload));
+      }
+      setPerfiles(prev => prev.map(p => p.key === perfil.key ? { ...p, nombre: nombreNuevo } : p));
+      showMsg(`✓ Renombrado a "${nombreNuevo}"`);
+    } catch (err) {
+      showMsg("Error al renombrar", "error");
+      console.error(err);
+    }
+  };
+
+  // v51: duplicar perfil como "<original> (copia)" en el proyecto activo
+  const duplicarPerfil = async (perfil, e) => {
+    e.stopPropagation();
+    const nombreCopia = `${perfil.nombre} (copia)`;
+    const payload = {
+      nombre: nombreCopia,
+      tabId: perfil.tabId,
+      timestamp: Date.now(),
+      autor: usuarioCtx?.nombre || null,
+      datos: perfil.datos,
+    };
+    // v51: guardar en Supabase (si hay proyecto activo) Y localStorage (respaldo)
+    let supabaseOK = false;
+    let supabaseId = null;
+    if (proyectoActivoCtx?.id) {
+      try {
+        const res = await crearPerfilSupabase({
+          proyectoId: proyectoActivoCtx.id,
+          tabId: perfil.tabId,
+          nombre: nombreCopia,
+          autor: payload.autor,
+          datos: perfil.datos,
+        });
+        if (Array.isArray(res) && res.length > 0) {
+          supabaseId = res[0].id;
+          supabaseOK = true;
+        }
+      } catch (err) {
+        console.warn("Fallo duplicando en Supabase:", err.message);
+      }
+    }
+    // Guardar copia en localStorage como respaldo
+    const key = `${STORAGE_PREFIX}${Date.now()}_${nombreCopia.replace(/[^a-zA-Z0-9]/g,"_").slice(0,40)}`;
+    try {
+      await storage.set(key, JSON.stringify(payload));
+      const nuevoPerfil = supabaseOK
+        ? { key: `sup_${supabaseId}`, supabaseId, proyectoId: proyectoActivoCtx.id, fuente: "supabase", ...payload }
+        : { key, fuente: "local", ...payload };
+      setPerfiles(prev => [nuevoPerfil, ...prev]);
+      showMsg(`✓ Duplicado: ${nombreCopia}`);
+    } catch (err) {
+      showMsg("Error al duplicar", "error");
+      console.error(err);
+    }
+  };
+
+  // v53: modificar perfil actualmente cargado (sobrescribir con datos actuales)
+  const modificarPerfil = async () => {
+    if (!perfilEnEdicion) return;
+    const fechaOriginal = perfilEnEdicion.timestamp
+      ? new Date(perfilEnEdicion.timestamp).toLocaleString("es-ES")
+      : "fecha desconocida";
+    const confirmar = confirm(
+      `Este perfil se guardó el ${fechaOriginal}\n\n¿Sobrescribir "${perfilEnEdicion.nombre}" con los datos actuales?`
+    );
+    if (!confirmar) return;
+    const payload = {
+      nombre: perfilEnEdicion.nombre,
+      tabId,
+      timestamp: Date.now(), // actualizar timestamp
+      autor: usuarioCtx?.nombre || null,
+      datos: datosActuales,
+    };
+    try {
+      if (perfilEnEdicion.fuente === "supabase" && perfilEnEdicion.supabaseId) {
+        // Sobrescribir en Supabase
+        await actualizarPerfilSupabase(
+          perfilEnEdicion.supabaseId,
+          { nombre: payload.nombre, datos: datosActuales, autor: payload.autor },
+          esAdmin ? usuarioCtx.pin : null
+        );
+      } else {
+        // Sobrescribir en localStorage (misma key)
+        await storage.set(perfilEnEdicion.key, JSON.stringify(payload));
+      }
+      // Actualizar en la lista visible
+      setPerfiles(prev => prev.map(p =>
+        p.key === perfilEnEdicion.key
+          ? { ...p, ...payload, key: p.key, fuente: p.fuente, supabaseId: p.supabaseId, proyectoId: p.proyectoId }
+          : p
+      ));
+      // Refrescar la referencia con los datos nuevos
+      setPerfilEnEdicion(prev => prev ? { ...prev, ...payload } : prev);
+      showMsg(`✓ Modificado: ${perfilEnEdicion.nombre}`);
+    } catch (err) {
+      showMsg("Error al modificar", "error");
       console.error(err);
     }
   };
@@ -1457,22 +1576,36 @@ function GestorPerfiles({ tabId, datosActuales, onCargarPerfil }) {
 
       {mostrarLista && (
         <div style={{ marginTop:10, padding:10, background:"#f0ede8", borderRadius:5, border:"1px solid #e0ddd8", maxHeight:340, overflowY:"auto" }}>
-          {/* v46: barra superior admin */}
-          {esAdmin && (
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8, paddingBottom:8, borderBottom:"1px solid #e0ddd8" }}>
-              <label style={{ display:"flex", alignItems:"center", gap:6, fontSize:10, color:"#666", fontFamily:"'Courier New',monospace", cursor:"pointer" }}>
-                <input
-                  type="checkbox"
-                  checked={verTodosProyectos}
-                  onChange={e => setVerTodosProyectos(e.target.checked)}
-                  style={{ cursor:"pointer" }}
-                />
-                Ver todos los proyectos (admin)
-              </label>
-              <button
-                onClick={() => setMostrarImportador(true)}
-                style={{ background:"transparent", color:"#b8864a", border:"1px solid #b8864a", padding:"3px 8px", borderRadius:3, cursor:"pointer", fontSize:9, fontFamily:"'Courier New',monospace", fontWeight:700, letterSpacing:"0.1em", textTransform:"uppercase" }}
-              >📥 Importar antiguos</button>
+          {/* v46+v53: barra superior con controles */}
+          {(esAdmin || perfilEnEdicion) && (
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8, paddingBottom:8, borderBottom:"1px solid #e0ddd8", gap:8, flexWrap:"wrap" }}>
+              {esAdmin ? (
+                <label style={{ display:"flex", alignItems:"center", gap:6, fontSize:10, color:"#666", fontFamily:"'Courier New',monospace", cursor:"pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={verTodosProyectos}
+                    onChange={e => setVerTodosProyectos(e.target.checked)}
+                    style={{ cursor:"pointer" }}
+                  />
+                  Ver todos los proyectos (admin)
+                </label>
+              ) : <div />}
+              <div style={{ display:"flex", gap:6 }}>
+                {/* v53: botón Modificar (todos) — solo si hay perfil cargado y coincide la pestaña */}
+                {perfilEnEdicion && perfilEnEdicion.tabId === tabId && (
+                  <button
+                    onClick={modificarPerfil}
+                    title={`Sobrescribir "${perfilEnEdicion.nombre}"`}
+                    style={{ background:"#b8864a", color:"#fff", border:"1px solid #b8864a", padding:"3px 8px", borderRadius:3, cursor:"pointer", fontSize:9, fontFamily:"'Courier New',monospace", fontWeight:700, letterSpacing:"0.1em", textTransform:"uppercase" }}
+                  >🔄 Modificar</button>
+                )}
+                {esAdmin && (
+                  <button
+                    onClick={() => setMostrarImportador(true)}
+                    style={{ background:"transparent", color:"#b8864a", border:"1px solid #b8864a", padding:"3px 8px", borderRadius:3, cursor:"pointer", fontSize:9, fontFamily:"'Courier New',monospace", fontWeight:700, letterSpacing:"0.1em", textTransform:"uppercase" }}
+                  >📥 Importar antiguos</button>
+                )}
+              </div>
             </div>
           )}
           {/* v46: aviso si Supabase falló */}
@@ -1515,9 +1648,17 @@ function GestorPerfiles({ tabId, datosActuales, onCargarPerfil }) {
                   <span style={{ color:"#aaa" }}>{new Date(perfil.timestamp).toLocaleString("es-ES")}</span>
                 </div>
               </div>
-              <button onClick={(e) => eliminarPerfil(perfil, e)}
-                style={{ background:"transparent", border:"none", color:"#c08080", fontSize:14, cursor:"pointer", padding:"4px 8px", marginLeft:8 }}
-                title="Eliminar">🗑</button>
+              <div style={{ display:"flex", alignItems:"center", marginLeft:8 }}>
+                <button onClick={(e) => renombrarPerfil(perfil, e)}
+                  style={{ background:"transparent", border:"none", color:"#7a7a7a", fontSize:13, cursor:"pointer", padding:"4px 6px" }}
+                  title="Renombrar">✏️</button>
+                <button onClick={(e) => duplicarPerfil(perfil, e)}
+                  style={{ background:"transparent", border:"none", color:"#7a7a7a", fontSize:13, cursor:"pointer", padding:"4px 6px" }}
+                  title="Duplicar">📋</button>
+                <button onClick={(e) => eliminarPerfil(perfil, e)}
+                  style={{ background:"transparent", border:"none", color:"#c08080", fontSize:14, cursor:"pointer", padding:"4px 8px" }}
+                  title="Eliminar">🗑</button>
+              </div>
             </div>
           ))}
         </div>
@@ -4166,6 +4307,16 @@ async function borrarPerfilSupabase(perfilId, adminPin) {
   });
 }
 
+// v51: renombrar perfil en Supabase (admin puede renombrar de otros proyectos con pin)
+async function actualizarPerfilSupabase(perfilId, cambios, adminPin) {
+  const headers = adminPin ? { "x-admin-pin": adminPin, "Prefer": "return=representation" } : { "Prefer": "return=representation" };
+  return supabaseFetch(`perfiles?id=eq.${perfilId}`, {
+    method: "PATCH",
+    headers,
+    body: JSON.stringify(cambios),
+  });
+}
+
 
 async function crearUsuario(adminPin, nombre, pin, esAdmin) {
   return supabaseFetch(`usuarios`, {
@@ -5709,6 +5860,9 @@ function CosteEmpresa() {
             const d = await storage.get(k);
             const data = JSON.parse(d.value);
             let tabId = data.tabId;
+            // Normalizar: convertir formato GestorPerfiles ("40h"/"45h") al formato CosteEmpresa ("tab40"/"iruna45")
+            if (tabId === "40h") tabId = "tab40";
+            else if (tabId === "45h") tabId = "iruna45";
             if (!tabId) {
               if (k.startsWith("perfil_45h_")) tabId = "iruna45";
               else if (k.startsWith("perfil_40h_")) tabId = "tab40";
@@ -5792,12 +5946,15 @@ function CosteEmpresa() {
 
   // Genera filename base (proyecto_productora_trabajador_costeempresa)
   const generarFilename = () => {
-    if (!perfilCargado) return "costeempresa";
+    if (!perfilCargado) return "CosteEmpresa";
     const d = perfilCargado.datos || {};
-    const partes = [d.proyecto, d.productora, d.nombre, "costeempresa"]
+    // v52: nombre limpio: <Proyecto>_<Productora>_<Nombre>_CosteEmpresa_<40h|45h>
+    const sufijoHoras = perfilCargado.tabId === "tab40" ? "40h" : "45h";
+    const partes = [d.proyecto, d.productora, d.nombre]
       .filter(Boolean)
       .map(s => String(s).replace(/[^a-zA-Z0-9]/g, "_"));
-    return partes.join("_") || "costeempresa";
+    partes.push("CosteEmpresa", sufijoHoras);
+    return partes.join("_") || "CosteEmpresa";
   };
 
   // Calcula todas las filas de coste empresa (reutilizable)
@@ -6011,6 +6168,7 @@ function CosteEmpresa() {
         <td class="n g">${fmt(f.gestoria)}</td>
         <td class="n ${(f.exento || 0) === 0 ? 'z' : 'red'}">${(f.exento || 0) === 0 ? "—" : "-" + fmt(f.exento)}</td>
         <td class="n red"><b>${fmt(f.totalCosteEmpresa)}</b></td>
+        <td class="n gold" style="background:#fdf8f0;border-left:2px solid #b8864a"><b>${fmt(f.total + f.totalCosteEmpresa)}</b></td>
       </tr>
     `).join("");
 
@@ -6018,7 +6176,7 @@ function CosteEmpresa() {
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>${generarFilename()}_CosteEmpresa</title>
+<title>${generarFilename()}</title>
 <style>
   @page { size: A4 portrait; margin: 10mm; }
   body { font-family: 'Courier New', monospace; color: #1a1a1a; font-size: 8.5px; margin: 0; padding: 0; position: relative; }
@@ -6081,11 +6239,6 @@ function CosteEmpresa() {
 <body>
 <div class="watermark"><span class="wm1">CONFIDENCIAL</span><span class="wm2">USO INTERNO</span></div>
 <div class="content">
-
-<div class="no-print">
-  <span style="font-size:11px;color:#7a5a2a">Pulsa imprimir o "Guardar como PDF" para descargar este documento.</span>
-  <button onclick="window.print()">📄 Imprimir / Guardar PDF</button>
-</div>
 
 <div class="banner">
   <div class="logo">BD PROD TOOLS</div>
@@ -6166,6 +6319,7 @@ function CosteEmpresa() {
         <th>Gestoría</th>
         <th class="red">Exento</th>
         <th class="red">TOTAL</th>
+        <th style="background:#b8864a;color:#fff;border-left:2px solid #b8864a">TOTAL MES</th>
       </tr>
     </thead>
     <tbody>
@@ -6181,6 +6335,7 @@ function CosteEmpresa() {
         <td class="n g">${fmt(totales.gestoria)}</td>
         <td class="n red">${(totales.exento || 0) === 0 ? "—" : "-" + fmt(totales.exento)}</td>
         <td class="n red">${fmt(totales.totalCosteEmpresa)}</td>
+        <td class="n gold" style="background:#b8864a;color:#fff;border-left:2px solid #b8864a"><b>${fmt(totales.total + totales.totalCosteEmpresa)}</b></td>
       </tr>
     </tbody>
   </table>
@@ -7258,7 +7413,7 @@ function BannerSesion({ usuario, proyectoActivo, onLogout, onAdmin, onLogs, onPu
         <span style={{ color: "#888", textTransform: "uppercase", fontSize: 9, letterSpacing: "0.18em" }}>Sesión:</span>
         <span style={{ fontWeight: 700, color: "#f0ede8" }}>{usuario.nombre}</span>
         {usuario.es_admin && <span style={{ background: "#c8a96e", color: "#1a1a1a", padding: "2px 6px", borderRadius: 3, fontSize: 8, fontWeight: 700, letterSpacing: "0.1em" }}>ADMIN</span>}
-        <span style={{ color: "#ffffff", fontSize: 13, letterSpacing: "0.08em", fontWeight: 700, marginLeft: 6 }} title="Versión de la app">v50</span>
+        <span style={{ color: "#ffffff", fontSize: 13, letterSpacing: "0.08em", fontWeight: 700, marginLeft: 6 }} title="Versión de la app">v53</span>
       </div>
 
       {/* Pestañas centrales */}
