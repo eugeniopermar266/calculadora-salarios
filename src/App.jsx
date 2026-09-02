@@ -13,7 +13,9 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // Festivos nacionales + autonómicos. Ordenado por fecha.
 // 2026: oficial (BOE-A-2025-21667 y Decreto 61/2025 BOC)
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
-const FESTIVOS_BILBAO = [
+// v54: Festivos por defecto (fallback si Supabase falla). El array activo se
+// rellena desde Supabase en el arranque; ver cargarFestivosSupabase()
+const FESTIVOS_DEFAULT = [
   // 2026 — Decreto 82/2025 (BOPV nº78, 25 abril 2025) + festivos territoriales y locales
   // 8 nacionales
   { fecha: "2026-01-01", nombre: "Año Nuevo",                  tipo: "nacional" },
@@ -35,13 +37,16 @@ const FESTIVOS_BILBAO = [
   { fecha: "2026-08-28", nombre: "Semana Grande (Aste Nagusia)", tipo: "local" },
 ];
 
+// v54: array mutable — se actualiza cuando Supabase responde
+let FESTIVOS_BILBAO = [...FESTIVOS_DEFAULT];
+
 // Alias para compatibilidad con el resto del código
-const FESTIVOS_CANARIAS = FESTIVOS_BILBAO;
+const FESTIVOS_CANARIAS_GETTER = () => FESTIVOS_BILBAO;
 
 // Devuelve festivos que caen dentro del rango [inicio, fin] (ambos inclusive)
 function festivosEnRango(fechaInicio, fechaFin) {
   if (!fechaInicio || !fechaFin) return [];
-  return FESTIVOS_CANARIAS.filter(f => f.fecha >= fechaInicio && f.fecha <= fechaFin);
+  return FESTIVOS_BILBAO.filter(f => f.fecha >= fechaInicio && f.fecha <= fechaFin);
 }
 
 // Devuelve qué mes (índice del desglose) le corresponde a una fecha YYYY-MM-DD
@@ -4317,6 +4322,43 @@ async function actualizarPerfilSupabase(perfilId, cambios, adminPin) {
   });
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+// FESTIVOS en Supabase (v54)
+// ═══════════════════════════════════════════════════════════════════════
+
+async function listarFestivosSupabase() {
+  try {
+    const data = await supabaseFetch(`festivos?select=*&order=fecha.asc`);
+    return data || [];
+  } catch (e) {
+    console.warn("Error cargando festivos:", e.message);
+    return null;
+  }
+}
+
+async function crearFestivoSupabase(adminPin, { fecha, nombre, tipo }) {
+  return supabaseFetch(`festivos`, {
+    method: "POST",
+    headers: { "x-admin-pin": adminPin, "Prefer": "return=representation" },
+    body: JSON.stringify({ fecha, nombre, tipo }),
+  });
+}
+
+async function actualizarFestivoSupabase(adminPin, id, cambios) {
+  return supabaseFetch(`festivos?id=eq.${id}`, {
+    method: "PATCH",
+    headers: { "x-admin-pin": adminPin, "Prefer": "return=representation" },
+    body: JSON.stringify(cambios),
+  });
+}
+
+async function borrarFestivoSupabase(adminPin, id) {
+  return supabaseFetch(`festivos?id=eq.${id}`, {
+    method: "DELETE",
+    headers: { "x-admin-pin": adminPin },
+  });
+}
+
 
 async function crearUsuario(adminPin, nombre, pin, esAdmin) {
   return supabaseFetch(`usuarios`, {
@@ -7336,10 +7378,215 @@ function PanelProyectos({ usuarioActual, onCerrar }) {
 
 
 // ═══════════════════════════════════════════════════════════════════════
+// PANEL ADMIN: FESTIVOS (v54)
+// ═══════════════════════════════════════════════════════════════════════
+
+function PanelFestivos({ usuarioActual, onCerrar, onCambios }) {
+  const [festivos, setFestivos] = useState([]);
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState(null);
+  const [nuevoForm, setNuevoForm] = useState({ fecha: "", nombre: "", tipo: "nacional" });
+  const [mostrarNuevo, setMostrarNuevo] = useState(false);
+  const [editando, setEditando] = useState(null);
+  const [filtroAnio, setFiltroAnio] = useState("");
+
+  const recargar = async () => {
+    setCargando(true); setError(null);
+    try {
+      const lista = await listarFestivosSupabase();
+      setFestivos(lista || []);
+      // Actualizar array global también
+      if (Array.isArray(lista) && lista.length > 0) {
+        FESTIVOS_BILBAO = lista.map(f => ({ fecha: f.fecha, nombre: f.nombre, tipo: f.tipo || "nacional" }));
+      }
+    } catch (err) { setError(err.message); }
+    setCargando(false);
+  };
+
+  useEffect(() => { recargar(); }, []);
+
+  const onAdd = async () => {
+    if (!nuevoForm.fecha || !nuevoForm.nombre.trim()) {
+      alert("Fecha y Nombre son obligatorios"); return;
+    }
+    try {
+      await crearFestivoSupabase(usuarioActual.pin, {
+        fecha: nuevoForm.fecha,
+        nombre: nuevoForm.nombre.trim(),
+        tipo: nuevoForm.tipo,
+      });
+      setNuevoForm({ fecha: "", nombre: "", tipo: "nacional" });
+      setMostrarNuevo(false);
+      recargar();
+      if (onCambios) onCambios();
+    } catch (err) { alert("Error al crear: " + err.message); }
+  };
+
+  const onGuardarEdit = async () => {
+    try {
+      await actualizarFestivoSupabase(usuarioActual.pin, editando.id, {
+        fecha: editando.fecha,
+        nombre: editando.nombre.trim(),
+        tipo: editando.tipo,
+      });
+      setEditando(null);
+      recargar();
+      if (onCambios) onCambios();
+    } catch (err) { alert("Error al guardar: " + err.message); }
+  };
+
+  const onBorrar = async (f) => {
+    if (!confirm(`¿Borrar el festivo "${f.nombre}" (${f.fecha})?`)) return;
+    try {
+      await borrarFestivoSupabase(usuarioActual.pin, f.id);
+      recargar();
+      if (onCambios) onCambios();
+    } catch (err) { alert("Error al borrar: " + err.message); }
+  };
+
+  // Filtrar por año
+  const anios = [...new Set(festivos.map(f => f.fecha.slice(0, 4)))].sort();
+  const festivosFiltrados = filtroAnio
+    ? festivos.filter(f => f.fecha.startsWith(filtroAnio))
+    : festivos;
+
+  const overlay = {
+    position: "fixed", inset: 0, background: "rgba(20,20,20,0.75)",
+    display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000,
+  };
+  const modal = {
+    background: "#faf7f2", padding: 20, borderRadius: 6, maxWidth: 900, width: "92%",
+    maxHeight: "88vh", overflowY: "auto", color: "#1a1a1a",
+    fontFamily: "'Courier New',monospace", border: "1px solid #b8864a",
+  };
+  const btnGold = {
+    background: "#b8864a", color: "#fff", border: "none",
+    padding: "6px 12px", borderRadius: 4, cursor: "pointer",
+    fontFamily: "'Courier New',monospace", fontSize: 11, fontWeight: 700,
+    letterSpacing: "0.1em", textTransform: "uppercase",
+  };
+  const btnGhost = {
+    background: "transparent", color: "#b8864a", border: "1px solid #b8864a",
+    padding: "6px 12px", borderRadius: 4, cursor: "pointer",
+    fontFamily: "'Courier New',monospace", fontSize: 10, fontWeight: 700,
+    letterSpacing: "0.1em", textTransform: "uppercase",
+  };
+  const inp = {
+    padding: "6px 8px", border: "1px solid #d0ccc6", borderRadius: 4,
+    fontFamily: "'Courier New',monospace", fontSize: 12, background: "#fff",
+    color: "#1a1a1a", colorScheme: "light",
+  };
+  const tipoColores = {
+    nacional: "#8a3a3a",
+    autonomico: "#3a6898",
+    territorial: "#7a5a2a",
+    local: "#5a7a3a",
+  };
+  const fmtFecha = (f) => {
+    if (!f) return "";
+    const [y, m, d] = f.split("-");
+    const dias = ["Do","Lu","Ma","Mi","Ju","Vi","Sa"];
+    const dow = new Date(f + "T12:00:00").getDay();
+    return `${d}/${m}/${y} · ${dias[dow]}`;
+  };
+
+  return (
+    <div style={overlay} onClick={onCerrar}>
+      <div style={modal} onClick={e => e.stopPropagation()}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, borderBottom: "1px solid #e0ddd8", paddingBottom: 10 }}>
+          <h2 style={{ margin: 0, fontSize: 14, letterSpacing: "0.15em", textTransform: "uppercase", color: "#1a1a1a" }}>📅 Calendario de Festivos</h2>
+          <button onClick={onCerrar} style={{ background: "transparent", color: "#888", border: "1px solid #ccc", padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontFamily: "'Courier New',monospace" }}>Cerrar</button>
+        </div>
+
+        {error && <div style={{ background: "#fee", color: "#900", padding: 8, borderRadius: 4, marginBottom: 10, fontSize: 11 }}>Error: {error}</div>}
+
+        {/* Barra superior: filtro año + botón nuevo */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 8 }}>
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <span style={{ fontSize: 10, color: "#666", textTransform: "uppercase", letterSpacing: "0.08em" }}>Año:</span>
+            <button onClick={() => setFiltroAnio("")} style={{ ...btnGhost, background: filtroAnio === "" ? "#b8864a" : "transparent", color: filtroAnio === "" ? "#fff" : "#b8864a", padding: "3px 8px", fontSize: 9 }}>Todos</button>
+            {anios.map(a => (
+              <button key={a} onClick={() => setFiltroAnio(a)} style={{ ...btnGhost, background: filtroAnio === a ? "#b8864a" : "transparent", color: filtroAnio === a ? "#fff" : "#b8864a", padding: "3px 8px", fontSize: 9 }}>{a}</button>
+            ))}
+          </div>
+          {!mostrarNuevo && (
+            <button onClick={() => setMostrarNuevo(true)} style={btnGold}>+ Nuevo festivo</button>
+          )}
+        </div>
+
+        {/* Formulario nuevo */}
+        {mostrarNuevo && (
+          <div style={{ background: "#fff", padding: 12, borderRadius: 4, marginBottom: 14, border: "1px solid #e0ddd8" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "auto 1fr auto auto auto", gap: 8, alignItems: "center" }}>
+              <input type="date" value={nuevoForm.fecha} onChange={e => setNuevoForm({...nuevoForm, fecha: e.target.value})} style={inp} />
+              <input placeholder="Nombre del festivo" value={nuevoForm.nombre} onChange={e => setNuevoForm({...nuevoForm, nombre: e.target.value})} style={inp} />
+              <select value={nuevoForm.tipo} onChange={e => setNuevoForm({...nuevoForm, tipo: e.target.value})} style={inp}>
+                <option value="nacional">Nacional</option>
+                <option value="autonomico">Autonómico</option>
+                <option value="territorial">Territorial</option>
+                <option value="local">Local</option>
+              </select>
+              <button onClick={onAdd} style={btnGold}>Crear</button>
+              <button onClick={() => { setMostrarNuevo(false); setNuevoForm({ fecha: "", nombre: "", tipo: "nacional" }); }} style={btnGhost}>Cancelar</button>
+            </div>
+          </div>
+        )}
+
+        {cargando && <div style={{ padding: 20, textAlign: "center", color: "#888" }}>Cargando...</div>}
+
+        {!cargando && festivosFiltrados.length === 0 && (
+          <div style={{ padding: 20, textAlign: "center", color: "#888", fontSize: 12 }}>
+            {festivos.length === 0 ? "No hay festivos. Crea el primero." : "No hay festivos en este año."}
+          </div>
+        )}
+
+        {!cargando && festivosFiltrados.map(f => (
+          <div key={f.id} style={{ background: "#fff", padding: 10, borderRadius: 4, marginBottom: 6, border: "1px solid #e0ddd8" }}>
+            {editando?.id === f.id ? (
+              <div style={{ display: "grid", gridTemplateColumns: "auto 1fr auto auto auto", gap: 8, alignItems: "center" }}>
+                <input type="date" value={editando.fecha} onChange={e => setEditando({...editando, fecha: e.target.value})} style={inp} />
+                <input value={editando.nombre} onChange={e => setEditando({...editando, nombre: e.target.value})} style={inp} />
+                <select value={editando.tipo} onChange={e => setEditando({...editando, tipo: e.target.value})} style={inp}>
+                  <option value="nacional">Nacional</option>
+                  <option value="autonomico">Autonómico</option>
+                  <option value="territorial">Territorial</option>
+                  <option value="local">Local</option>
+                </select>
+                <button onClick={onGuardarEdit} style={btnGold}>Guardar</button>
+                <button onClick={() => setEditando(null)} style={btnGhost}>Cancelar</button>
+              </div>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "180px 1fr auto auto auto", gap: 8, alignItems: "center" }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#1a1a1a", fontFamily: "'Courier New',monospace" }}>
+                  {fmtFecha(f.fecha)}
+                </div>
+                <div style={{ fontSize: 12, color: "#1a1a1a" }}>{f.nombre}</div>
+                <span style={{
+                  fontSize: 9, padding: "2px 8px", borderRadius: 3,
+                  background: tipoColores[f.tipo] || "#888", color: "#fff",
+                  textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700,
+                }}>{f.tipo}</span>
+                <button onClick={() => setEditando({ id: f.id, fecha: f.fecha, nombre: f.nombre, tipo: f.tipo })} style={btnGhost}>Editar</button>
+                <button onClick={() => onBorrar(f)} style={{ ...btnGhost, borderColor: "#c00", color: "#c00" }}>🗑</button>
+              </div>
+            )}
+          </div>
+        ))}
+
+        <div style={{ marginTop: 14, padding: 10, background: "#f0ede8", borderRadius: 4, fontSize: 10, color: "#666", lineHeight: 1.5 }}>
+          ℹ Los cambios en los festivos afectan a los cálculos de horas extra en fechas que caigan en festivo. Los perfiles ya guardados no se recalculan hasta que se vuelvan a abrir.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════
 // BANNER SUPERIOR (sesión actual)
 // ═══════════════════════════════════════════════════════════════════════
 
-function BannerSesion({ usuario, proyectoActivo, onLogout, onAdmin, onLogs, onPuestos, onProyectos, tab, onChangeTab }) {
+function BannerSesion({ usuario, proyectoActivo, onLogout, onAdmin, onLogs, onPuestos, onProyectos, onFestivos, tab, onChangeTab }) {
   const tabBtn = (id, label) => {
     const activa = tab === id;
     return (
@@ -7413,7 +7660,7 @@ function BannerSesion({ usuario, proyectoActivo, onLogout, onAdmin, onLogs, onPu
         <span style={{ color: "#888", textTransform: "uppercase", fontSize: 9, letterSpacing: "0.18em" }}>Sesión:</span>
         <span style={{ fontWeight: 700, color: "#f0ede8" }}>{usuario.nombre}</span>
         {usuario.es_admin && <span style={{ background: "#c8a96e", color: "#1a1a1a", padding: "2px 6px", borderRadius: 3, fontSize: 8, fontWeight: 700, letterSpacing: "0.1em" }}>ADMIN</span>}
-        <span style={{ color: "#ffffff", fontSize: 13, letterSpacing: "0.08em", fontWeight: 700, marginLeft: 6 }} title="Versión de la app">v53</span>
+        <span style={{ color: "#ffffff", fontSize: 13, letterSpacing: "0.08em", fontWeight: 700, marginLeft: 6 }} title="Versión de la app">v54</span>
       </div>
 
       {/* Pestañas centrales */}
@@ -7440,6 +7687,7 @@ function BannerSesion({ usuario, proyectoActivo, onLogout, onAdmin, onLogs, onPu
             <button onClick={onAdmin} style={{ background: "transparent", color: "#c8a96e", border: "1px solid #c8a96e", padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontSize: 10, fontFamily: "'Courier New',monospace", fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" }}>⚙ Usuarios</button>
             <button onClick={onLogs} style={{ background: "transparent", color: "#c8a96e", border: "1px solid #c8a96e", padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontSize: 10, fontFamily: "'Courier New',monospace", fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" }}>📊 Logs</button>
             <button onClick={onPuestos} style={{ background: "transparent", color: "#c8a96e", border: "1px solid #c8a96e", padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontSize: 10, fontFamily: "'Courier New',monospace", fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" }}>📋 Puestos</button>
+            <button onClick={onFestivos} style={{ background: "transparent", color: "#c8a96e", border: "1px solid #c8a96e", padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontSize: 10, fontFamily: "'Courier New',monospace", fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" }}>📅 Festivos</button>
           </>
         )}
         <button onClick={onLogout} style={{ background: "transparent", color: "#aaa", border: "1px solid #444", padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontSize: 10, fontFamily: "'Courier New',monospace", letterSpacing: "0.1em", textTransform: "uppercase" }}>Cerrar sesión</button>
@@ -7460,8 +7708,23 @@ export default function App() {
   const [mostrarLogs, setMostrarLogs] = useState(false);
   const [mostrarPuestos, setMostrarPuestos] = useState(false);
   const [mostrarProyectos, setMostrarProyectos] = useState(false);
+  const [mostrarFestivos, setMostrarFestivos] = useState(false); // v54
   const [proyectoActivo, setProyectoActivo] = useState(null); // v45: proyecto seleccionado
   const [tab, setTab] = useState("iruna45"); // "iruna45" | "tab40"
+
+  // v54: Cargar festivos desde Supabase al arrancar. Si falla, se queda el array por defecto.
+  useEffect(() => {
+    (async () => {
+      const lista = await listarFestivosSupabase();
+      if (Array.isArray(lista) && lista.length > 0) {
+        FESTIVOS_BILBAO = lista.map(f => ({
+          fecha: f.fecha,
+          nombre: f.nombre,
+          tipo: f.tipo || "nacional",
+        }));
+      }
+    })();
+  }, []);
 
   // ── Carga inicial: lee sesión, comprueba si ha expirado, entra directo si vale
   useEffect(() => {
@@ -7634,6 +7897,7 @@ export default function App() {
           onAdmin={() => setMostrarAdmin(true)}
           onLogs={() => setMostrarLogs(true)}
           onPuestos={() => setMostrarPuestos(true)}
+          onFestivos={() => setMostrarFestivos(true)}
           onProyectos={salirDelProyecto}
           tab={tab}
           onChangeTab={setTab}
@@ -7653,6 +7917,9 @@ export default function App() {
         )}
         {mostrarProyectos && usuario.es_admin && (
           <PanelProyectos usuarioActual={usuario} onCerrar={() => setMostrarProyectos(false)} />
+        )}
+        {mostrarFestivos && usuario.es_admin && (
+          <PanelFestivos usuarioActual={usuario} onCerrar={() => setMostrarFestivos(false)} />
         )}
       </div>
       </ProyectoContext.Provider>
