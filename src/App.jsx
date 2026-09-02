@@ -7728,12 +7728,32 @@ function PanelFestivos({ usuarioActual, onCerrar, onCambios }) {
       alert("Fecha y Nombre son obligatorios"); return;
     }
     try {
-      await crearFestivoSupabase(usuarioActual.pin, {
-        fecha: nuevoForm.fecha,
-        nombre: nuevoForm.nombre.trim(),
-        tipo: nuevoForm.tipo,
-        comunidad: nuevoForm.comunidad,
-      });
+      if (nuevoForm.tipo === "nacional") {
+        // v56: nacionales se crean en las 4 comunidades
+        const errores = [];
+        for (const c of COMUNIDADES) {
+          try {
+            await crearFestivoSupabase(usuarioActual.pin, {
+              fecha: nuevoForm.fecha,
+              nombre: nuevoForm.nombre.trim(),
+              tipo: "nacional",
+              comunidad: c.key,
+            });
+          } catch (e) {
+            // Si ya existe en esa comunidad (conflict), lo ignoramos
+            if (!(e.message || "").toLowerCase().includes("duplicate")) errores.push(`${c.label}: ${e.message}`);
+          }
+        }
+        if (errores.length > 0) alert("Algunos fallos: " + errores.join(" · "));
+      } else {
+        // Autonómico/territorial/local: solo comunidad seleccionada
+        await crearFestivoSupabase(usuarioActual.pin, {
+          fecha: nuevoForm.fecha,
+          nombre: nuevoForm.nombre.trim(),
+          tipo: nuevoForm.tipo,
+          comunidad: nuevoForm.comunidad,
+        });
+      }
       setNuevoForm({ fecha: "", nombre: "", tipo: "nacional", comunidad: filtroComunidad });
       setMostrarNuevo(false);
       recargar();
@@ -7743,12 +7763,72 @@ function PanelFestivos({ usuarioActual, onCerrar, onCambios }) {
 
   const onGuardarEdit = async () => {
     try {
-      await actualizarFestivoSupabase(usuarioActual.pin, editando.id, {
-        fecha: editando.fecha,
-        nombre: editando.nombre.trim(),
-        tipo: editando.tipo,
-        comunidad: editando.comunidad,
-      });
+      const eraNacional = editando._original?.tipo === "nacional";
+      const esNacional = editando.tipo === "nacional";
+
+      if (eraNacional || esNacional) {
+        // v56: aviso si era o pasa a ser nacional
+        const ok = confirm(
+          `Este festivo ${eraNacional ? "está" : "pasará a estar"} en las 4 comunidades (Madrid, Gran Canaria, Tenerife, Bilbao).\n\n¿Editarlo en todas?`
+        );
+        if (!ok) return;
+
+        if (eraNacional) {
+          // Buscar todos los festivos que eran hermanos del original (misma fecha original, tipo nacional)
+          const hermanos = festivos.filter(f =>
+            f.fecha === editando._original.fecha && f.tipo === "nacional"
+          );
+          const errores = [];
+          for (const h of hermanos) {
+            try {
+              await actualizarFestivoSupabase(usuarioActual.pin, h.id, {
+                fecha: editando.fecha,
+                nombre: editando.nombre.trim(),
+                tipo: editando.tipo,
+                // NO cambiamos comunidad, cada hermano mantiene la suya
+                comunidad: h.comunidad,
+              });
+            } catch (e) { errores.push(`${h.comunidad}: ${e.message}`); }
+          }
+          if (errores.length > 0) alert("Algunos fallos: " + errores.join(" · "));
+
+          // Si el nuevo tipo NO es nacional, borrar los hermanos que no sean de la comunidad editada
+          if (!esNacional) {
+            for (const h of hermanos) {
+              if (h.id !== editando.id) {
+                try { await borrarFestivoSupabase(usuarioActual.pin, h.id); } catch {}
+              }
+            }
+          }
+        } else {
+          // era no-nacional pero pasa a nacional: actualizar el actual y crear en las otras 3 comunidades
+          await actualizarFestivoSupabase(usuarioActual.pin, editando.id, {
+            fecha: editando.fecha,
+            nombre: editando.nombre.trim(),
+            tipo: "nacional",
+            comunidad: editando.comunidad,
+          });
+          for (const c of COMUNIDADES) {
+            if (c.key === editando.comunidad) continue;
+            try {
+              await crearFestivoSupabase(usuarioActual.pin, {
+                fecha: editando.fecha,
+                nombre: editando.nombre.trim(),
+                tipo: "nacional",
+                comunidad: c.key,
+              });
+            } catch {} // ignora duplicados
+          }
+        }
+      } else {
+        // Ni era ni es nacional: comportamiento normal
+        await actualizarFestivoSupabase(usuarioActual.pin, editando.id, {
+          fecha: editando.fecha,
+          nombre: editando.nombre.trim(),
+          tipo: editando.tipo,
+          comunidad: editando.comunidad,
+        });
+      }
       setEditando(null);
       recargar();
       if (onCambios) onCambios();
@@ -7756,6 +7836,23 @@ function PanelFestivos({ usuarioActual, onCerrar, onCambios }) {
   };
 
   const onBorrar = async (f) => {
+    // v56: si es nacional, avisar y borrar en las 4
+    if (f.tipo === "nacional") {
+      const hermanos = festivos.filter(x => x.fecha === f.fecha && x.tipo === "nacional");
+      const ok = confirm(
+        `Este festivo "${f.nombre}" (${f.fecha}) está en ${hermanos.length} comunidades como Nacional.\n\n¿Borrarlo en todas?`
+      );
+      if (!ok) return;
+      const errores = [];
+      for (const h of hermanos) {
+        try { await borrarFestivoSupabase(usuarioActual.pin, h.id); } catch (e) { errores.push(e.message); }
+      }
+      if (errores.length > 0) alert("Algunos fallos: " + errores.join(" · "));
+      recargar();
+      if (onCambios) onCambios();
+      return;
+    }
+    // Autonómico/territorial/local: borrado normal
     if (!confirm(`¿Borrar el festivo "${f.nombre}" (${f.fecha})?`)) return;
     try {
       await borrarFestivoSupabase(usuarioActual.pin, f.id);
@@ -7867,7 +7964,7 @@ function PanelFestivos({ usuarioActual, onCerrar, onCambios }) {
         {/* Formulario nuevo */}
         {mostrarNuevo && (
           <div style={{ background: "#fff", padding: 12, borderRadius: 4, marginBottom: 14, border: "1px solid #e0ddd8" }}>
-            <div style={{ display: "grid", gridTemplateColumns: "auto 1fr auto auto auto auto", gap: 8, alignItems: "center" }}>
+            <div style={{ display: "grid", gridTemplateColumns: nuevoForm.tipo === "nacional" ? "auto 1fr auto 1fr auto auto" : "auto 1fr auto auto auto auto", gap: 8, alignItems: "center" }}>
               <input type="date" value={nuevoForm.fecha} onChange={e => setNuevoForm({...nuevoForm, fecha: e.target.value})} style={inp} />
               <input placeholder="Nombre del festivo" value={nuevoForm.nombre} onChange={e => setNuevoForm({...nuevoForm, nombre: e.target.value})} style={inp} />
               <select value={nuevoForm.tipo} onChange={e => setNuevoForm({...nuevoForm, tipo: e.target.value})} style={inp}>
@@ -7876,9 +7973,15 @@ function PanelFestivos({ usuarioActual, onCerrar, onCambios }) {
                 <option value="territorial">Territorial</option>
                 <option value="local">Local</option>
               </select>
-              <select value={nuevoForm.comunidad} onChange={e => setNuevoForm({...nuevoForm, comunidad: e.target.value})} style={inp}>
-                {COMUNIDADES.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
-              </select>
+              {nuevoForm.tipo === "nacional" ? (
+                <div style={{ fontSize: 10, color: "#7a5a2a", fontStyle: "italic", padding: "0 4px" }}>
+                  Se creará en las 4 comunidades
+                </div>
+              ) : (
+                <select value={nuevoForm.comunidad} onChange={e => setNuevoForm({...nuevoForm, comunidad: e.target.value})} style={inp}>
+                  {COMUNIDADES.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
+                </select>
+              )}
               <button onClick={onAdd} style={btnGold}>Crear</button>
               <button onClick={() => { setMostrarNuevo(false); }} style={btnGhost}>Cancelar</button>
             </div>
@@ -7896,7 +7999,7 @@ function PanelFestivos({ usuarioActual, onCerrar, onCambios }) {
         {!cargando && festivosFiltrados.map(f => (
           <div key={f.id} style={{ background: "#fff", padding: 10, borderRadius: 4, marginBottom: 6, border: "1px solid #e0ddd8" }}>
             {editando?.id === f.id ? (
-              <div style={{ display: "grid", gridTemplateColumns: "auto 1fr auto auto auto auto", gap: 8, alignItems: "center" }}>
+              <div style={{ display: "grid", gridTemplateColumns: editando.tipo === "nacional" ? "auto 1fr auto 1fr auto auto" : "auto 1fr auto auto auto auto", gap: 8, alignItems: "center" }}>
                 <input type="date" value={editando.fecha} onChange={e => setEditando({...editando, fecha: e.target.value})} style={inp} />
                 <input value={editando.nombre} onChange={e => setEditando({...editando, nombre: e.target.value})} style={inp} />
                 <select value={editando.tipo} onChange={e => setEditando({...editando, tipo: e.target.value})} style={inp}>
@@ -7905,9 +8008,15 @@ function PanelFestivos({ usuarioActual, onCerrar, onCambios }) {
                   <option value="territorial">Territorial</option>
                   <option value="local">Local</option>
                 </select>
-                <select value={editando.comunidad} onChange={e => setEditando({...editando, comunidad: e.target.value})} style={inp}>
-                  {COMUNIDADES.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
-                </select>
+                {editando.tipo === "nacional" ? (
+                  <div style={{ fontSize: 10, color: "#7a5a2a", fontStyle: "italic", padding: "0 4px" }}>
+                    Se aplica en las 4 comunidades
+                  </div>
+                ) : (
+                  <select value={editando.comunidad} onChange={e => setEditando({...editando, comunidad: e.target.value})} style={inp}>
+                    {COMUNIDADES.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
+                  </select>
+                )}
                 <button onClick={onGuardarEdit} style={btnGold}>Guardar</button>
                 <button onClick={() => setEditando(null)} style={btnGhost}>Cancelar</button>
               </div>
@@ -7922,7 +8031,7 @@ function PanelFestivos({ usuarioActual, onCerrar, onCambios }) {
                   background: tipoColores[f.tipo] || "#888", color: "#fff",
                   textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700,
                 }}>{f.tipo}</span>
-                <button onClick={() => setEditando({ id: f.id, fecha: f.fecha, nombre: f.nombre, tipo: f.tipo, comunidad: f.comunidad })} style={btnGhost}>Editar</button>
+                <button onClick={() => setEditando({ id: f.id, fecha: f.fecha, nombre: f.nombre, tipo: f.tipo, comunidad: f.comunidad, _original: { fecha: f.fecha, tipo: f.tipo, comunidad: f.comunidad } })} style={btnGhost}>Editar</button>
                 <button onClick={() => onBorrar(f)} style={{ ...btnGhost, borderColor: "#c00", color: "#c00" }}>🗑</button>
               </div>
             )}
@@ -8016,7 +8125,7 @@ function BannerSesion({ usuario, proyectoActivo, onLogout, onAdmin, onLogs, onPu
         <span style={{ color: "#888", textTransform: "uppercase", fontSize: 9, letterSpacing: "0.18em" }}>Sesión:</span>
         <span style={{ fontWeight: 700, color: "#f0ede8" }}>{usuario.nombre}</span>
         {usuario.es_admin && <span style={{ background: "#c8a96e", color: "#1a1a1a", padding: "2px 6px", borderRadius: 3, fontSize: 8, fontWeight: 700, letterSpacing: "0.1em" }}>ADMIN</span>}
-        <span style={{ color: "#ffffff", fontSize: 13, letterSpacing: "0.08em", fontWeight: 700, marginLeft: 6 }} title="Versión de la app">v55</span>
+        <span style={{ color: "#ffffff", fontSize: 13, letterSpacing: "0.08em", fontWeight: 700, marginLeft: 6 }} title="Versión de la app">v56</span>
       </div>
 
       {/* Pestañas centrales */}
