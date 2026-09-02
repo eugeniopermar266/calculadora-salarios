@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v57";
+const APP_VERSION = "v58";
 
 // v54: Festivos por defecto (fallback si Supabase falla). El array activo se
 // rellena desde Supabase en el arranque; ver cargarFestivosSupabase()
@@ -7479,6 +7479,7 @@ function PanelCalendarioProyecto({ proyecto, usuarioActual, onCerrar }) {
     festivoTrab:{ bg: "#ffe8c8", border: "#e89838", txt: "#8a5820" }, // festivo trabajado (naranja)
     rodaje:     { bg: "#faf1e0", border: "#c8963a", txt: "#7a5a2a" }, // dorado
     vacaciones: { bg: "#e0edf5", border: "#5090c0", txt: "#204878" }, // azul
+    descanso:   { bg: "#ece0f0", border: "#8a5aa0", txt: "#502870" }, // v58: morado
     finde:      { bg: "#f0ede8", border: "#d0ccc6", txt: "#999" },
     fuera:      { bg: "#fafafa", border: "#eee", txt: "#ccc" },
   };
@@ -7587,7 +7588,7 @@ function PanelCalendarioProyecto({ proyecto, usuarioActual, onCerrar }) {
     } catch (err) { setError(err.message); }
   };
 
-  // ── Añadir tramo (rodaje o vacaciones)
+  // ── Añadir tramo (rodaje o vacaciones) — excluye sáb/dom
   const addTramo = () => {
     if (!tramoForm.desde || !tramoForm.hasta) { alert("Rellena las dos fechas"); return; }
     if (tramoForm.desde > tramoForm.hasta) { alert("Desde no puede ser posterior a Hasta"); return; }
@@ -7595,12 +7596,12 @@ function PanelCalendarioProyecto({ proyecto, usuarioActual, onCerrar }) {
     const start = new Date(tramoForm.desde + "T12:00:00");
     const end = new Date(tramoForm.hasta + "T12:00:00");
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      const dow = d.getDay(); // 0=Do, 6=Sa
+      if (dow === 0 || dow === 6) continue; // v58: no marcar fines de semana
       const iso = d.toISOString().slice(0, 10);
-      const dow = d.getDay();
       const info = nuevos[iso] || {};
       if (tramoForm.tipo === "rodaje") info.rodaje = true;
       if (tramoForm.tipo === "vacaciones") info.vacaciones = true;
-      // Si es lun-vie y no era laboral, no cambiamos nada extra (rodaje/vac ya son marcadores)
       nuevos[iso] = info;
     }
     setDias(nuevos);
@@ -7680,12 +7681,14 @@ function PanelCalendarioProyecto({ proyecto, usuarioActual, onCerrar }) {
     const dow = new Date(fecha + "T12:00:00").getDay();
     const esFinde = dow === 0 || dow === 6;
 
-    // Prioridad: vacaciones > rodaje > festivo trabajado > festivo > laboral > finde
+    // v58: los festivos SIEMPRE priorizan sobre el resto (rojo o naranja según trabajado)
+    // Prioridad festivos: festivo trabajado (naranja) > festivo (rojo) > vacaciones > descanso > rodaje > laboral > finde
     let color = COLORES.fuera;
-    if (info.vacaciones) color = COLORES.vacaciones;
-    else if (info.rodaje) color = COLORES.rodaje;
-    else if (esFestivo && info.festivo_trabajado) color = COLORES.festivoTrab;
+    if (esFestivo && info.festivo_trabajado) color = COLORES.festivoTrab;
     else if (esFestivo) color = COLORES.festivo;
+    else if (info.vacaciones) color = COLORES.vacaciones;
+    else if (info.descanso) color = COLORES.descanso;
+    else if (info.rodaje) color = COLORES.rodaje;
     else if (info.laboral) color = COLORES.laboral;
     else if (esFinde) color = COLORES.finde;
 
@@ -7808,6 +7811,7 @@ function PanelCalendarioProyecto({ proyecto, usuarioActual, onCerrar }) {
                     { l: "Festivo trabajado", c: COLORES.festivoTrab },
                     { l: "Rodaje", c: COLORES.rodaje },
                     { l: "Vacaciones", c: COLORES.vacaciones },
+                    { l: "Descanso", c: COLORES.descanso },
                   ].map(item => (
                     <div key={item.l} style={{ display: "flex", alignItems: "center", gap: 4 }}>
                       <span style={{ width: 12, height: 12, borderRadius: 2, background: item.c.bg, border: `1px solid ${item.c.border}` }} />
@@ -7855,6 +7859,7 @@ function PanelCalendarioProyecto({ proyecto, usuarioActual, onCerrar }) {
                         <div style={{ display: "flex", flexDirection: "column", gap: 1, marginTop: 2, fontSize: 8, color: color.txt, opacity: 0.85 }}>
                           {info.rodaje && <span>🎬 rod</span>}
                           {info.vacaciones && <span>🏖 vac</span>}
+                          {info.descanso && <span>🌙 desc</span>}
                           {esFestivo && info.festivo_trabajado && <span>✓ trab</span>}
                         </div>
                         {esFestivo && !info.festivo_trabajado && (
@@ -7888,6 +7893,10 @@ function PanelCalendarioProyecto({ proyecto, usuarioActual, onCerrar }) {
                   <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 11, padding: "4px 6px", background: "#f0ede8", borderRadius: 3 }}>
                     <input type="checkbox" checked={!!(dias[popup.fecha]?.vacaciones)} onChange={() => toggleProp(popup.fecha, "vacaciones")} />
                     <span>🏖 Vacaciones</span>
+                  </label>
+                  <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 11, padding: "4px 6px", background: "#f0ede8", borderRadius: 3 }}>
+                    <input type="checkbox" checked={!!(dias[popup.fecha]?.descanso)} onChange={() => toggleProp(popup.fecha, "descanso")} />
+                    <span>🌙 Descanso</span>
                   </label>
                   {popup.esFestivo && (
                     <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 11, padding: "4px 6px", background: "#f0ede8", borderRadius: 3 }}>
