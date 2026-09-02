@@ -4326,9 +4326,11 @@ async function actualizarPerfilSupabase(perfilId, cambios, adminPin) {
 // FESTIVOS en Supabase (v54)
 // ═══════════════════════════════════════════════════════════════════════
 
-async function listarFestivosSupabase() {
+async function listarFestivosSupabase(comunidad = null) {
   try {
-    const data = await supabaseFetch(`festivos?select=*&order=fecha.asc`);
+    let path = `festivos?select=*&order=fecha.asc`;
+    if (comunidad) path += `&comunidad=eq.${comunidad}`;
+    const data = await supabaseFetch(path);
     return data || [];
   } catch (e) {
     console.warn("Error cargando festivos:", e.message);
@@ -4336,11 +4338,11 @@ async function listarFestivosSupabase() {
   }
 }
 
-async function crearFestivoSupabase(adminPin, { fecha, nombre, tipo }) {
+async function crearFestivoSupabase(adminPin, { fecha, nombre, tipo, comunidad }) {
   return supabaseFetch(`festivos`, {
     method: "POST",
     headers: { "x-admin-pin": adminPin, "Prefer": "return=representation" },
-    body: JSON.stringify({ fecha, nombre, tipo }),
+    body: JSON.stringify({ fecha, nombre, tipo, comunidad: comunidad || "bilbao" }),
   });
 }
 
@@ -4354,6 +4356,54 @@ async function actualizarFestivoSupabase(adminPin, id, cambios) {
 
 async function borrarFestivoSupabase(adminPin, id) {
   return supabaseFetch(`festivos?id=eq.${id}`, {
+    method: "DELETE",
+    headers: { "x-admin-pin": adminPin },
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// CALENDARIOS DE PROYECTO (v55)
+// ═══════════════════════════════════════════════════════════════════════
+
+async function obtenerCalendarioProyecto(proyectoId) {
+  try {
+    const data = await supabaseFetch(`calendarios_proyecto?proyecto_id=eq.${proyectoId}&select=*`);
+    return Array.isArray(data) && data.length > 0 ? data[0] : null;
+  } catch (e) {
+    console.warn("Error cargando calendario proyecto:", e.message);
+    return null;
+  }
+}
+
+async function crearCalendarioProyecto(adminPin, { proyectoId, fechaInicio, fechaFin, comunidad, dias = {}, notas = "" }) {
+  return supabaseFetch(`calendarios_proyecto`, {
+    method: "POST",
+    headers: { "x-admin-pin": adminPin, "Prefer": "return=representation" },
+    body: JSON.stringify({
+      proyecto_id: proyectoId,
+      fecha_inicio: fechaInicio,
+      fecha_fin: fechaFin,
+      comunidad,
+      dias,
+      notas,
+    }),
+  });
+}
+
+async function actualizarCalendarioProyecto(adminPin, id, cambios) {
+  const c = { ...cambios };
+  if (c.fechaInicio !== undefined) { c.fecha_inicio = c.fechaInicio; delete c.fechaInicio; }
+  if (c.fechaFin !== undefined) { c.fecha_fin = c.fechaFin; delete c.fechaFin; }
+  c.updated_at = new Date().toISOString();
+  return supabaseFetch(`calendarios_proyecto?id=eq.${id}`, {
+    method: "PATCH",
+    headers: { "x-admin-pin": adminPin, "Prefer": "return=representation" },
+    body: JSON.stringify(c),
+  });
+}
+
+async function borrarCalendarioProyecto(adminPin, id) {
+  return supabaseFetch(`calendarios_proyecto?id=eq.${id}`, {
     method: "DELETE",
     headers: { "x-admin-pin": adminPin },
   });
@@ -7189,6 +7239,7 @@ function PanelProyectos({ usuarioActual, onCerrar }) {
   const [mostrarNuevo, setMostrarNuevo] = useState(false);
   const [editando, setEditando] = useState(null); // {id, nombre, productora, activo}
   const [proyectoAsignar, setProyectoAsignar] = useState(null); // proyecto en edición de usuarios
+  const [proyectoConCalendario, setProyectoConCalendario] = useState(null); // v55: proyecto en edición de calendario
 
   const recargar = async () => {
     setCargando(true); setError(null);
@@ -7330,7 +7381,7 @@ function PanelProyectos({ usuarioActual, onCerrar }) {
                 <button onClick={() => setEditando(null)} style={btnGhost}>Cancelar</button>
               </div>
             ) : (
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto auto auto auto", gap: 8, alignItems: "center" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto auto auto auto auto", gap: 8, alignItems: "center" }}>
                 <div style={{ fontWeight: 700, color: p.activo ? "#1a1a1a" : "#999" }}>
                   {p.nombre} {!p.activo && <span style={{ fontSize: 9, color: "#c00" }}>(inactivo)</span>}
                 </div>
@@ -7339,6 +7390,7 @@ function PanelProyectos({ usuarioActual, onCerrar }) {
                   {asignaciones.filter(a => a.proyecto_id === p.id).length} usuarios
                 </div>
                 <button onClick={() => setProyectoAsignar(proyectoAsignar?.id === p.id ? null : p)} style={btnGhost}>👥 Usuarios</button>
+                <button onClick={() => setProyectoConCalendario(p)} style={btnGhost}>📅 Calendario</button>
                 <button onClick={() => setEditando({ id: p.id, nombre: p.nombre, productora: p.productora, activo: p.activo })} style={btnGhost}>Editar</button>
                 <button onClick={() => onBorrar(p)} style={{ ...btnGhost, borderColor: "#c00", color: "#c00" }}>🗑</button>
               </div>
@@ -7372,6 +7424,261 @@ function PanelProyectos({ usuarioActual, onCerrar }) {
           </div>
         ))}
       </div>
+      {/* v55: modal calendario del proyecto */}
+      {proyectoConCalendario && (
+        <PanelCalendarioProyecto
+          proyecto={proyectoConCalendario}
+          usuarioActual={usuarioActual}
+          onCerrar={() => setProyectoConCalendario(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════
+// PANEL: CALENDARIO DE PROYECTO (v55 · fase 1)
+// ═══════════════════════════════════════════════════════════════════════
+
+function PanelCalendarioProyecto({ proyecto, usuarioActual, onCerrar }) {
+  const [calendario, setCalendario] = useState(null); // null = aún cargando, false = no existe
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState(null);
+  const [form, setForm] = useState({ fechaInicio: "", fechaFin: "", comunidad: "" });
+  const [festivosComunidad, setFestivosComunidad] = useState([]);
+  const [guardando, setGuardando] = useState(false);
+  const [mensaje, setMensaje] = useState(null);
+
+  const COMUNIDADES = [
+    { key: "madrid", label: "Madrid" },
+    { key: "gran_canaria", label: "Gran Canaria" },
+    { key: "tenerife", label: "Tenerife" },
+    { key: "bilbao", label: "Bilbao" },
+  ];
+
+  const recargar = async () => {
+    setCargando(true); setError(null);
+    try {
+      const cal = await obtenerCalendarioProyecto(proyecto.id);
+      if (cal) {
+        setCalendario(cal);
+        setForm({
+          fechaInicio: cal.fecha_inicio || "",
+          fechaFin: cal.fecha_fin || "",
+          comunidad: cal.comunidad || "",
+        });
+      } else {
+        setCalendario(false);
+        setForm({ fechaInicio: "", fechaFin: "", comunidad: "" });
+      }
+    } catch (err) { setError(err.message); }
+    setCargando(false);
+  };
+
+  useEffect(() => { recargar(); }, [proyecto.id]);
+
+  // Cargar festivos de la comunidad seleccionada + filtrar por rango
+  useEffect(() => {
+    (async () => {
+      if (!form.comunidad) { setFestivosComunidad([]); return; }
+      const lista = await listarFestivosSupabase(form.comunidad);
+      let filtrados = lista || [];
+      if (form.fechaInicio && form.fechaFin) {
+        filtrados = filtrados.filter(f => f.fecha >= form.fechaInicio && f.fecha <= form.fechaFin);
+      }
+      setFestivosComunidad(filtrados);
+    })();
+  }, [form.comunidad, form.fechaInicio, form.fechaFin]);
+
+  const guardar = async () => {
+    if (!form.fechaInicio || !form.fechaFin) {
+      alert("Fecha de inicio y fin son obligatorias"); return;
+    }
+    if (form.fechaInicio > form.fechaFin) {
+      alert("La fecha de inicio no puede ser posterior a la fecha fin"); return;
+    }
+    if (!form.comunidad) {
+      alert("Selecciona una comunidad para los festivos"); return;
+    }
+    setGuardando(true); setError(null);
+    try {
+      if (calendario && calendario.id) {
+        // Actualizar
+        await actualizarCalendarioProyecto(usuarioActual.pin, calendario.id, {
+          fechaInicio: form.fechaInicio,
+          fechaFin: form.fechaFin,
+          comunidad: form.comunidad,
+        });
+        setMensaje({ tipo: "ok", texto: "✓ Calendario actualizado" });
+      } else {
+        // Crear nuevo
+        await crearCalendarioProyecto(usuarioActual.pin, {
+          proyectoId: proyecto.id,
+          fechaInicio: form.fechaInicio,
+          fechaFin: form.fechaFin,
+          comunidad: form.comunidad,
+          dias: {},
+        });
+        setMensaje({ tipo: "ok", texto: "✓ Calendario creado" });
+      }
+      recargar();
+      setTimeout(() => setMensaje(null), 3000);
+    } catch (err) {
+      setError(err.message);
+      setMensaje({ tipo: "error", texto: "Error: " + err.message });
+    }
+    setGuardando(false);
+  };
+
+  const eliminar = async () => {
+    if (!calendario || !calendario.id) return;
+    if (!confirm(`¿Borrar el calendario del proyecto "${proyecto.nombre}"?\nSe perderán las fechas, festivos y días marcados.`)) return;
+    try {
+      await borrarCalendarioProyecto(usuarioActual.pin, calendario.id);
+      setMensaje({ tipo: "ok", texto: "✓ Calendario borrado" });
+      recargar();
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const overlay = {
+    position: "fixed", inset: 0, background: "rgba(20,20,20,0.8)",
+    display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100,
+  };
+  const modal = {
+    background: "#faf7f2", padding: 20, borderRadius: 6, maxWidth: 800, width: "92%",
+    maxHeight: "88vh", overflowY: "auto", color: "#1a1a1a",
+    fontFamily: "'Courier New',monospace", border: "1px solid #b8864a",
+  };
+  const btnGold = {
+    background: "#b8864a", color: "#fff", border: "none",
+    padding: "8px 14px", borderRadius: 4, cursor: "pointer",
+    fontFamily: "'Courier New',monospace", fontSize: 11, fontWeight: 700,
+    letterSpacing: "0.1em", textTransform: "uppercase",
+  };
+  const btnGhost = {
+    background: "transparent", color: "#b8864a", border: "1px solid #b8864a",
+    padding: "6px 12px", borderRadius: 4, cursor: "pointer",
+    fontFamily: "'Courier New',monospace", fontSize: 10, fontWeight: 700,
+    letterSpacing: "0.1em", textTransform: "uppercase",
+  };
+  const inp = {
+    padding: "8px 10px", border: "1px solid #d0ccc6", borderRadius: 4,
+    fontFamily: "'Courier New',monospace", fontSize: 12, background: "#fff",
+    color: "#1a1a1a", colorScheme: "light", width: "100%",
+  };
+  const labelStyle = { display: "block", fontSize: 9, color: "#666", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 4 };
+  const tipoColores = {
+    nacional: "#8a3a3a", autonomico: "#3a6898",
+    territorial: "#7a5a2a", local: "#5a7a3a",
+  };
+  const fmtFechaCorta = (f) => {
+    if (!f) return "";
+    const [y, m, d] = f.split("-");
+    const dias = ["Do","Lu","Ma","Mi","Ju","Vi","Sa"];
+    const dow = new Date(f + "T12:00:00").getDay();
+    return `${d}/${m}/${y} · ${dias[dow]}`;
+  };
+
+  return (
+    <div style={overlay} onClick={onCerrar}>
+      <div style={modal} onClick={e => e.stopPropagation()}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, borderBottom: "1px solid #e0ddd8", paddingBottom: 10 }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: 14, letterSpacing: "0.15em", textTransform: "uppercase", color: "#1a1a1a" }}>📅 Calendario del proyecto</h2>
+            <div style={{ fontSize: 11, color: "#888", marginTop: 3, fontWeight: 700 }}>{proyecto.nombre} · {proyecto.productora}</div>
+          </div>
+          <button onClick={onCerrar} style={{ background: "transparent", color: "#888", border: "1px solid #ccc", padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontFamily: "'Courier New',monospace" }}>Cerrar</button>
+        </div>
+
+        {cargando && <div style={{ padding: 20, textAlign: "center", color: "#888" }}>Cargando...</div>}
+
+        {error && <div style={{ background: "#fee", color: "#900", padding: 8, borderRadius: 4, marginBottom: 10, fontSize: 11 }}>Error: {error}</div>}
+
+        {mensaje && (
+          <div style={{
+            padding: 10, borderRadius: 4, marginBottom: 12, fontSize: 11,
+            background: mensaje.tipo === "ok" ? "#e8f5e8" : "#fdf0f0",
+            border: `1px solid ${mensaje.tipo === "ok" ? "#c0e0c0" : "#e8c0c0"}`,
+            color: mensaje.tipo === "ok" ? "#2a7a50" : "#b02020",
+          }}>{mensaje.texto}</div>
+        )}
+
+        {!cargando && (
+          <>
+            {calendario === false && (
+              <div style={{ padding: 12, background: "#fdf8f0", border: "1px solid #e0d0a8", borderRadius: 4, marginBottom: 14, fontSize: 11, color: "#7a5a2a" }}>
+                Este proyecto todavía no tiene calendario. Rellena las fechas y comunidad para crearlo.
+              </div>
+            )}
+
+            {/* Formulario básico */}
+            <div style={{ background: "#fff", padding: 14, borderRadius: 4, marginBottom: 14, border: "1px solid #e0ddd8" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+                <div>
+                  <label style={labelStyle}>Fecha inicio</label>
+                  <input type="date" value={form.fechaInicio} onChange={e => setForm({...form, fechaInicio: e.target.value})} style={inp} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Fecha fin</label>
+                  <input type="date" value={form.fechaFin} onChange={e => setForm({...form, fechaFin: e.target.value})} style={inp} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Comunidad (festivos)</label>
+                  <select value={form.comunidad} onChange={e => setForm({...form, comunidad: e.target.value})} style={inp}>
+                    <option value="">— Elegir —</option>
+                    {COMUNIDADES.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 8, marginTop: 14, justifyContent: "space-between" }}>
+                <div>
+                  {calendario && calendario.id && (
+                    <button onClick={eliminar} style={{ ...btnGhost, borderColor: "#c00", color: "#c00" }}>🗑 Borrar calendario</button>
+                  )}
+                </div>
+                <button onClick={guardar} disabled={guardando} style={{ ...btnGold, cursor: guardando ? "wait" : "pointer" }}>
+                  {guardando ? "Guardando..." : (calendario && calendario.id ? "Guardar cambios" : "Crear calendario")}
+                </button>
+              </div>
+            </div>
+
+            {/* Vista previa: festivos aplicables al rango */}
+            {form.comunidad && form.fechaInicio && form.fechaFin && (
+              <div style={{ background: "#fff", padding: 14, borderRadius: 4, marginBottom: 14, border: "1px solid #e0ddd8" }}>
+                <div style={{ fontSize: 11, color: "#666", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 10, fontWeight: 700 }}>
+                  Festivos que caen en el rango ({festivosComunidad.length})
+                </div>
+                {festivosComunidad.length === 0 ? (
+                  <div style={{ fontSize: 11, color: "#888", padding: 8 }}>No hay festivos de esta comunidad en el rango indicado.</div>
+                ) : (
+                  <div style={{ display: "grid", gap: 4 }}>
+                    {festivosComunidad.map(f => (
+                      <div key={f.id} style={{ display: "grid", gridTemplateColumns: "160px 1fr auto", gap: 8, alignItems: "center", padding: "5px 8px", background: "#f0ede8", borderRadius: 3 }}>
+                        <div style={{ fontSize: 10, fontFamily: "'Courier New',monospace", color: "#1a1a1a", fontWeight: 700 }}>
+                          {fmtFechaCorta(f.fecha)}
+                        </div>
+                        <div style={{ fontSize: 11, color: "#1a1a1a" }}>{f.nombre}</div>
+                        <span style={{
+                          fontSize: 8, padding: "2px 6px", borderRadius: 2,
+                          background: tipoColores[f.tipo] || "#888", color: "#fff",
+                          textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700,
+                        }}>{f.tipo}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div style={{ padding: 10, background: "#f0ede8", borderRadius: 4, fontSize: 10, color: "#666", lineHeight: 1.5 }}>
+              ℹ <b>Fase 1</b>: aquí se define el rango del proyecto y la comunidad. En próximas fases podrás marcar días laborables/rodaje/vacaciones en un mini-calendario y los desplegables de fechas de 45H/40H se limitarán a este rango.
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }
@@ -7385,19 +7692,30 @@ function PanelFestivos({ usuarioActual, onCerrar, onCambios }) {
   const [festivos, setFestivos] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
-  const [nuevoForm, setNuevoForm] = useState({ fecha: "", nombre: "", tipo: "nacional" });
+  const [nuevoForm, setNuevoForm] = useState({ fecha: "", nombre: "", tipo: "nacional", comunidad: "bilbao" });
   const [mostrarNuevo, setMostrarNuevo] = useState(false);
   const [editando, setEditando] = useState(null);
   const [filtroAnio, setFiltroAnio] = useState("");
+  const [filtroComunidad, setFiltroComunidad] = useState("bilbao"); // v55: filtro por comunidad
+
+  const COMUNIDADES = [
+    { key: "madrid", label: "Madrid" },
+    { key: "gran_canaria", label: "Gran Canaria" },
+    { key: "tenerife", label: "Tenerife" },
+    { key: "bilbao", label: "Bilbao" },
+  ];
 
   const recargar = async () => {
     setCargando(true); setError(null);
     try {
       const lista = await listarFestivosSupabase();
       setFestivos(lista || []);
-      // Actualizar array global también
+      // Actualizar array global (Bilbao) para compatibilidad con código antiguo
       if (Array.isArray(lista) && lista.length > 0) {
-        FESTIVOS_BILBAO = lista.map(f => ({ fecha: f.fecha, nombre: f.nombre, tipo: f.tipo || "nacional" }));
+        const bilbao = lista.filter(f => f.comunidad === "bilbao");
+        if (bilbao.length > 0) {
+          FESTIVOS_BILBAO = bilbao.map(f => ({ fecha: f.fecha, nombre: f.nombre, tipo: f.tipo || "nacional" }));
+        }
       }
     } catch (err) { setError(err.message); }
     setCargando(false);
@@ -7414,8 +7732,9 @@ function PanelFestivos({ usuarioActual, onCerrar, onCambios }) {
         fecha: nuevoForm.fecha,
         nombre: nuevoForm.nombre.trim(),
         tipo: nuevoForm.tipo,
+        comunidad: nuevoForm.comunidad,
       });
-      setNuevoForm({ fecha: "", nombre: "", tipo: "nacional" });
+      setNuevoForm({ fecha: "", nombre: "", tipo: "nacional", comunidad: filtroComunidad });
       setMostrarNuevo(false);
       recargar();
       if (onCambios) onCambios();
@@ -7428,6 +7747,7 @@ function PanelFestivos({ usuarioActual, onCerrar, onCambios }) {
         fecha: editando.fecha,
         nombre: editando.nombre.trim(),
         tipo: editando.tipo,
+        comunidad: editando.comunidad,
       });
       setEditando(null);
       recargar();
@@ -7444,11 +7764,13 @@ function PanelFestivos({ usuarioActual, onCerrar, onCambios }) {
     } catch (err) { alert("Error al borrar: " + err.message); }
   };
 
-  // Filtrar por año
+  // Filtrar por año Y comunidad
   const anios = [...new Set(festivos.map(f => f.fecha.slice(0, 4)))].sort();
-  const festivosFiltrados = filtroAnio
-    ? festivos.filter(f => f.fecha.startsWith(filtroAnio))
-    : festivos;
+  const festivosFiltrados = festivos.filter(f => {
+    if (filtroComunidad && f.comunidad !== filtroComunidad) return false;
+    if (filtroAnio && !f.fecha.startsWith(filtroAnio)) return false;
+    return true;
+  });
 
   const overlay = {
     position: "fixed", inset: 0, background: "rgba(20,20,20,0.75)",
@@ -7500,6 +7822,34 @@ function PanelFestivos({ usuarioActual, onCerrar, onCambios }) {
 
         {error && <div style={{ background: "#fee", color: "#900", padding: 8, borderRadius: 4, marginBottom: 10, fontSize: 11 }}>Error: {error}</div>}
 
+        {/* v55: tabs de comunidad */}
+        <div style={{ display: "flex", gap: 4, marginBottom: 10, padding: 4, background: "#e8e4de", borderRadius: 4 }}>
+          {COMUNIDADES.map(c => {
+            const cnt = festivos.filter(f => f.comunidad === c.key).length;
+            const activo = filtroComunidad === c.key;
+            return (
+              <button
+                key={c.key}
+                onClick={() => { setFiltroComunidad(c.key); setNuevoForm(prev => ({...prev, comunidad: c.key})); }}
+                style={{
+                  flex: 1,
+                  background: activo ? "#b8864a" : "transparent",
+                  color: activo ? "#fff" : "#666",
+                  border: "none",
+                  padding: "6px 10px",
+                  borderRadius: 3,
+                  cursor: "pointer",
+                  fontFamily: "'Courier New',monospace",
+                  fontSize: 10,
+                  fontWeight: 700,
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                }}
+              >{c.label} <span style={{ opacity: 0.7, fontSize: 9 }}>({cnt})</span></button>
+            );
+          })}
+        </div>
+
         {/* Barra superior: filtro año + botón nuevo */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 8 }}>
           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
@@ -7517,7 +7867,7 @@ function PanelFestivos({ usuarioActual, onCerrar, onCambios }) {
         {/* Formulario nuevo */}
         {mostrarNuevo && (
           <div style={{ background: "#fff", padding: 12, borderRadius: 4, marginBottom: 14, border: "1px solid #e0ddd8" }}>
-            <div style={{ display: "grid", gridTemplateColumns: "auto 1fr auto auto auto", gap: 8, alignItems: "center" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "auto 1fr auto auto auto auto", gap: 8, alignItems: "center" }}>
               <input type="date" value={nuevoForm.fecha} onChange={e => setNuevoForm({...nuevoForm, fecha: e.target.value})} style={inp} />
               <input placeholder="Nombre del festivo" value={nuevoForm.nombre} onChange={e => setNuevoForm({...nuevoForm, nombre: e.target.value})} style={inp} />
               <select value={nuevoForm.tipo} onChange={e => setNuevoForm({...nuevoForm, tipo: e.target.value})} style={inp}>
@@ -7526,8 +7876,11 @@ function PanelFestivos({ usuarioActual, onCerrar, onCambios }) {
                 <option value="territorial">Territorial</option>
                 <option value="local">Local</option>
               </select>
+              <select value={nuevoForm.comunidad} onChange={e => setNuevoForm({...nuevoForm, comunidad: e.target.value})} style={inp}>
+                {COMUNIDADES.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
+              </select>
               <button onClick={onAdd} style={btnGold}>Crear</button>
-              <button onClick={() => { setMostrarNuevo(false); setNuevoForm({ fecha: "", nombre: "", tipo: "nacional" }); }} style={btnGhost}>Cancelar</button>
+              <button onClick={() => { setMostrarNuevo(false); }} style={btnGhost}>Cancelar</button>
             </div>
           </div>
         )}
@@ -7536,14 +7889,14 @@ function PanelFestivos({ usuarioActual, onCerrar, onCambios }) {
 
         {!cargando && festivosFiltrados.length === 0 && (
           <div style={{ padding: 20, textAlign: "center", color: "#888", fontSize: 12 }}>
-            {festivos.length === 0 ? "No hay festivos. Crea el primero." : "No hay festivos en este año."}
+            {festivos.length === 0 ? "No hay festivos. Crea el primero." : "No hay festivos con estos filtros."}
           </div>
         )}
 
         {!cargando && festivosFiltrados.map(f => (
           <div key={f.id} style={{ background: "#fff", padding: 10, borderRadius: 4, marginBottom: 6, border: "1px solid #e0ddd8" }}>
             {editando?.id === f.id ? (
-              <div style={{ display: "grid", gridTemplateColumns: "auto 1fr auto auto auto", gap: 8, alignItems: "center" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "auto 1fr auto auto auto auto", gap: 8, alignItems: "center" }}>
                 <input type="date" value={editando.fecha} onChange={e => setEditando({...editando, fecha: e.target.value})} style={inp} />
                 <input value={editando.nombre} onChange={e => setEditando({...editando, nombre: e.target.value})} style={inp} />
                 <select value={editando.tipo} onChange={e => setEditando({...editando, tipo: e.target.value})} style={inp}>
@@ -7551,6 +7904,9 @@ function PanelFestivos({ usuarioActual, onCerrar, onCambios }) {
                   <option value="autonomico">Autonómico</option>
                   <option value="territorial">Territorial</option>
                   <option value="local">Local</option>
+                </select>
+                <select value={editando.comunidad} onChange={e => setEditando({...editando, comunidad: e.target.value})} style={inp}>
+                  {COMUNIDADES.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
                 </select>
                 <button onClick={onGuardarEdit} style={btnGold}>Guardar</button>
                 <button onClick={() => setEditando(null)} style={btnGhost}>Cancelar</button>
@@ -7566,7 +7922,7 @@ function PanelFestivos({ usuarioActual, onCerrar, onCambios }) {
                   background: tipoColores[f.tipo] || "#888", color: "#fff",
                   textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700,
                 }}>{f.tipo}</span>
-                <button onClick={() => setEditando({ id: f.id, fecha: f.fecha, nombre: f.nombre, tipo: f.tipo })} style={btnGhost}>Editar</button>
+                <button onClick={() => setEditando({ id: f.id, fecha: f.fecha, nombre: f.nombre, tipo: f.tipo, comunidad: f.comunidad })} style={btnGhost}>Editar</button>
                 <button onClick={() => onBorrar(f)} style={{ ...btnGhost, borderColor: "#c00", color: "#c00" }}>🗑</button>
               </div>
             )}
@@ -7660,7 +8016,7 @@ function BannerSesion({ usuario, proyectoActivo, onLogout, onAdmin, onLogs, onPu
         <span style={{ color: "#888", textTransform: "uppercase", fontSize: 9, letterSpacing: "0.18em" }}>Sesión:</span>
         <span style={{ fontWeight: 700, color: "#f0ede8" }}>{usuario.nombre}</span>
         {usuario.es_admin && <span style={{ background: "#c8a96e", color: "#1a1a1a", padding: "2px 6px", borderRadius: 3, fontSize: 8, fontWeight: 700, letterSpacing: "0.1em" }}>ADMIN</span>}
-        <span style={{ color: "#ffffff", fontSize: 13, letterSpacing: "0.08em", fontWeight: 700, marginLeft: 6 }} title="Versión de la app">v54</span>
+        <span style={{ color: "#ffffff", fontSize: 13, letterSpacing: "0.08em", fontWeight: 700, marginLeft: 6 }} title="Versión de la app">v55</span>
       </div>
 
       {/* Pestañas centrales */}
