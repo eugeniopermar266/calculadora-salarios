@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v71";
+const APP_VERSION = "v72";
 
 // v54: Festivos por defecto (fallback si Supabase falla). El array activo se
 // rellena desde Supabase en el arranque; ver cargarFestivosSupabase()
@@ -2918,6 +2918,20 @@ function App45({ modoTab = "iruna45" }) {
   const [mostrarFestivosLegacy, setMostrarFestivosLegacy] = useState(false); // v62: panel viejo festivos oculto por defecto si hay calendario
   const saltarAutoRellenoRef = useRef(false); // v71: cuando acabamos de cargar un perfil, saltamos el próximo auto-relleno
 
+  const [festivosComunidadCal, setFestivosComunidadCal] = useState([]); // v63: fechas de festivos de la comunidad del calendario del proyecto
+
+  // v63: cargar festivos de la comunidad del calendario del proyecto activo
+  useEffect(() => {
+    (async () => {
+      const cal = proyectoActivoCtx?.__calendario;
+      if (!cal?.comunidad) { setFestivosComunidadCal([]); return; }
+      try {
+        const lista = await listarFestivosSupabase(cal.comunidad);
+        setFestivosComunidadCal((lista || []).map(f => f.fecha));
+      } catch { setFestivosComunidadCal([]); }
+    })();
+  }, [proyectoActivoCtx?.__calendario?.id, proyectoActivoCtx?.__calendario?.comunidad]);
+
   // v71: recalcular horas/festivos/vacaciones desde el calendario y aplicar (sobrescribiendo)
   const aplicarCalendarioAhora = () => {
     const p = calcularPeriodo(fechaInicio, fechaFin);
@@ -3040,19 +3054,6 @@ function App45({ modoTab = "iruna45" }) {
 
     return false;
   })();
-  const [festivosComunidadCal, setFestivosComunidadCal] = useState([]); // v63: fechas de festivos de la comunidad del calendario del proyecto
-
-  // v63: cargar festivos de la comunidad del calendario del proyecto activo
-  useEffect(() => {
-    (async () => {
-      const cal = proyectoActivoCtx?.__calendario;
-      if (!cal?.comunidad) { setFestivosComunidadCal([]); return; }
-      try {
-        const lista = await listarFestivosSupabase(cal.comunidad);
-        setFestivosComunidadCal((lista || []).map(f => f.fecha));
-      } catch { setFestivosComunidadCal([]); }
-    })();
-  }, [proyectoActivoCtx?.__calendario?.id, proyectoActivoCtx?.__calendario?.comunidad]);
   const [plusHerramienta,  setPlusHerramienta] = useState({ importe: 0, modo: "mes" });
   const [plusCoche,        setPlusCoche]       = useState({ importe: 0, modo: "mes" });
   const [plusVivienda,     setPlusVivienda]    = useState({ importe: 0, modo: "mes" });
