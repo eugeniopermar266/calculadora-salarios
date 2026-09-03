@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v68";
+const APP_VERSION = "v69";
 
 // v54: Festivos por defecto (fallback si Supabase falla). El array activo se
 // rellena desde Supabase en el arranque; ver cargarFestivosSupabase()
@@ -4284,6 +4284,52 @@ ${docHTML}
                     </div>
                   </>
                 )}
+                {/* v69: Resumen del calendario del proyecto (días del trabajador por categoría) */}
+                {proyectoActivoCtx?.__calendario?.dias && fechaInicio && fechaFin && (() => {
+                  const cal = proyectoActivoCtx.__calendario;
+                  const setFest = new Set(festivosComunidadCal || []);
+                  let cRodaje = 0, cLaboralNoRodaje = 0, cVacaciones = 0, cFestivosTrab = 0, cFestivosNoTrab = 0, cDescanso = 0;
+                  for (const [fecha, info] of Object.entries(cal.dias || {})) {
+                    if (fecha < fechaInicio || fecha > fechaFin) continue;
+                    if (!info) continue;
+                    const esFest = setFest.has(fecha);
+                    if (esFest) {
+                      if (info.festivo_trabajado) cFestivosTrab++;
+                      else cFestivosNoTrab++;
+                      continue; // festivo tiene prioridad, no lo contamos también como laboral
+                    }
+                    if (info.vacaciones) { cVacaciones++; continue; }
+                    if (info.descanso) { cDescanso++; continue; }
+                    if (info.rodaje) { cRodaje++; continue; }
+                    if (info.laboral) { cLaboralNoRodaje++; continue; }
+                  }
+                  const hayAlgo = cRodaje + cLaboralNoRodaje + cVacaciones + cFestivosTrab + cFestivosNoTrab + cDescanso > 0;
+                  if (!hayAlgo) return null;
+                  const cats = [
+                    { label: "Rodaje",              n: cRodaje,           bg: "#faf1e0", border: "#c8963a", color: "#7a5a2a" },
+                    { label: "Laboral no-rodaje",   n: cLaboralNoRodaje,  bg: "#e8f0e0", border: "#8ab070", color: "#3a5a2a" },
+                    { label: "Vacaciones",          n: cVacaciones,       bg: "#e0edf5", border: "#5090c0", color: "#204878" },
+                    { label: "Festivos trabajados", n: cFestivosTrab,     bg: "#ffe8c8", border: "#e89838", color: "#8a5820" },
+                    { label: "Festivos no trab.",   n: cFestivosNoTrab,   bg: "#fde0e0", border: "#c05050", color: "#8a2020" },
+                    { label: "Descanso",            n: cDescanso,         bg: "#ece0f0", border: "#8a5aa0", color: "#502870" },
+                  ];
+                  return (
+                    <>
+                      <Div />
+                      <div style={{ padding:"10px 12px", background:"#f8f5ff", borderRadius:6, border:"1px solid #d8c8e8" }}>
+                        <div style={{ fontSize:9, color:"#6a3a9a", letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:8 }}>Días del calendario en el período</div>
+                        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(110px, 1fr))", gap:6 }}>
+                          {cats.map(c => (
+                            <div key={c.label} style={{ background:c.bg, border:`1px solid ${c.border}`, borderRadius:4, padding:"6px 8px", textAlign:"center" }}>
+                              <div style={{ fontSize:18, fontWeight:700, color:c.color, fontFamily:"'Courier Prime', 'Courier New', monospace", lineHeight:1 }}>{c.n}</div>
+                              <div style={{ fontSize:8, color:c.color, marginTop:3, letterSpacing:"0.06em", textTransform:"uppercase", fontFamily:"'Courier Prime', 'Courier New', monospace", opacity: c.n === 0 ? 0.5 : 1 }}>{c.label}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  );
+                })()}
                 {/* Aviso orientativo */}
                 <div style={{ marginTop:16, paddingTop:12, borderTop:"1px solid #e0ddd8", fontSize:10, color:"#666", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", lineHeight:1.5, fontStyle:"italic", textAlign:"center" }}>
                   Cálculo orientativo del salario mensual bruto, que puede diferir ligeramente de la nómina real generada en cada periodo.
