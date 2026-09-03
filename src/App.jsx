@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v66";
+const APP_VERSION = "v67";
 
 // v54: Festivos por defecto (fallback si Supabase falla). El array activo se
 // rellena desde Supabase en el arranque; ver cargarFestivosSupabase()
@@ -560,8 +560,8 @@ function PuestoSelector({ puesto, codigoContable, onPuesto, onCodigoContable }) 
     else onCodigoContable(""); // texto libre = sin código
   };
 
-  const inp = { padding: "11px 13px", fontSize: 13, border: "1px solid #c0bcb5", borderRadius: 6, fontFamily: "'Courier New',monospace", boxSizing: "border-box", width: "100%", outline: "none", background: "#fafaf7", color: "#1a1a1a" };
-  const LS = { display: "block", fontSize: 10, color: "#666", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 6, fontWeight: 700, fontFamily: "'Courier New',monospace" };
+  const inp = { padding: "11px 13px", fontSize: 13, border: "1px solid #c0bcb5", borderRadius: 6, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", boxSizing: "border-box", width: "100%", outline: "none", background: "#fafaf7", color: "#1a1a1a" };
+  const LS = { display: "block", fontSize: 10, color: "#666", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 6, fontWeight: 700, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace" };
 
   return (
     <div style={{ marginBottom: 14 }}>
@@ -593,7 +593,7 @@ function PuestoSelector({ puesto, codigoContable, onPuesto, onCodigoContable }) 
           style={{
             position: "relative", zIndex: 100, marginTop: 4,
             background: "#fff", border: "1px solid #c0bcb5", borderRadius: 6,
-            maxHeight: 320, overflowY: "auto", fontFamily: "'Courier New',monospace",
+            maxHeight: 320, overflowY: "auto", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace",
             boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
           }}
         >
@@ -620,7 +620,7 @@ function PuestoSelector({ puesto, codigoContable, onPuesto, onCodigoContable }) 
                     onMouseLeave={e => e.currentTarget.style.background = p.nombre === puesto ? "rgba(184,134,74,0.1)" : "transparent"}
                   >
                     <span style={{ color: "#1a1a1a", fontWeight: p.nombre === puesto ? 700 : 400 }}>{p.nombre}</span>
-                    <span style={{ color: "#888", fontSize: 10, fontFamily: "'Courier New',monospace" }}>{p.codigo}</span>
+                    <span style={{ color: "#888", fontSize: 10, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>{p.codigo}</span>
                   </div>
                 ))}
               </div>
@@ -640,7 +640,7 @@ function PuestoSelector({ puesto, codigoContable, onPuesto, onCodigoContable }) 
           style={{ ...inp, background: codigoContable ? "#f0ede8" : "#fafaf7", color: codigoContable ? "#1a1a1a" : "#aaa", fontWeight: codigoContable ? 700 : 400, cursor: "default" }}
         />
         {!codigoContable && busqueda && (
-          <div style={{ fontSize: 9, color: "#a07030", marginTop: 4, fontFamily: "'Courier New',monospace", fontStyle: "italic" }}>
+          <div style={{ fontSize: 9, color: "#a07030", marginTop: 4, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontStyle: "italic" }}>
             ℹ Puesto no estándar (sin código contable asignado)
           </div>
         )}
@@ -941,13 +941,13 @@ const BadgeBrutos = ({ size = "normal" }) => {
       letterSpacing: "0.12em",
       textTransform: "uppercase",
       borderRadius: 3,
-      fontFamily: "'Courier New', monospace",
+      fontFamily: "'Courier Prime', 'Courier New', monospace",
       verticalAlign: "middle",
       ...s,
     }}>Importes Brutos</span>
   );
 };
-const LS = { display: "block", fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#555", marginBottom: 6, fontFamily: "'Courier New', monospace" };
+const LS = { display: "block", fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#555", marginBottom: 6, fontFamily: "'Courier Prime', 'Courier New', monospace" };
 
 function Field({ label, value, onChange, onBlur, type = "number", prefix, hint, small, readOnly, lockHint, min, max }) {
   return (
@@ -958,7 +958,7 @@ function Field({ label, value, onChange, onBlur, type = "number", prefix, hint, 
         </label>
       )}
       <div style={{ position: "relative", minWidth: 0 }}>
-        {prefix && <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "#b8864a", fontWeight: 700, fontSize: 13, fontFamily: "'Courier New', monospace" }}>{prefix}</span>}
+        {prefix && <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "#b8864a", fontWeight: 700, fontSize: 13, fontFamily: "'Courier Prime', 'Courier New', monospace" }}>{prefix}</span>}
         <input
           type={type === "date" ? "date" : type === "text" ? "text" : "number"}
           value={value}
@@ -974,7 +974,7 @@ function Field({ label, value, onChange, onBlur, type = "number", prefix, hint, 
             border: `1px solid ${readOnly ? "#c8a96e" : "#d0ccc6"}`,
             borderRadius: 4,
             color: readOnly ? "#666" : "#1a1a1a",
-            fontFamily: "'Courier New', monospace",
+            fontFamily: "'Courier Prime', 'Courier New', monospace",
             fontSize: small ? 13 : 14,
             padding: prefix ? (small ? "7px 8px 7px 22px" : "9px 10px 9px 26px") : (small ? "7px 10px" : "9px 12px"),
             outline: "none", boxSizing: "border-box", transition: "border-color 0.2s",
@@ -988,8 +988,8 @@ function Field({ label, value, onChange, onBlur, type = "number", prefix, hint, 
           }}
         />
       </div>
-      {hint && <p style={{ margin: "3px 0 0", fontSize: 9, color: "#777", fontFamily: "'Courier New', monospace" }}>{hint}</p>}
-      {readOnly && lockHint && <p style={{ margin: "3px 0 0", fontSize: 9, color: "#b8864a", fontFamily: "'Courier New', monospace", fontStyle: "italic" }}>{lockHint}</p>}
+      {hint && <p style={{ margin: "3px 0 0", fontSize: 9, color: "#777", fontFamily: "'Courier Prime', 'Courier New', monospace" }}>{hint}</p>}
+      {readOnly && lockHint && <p style={{ margin: "3px 0 0", fontSize: 9, color: "#b8864a", fontFamily: "'Courier Prime', 'Courier New', monospace", fontStyle: "italic" }}>{lockHint}</p>}
     </div>
   );
 }
@@ -1002,8 +1002,8 @@ function Toggle({ label, sublabel, value, onChange }) {
       border: `1px solid ${value ? "#c8963a" : "#e0ddd8"}`, marginBottom: 10, cursor: "pointer",
     }}>
       <div>
-        <div style={{ fontSize: 11, color: value ? "#7a5a2a" : "#999", fontFamily: "'Courier New', monospace", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 700 }}>{label}</div>
-        {sublabel && <div style={{ fontSize: 9, color: "#777", marginTop: 2, fontFamily: "'Courier New', monospace" }}>{sublabel}</div>}
+        <div style={{ fontSize: 11, color: value ? "#7a5a2a" : "#999", fontFamily: "'Courier Prime', 'Courier New', monospace", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 700 }}>{label}</div>
+        {sublabel && <div style={{ fontSize: 9, color: "#777", marginTop: 2, fontFamily: "'Courier Prime', 'Courier New', monospace" }}>{sublabel}</div>}
       </div>
       <div style={{ position: "relative", width: 38, height: 20, flexShrink: 0, marginLeft: 12 }}>
         <div style={{ width: "100%", height: "100%", borderRadius: 10, background: value ? "#c8a96e" : "#222", transition: "background 0.25s" }} />
@@ -1023,11 +1023,11 @@ function Row({ label, value, sub, highlight, green, muted }) {
       borderBottom: highlight ? "none" : "1px solid #191919",
       marginBottom: highlight ? 6 : 0,
     }}>
-      <span style={{ fontSize: highlight ? 11 : 10, letterSpacing: "0.07em", textTransform: "uppercase", color: highlight ? "#7a5a2a" : muted ? "#999" : "#1a1a1a", fontFamily: "'Courier New', monospace", fontWeight: highlight ? 700 : 400 }}>
+      <span style={{ fontSize: highlight ? 11 : 10, letterSpacing: "0.07em", textTransform: "uppercase", color: highlight ? "#7a5a2a" : muted ? "#999" : "#1a1a1a", fontFamily: "'Courier Prime', 'Courier New', monospace", fontWeight: highlight ? 700 : 400 }}>
         {label}
         {sub && <span style={{ display: "block", fontSize: 9, color: "#888", marginTop: 2 }}>{sub}</span>}
       </span>
-      <span style={{ fontSize: highlight ? 17 : 13, fontWeight: highlight ? 700 : 500, color: green ? "#1a7a58" : highlight ? "#b8864a" : muted ? "#999" : "#1a1a1a", fontFamily: "'Courier New', monospace" }}>
+      <span style={{ fontSize: highlight ? 17 : 13, fontWeight: highlight ? 700 : 500, color: green ? "#1a7a58" : highlight ? "#b8864a" : muted ? "#999" : "#1a1a1a", fontFamily: "'Courier Prime', 'Courier New', monospace" }}>
         {value}
       </span>
     </div>
@@ -1127,7 +1127,7 @@ function ImportadorAntiguos({ usuarioActual, tabId, onCerrar, onImportado }) {
   const modal = {
     background: "#faf7f2", padding: 20, borderRadius: 6, maxWidth: 750, width: "92%",
     maxHeight: "88vh", overflowY: "auto", color: "#1a1a1a",
-    fontFamily: "'Courier New',monospace", border: "1px solid #b8864a",
+    fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", border: "1px solid #b8864a",
   };
 
   return (
@@ -1135,7 +1135,7 @@ function ImportadorAntiguos({ usuarioActual, tabId, onCerrar, onImportado }) {
       <div style={modal} onClick={e => e.stopPropagation()}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, borderBottom: "1px solid #e0ddd8", paddingBottom: 10 }}>
           <h2 style={{ margin: 0, fontSize: 14, letterSpacing: "0.15em", textTransform: "uppercase", color: "#1a1a1a" }}>📥 Importar Perfiles Antiguos</h2>
-          <button onClick={onCerrar} style={{ background: "transparent", color: "#888", border: "1px solid #ccc", padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontFamily: "'Courier New',monospace" }}>Cerrar</button>
+          <button onClick={onCerrar} style={{ background: "transparent", color: "#888", border: "1px solid #ccc", padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>Cerrar</button>
         </div>
 
         <div style={{ fontSize: 11, color: "#666", marginBottom: 12, lineHeight: 1.5 }}>
@@ -1178,7 +1178,7 @@ function ImportadorAntiguos({ usuarioActual, tabId, onCerrar, onImportado }) {
                   <select
                     value={seleccion[p.key] || ""}
                     onChange={e => setSeleccion({ ...seleccion, [p.key]: e.target.value })}
-                    style={{ padding: "6px 8px", border: "1px solid #d0ccc6", borderRadius: 4, fontFamily: "'Courier New',monospace", fontSize: 11, background: "#fff", color: "#1a1a1a", minWidth: 180 }}
+                    style={{ padding: "6px 8px", border: "1px solid #d0ccc6", borderRadius: 4, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize: 11, background: "#fff", color: "#1a1a1a", minWidth: 180 }}
                   >
                     <option value="">— No importar —</option>
                     {proyectos.map(pr => (
@@ -1193,12 +1193,12 @@ function ImportadorAntiguos({ usuarioActual, tabId, onCerrar, onImportado }) {
               <button
                 onClick={onCerrar}
                 disabled={importando}
-                style={{ background: "transparent", color: "#666", border: "1px solid #ccc", padding: "8px 16px", borderRadius: 4, cursor: importando ? "wait" : "pointer", fontFamily: "'Courier New',monospace", fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}
+                style={{ background: "transparent", color: "#666", border: "1px solid #ccc", padding: "8px 16px", borderRadius: 4, cursor: importando ? "wait" : "pointer", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}
               >Cancelar</button>
               <button
                 onClick={importarSeleccionados}
                 disabled={importando}
-                style={{ background: "#b8864a", color: "#fff", border: "none", padding: "8px 16px", borderRadius: 4, cursor: importando ? "wait" : "pointer", fontFamily: "'Courier New',monospace", fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}
+                style={{ background: "#b8864a", color: "#fff", border: "none", padding: "8px 16px", borderRadius: 4, cursor: importando ? "wait" : "pointer", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}
               >{importando ? "Importando..." : "Importar seleccionados"}</button>
             </div>
           </>
@@ -1599,7 +1599,7 @@ function GestorPerfiles({ tabId, datosActuales, onCargarPerfil }) {
   };
 
   const btnStyle = (color = "#1a1a1a", fondo = "#fff") => ({
-    padding: "6px 12px", fontSize: 9, fontFamily: "'Courier New', monospace",
+    padding: "6px 12px", fontSize: 9, fontFamily: "'Courier Prime', 'Courier New', monospace",
     fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase",
     background: fondo, color, border: `1px solid ${color === "#1a1a1a" ? "#d0ccc6" : color}`,
     borderRadius: 4, cursor: "pointer", whiteSpace: "nowrap",
@@ -1622,7 +1622,7 @@ function GestorPerfiles({ tabId, datosActuales, onCargarPerfil }) {
       </div>
 
       {mensaje && (
-        <div style={{ marginTop:8, padding:"6px 10px", borderRadius:4, fontSize:10, fontFamily:"'Courier New',monospace",
+        <div style={{ marginTop:8, padding:"6px 10px", borderRadius:4, fontSize:10, fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",
           background: mensaje.tipo === "error" ? "#fdf0f0" : "#f0f8f0",
           color: mensaje.tipo === "error" ? "#b02020" : "#2a7a50",
           border: `1px solid ${mensaje.tipo === "error" ? "#e8c0c0" : "#c0e0c0"}` }}>
@@ -1632,7 +1632,7 @@ function GestorPerfiles({ tabId, datosActuales, onCargarPerfil }) {
 
       {mostrarGuardar && (
         <div style={{ marginTop:10, padding:10, background:"#f0ede8", borderRadius:5, border:"1px solid #e0ddd8" }}>
-          <div style={{ fontSize:9, color:"#777", textTransform:"uppercase", letterSpacing:"0.1em", marginBottom:6, fontFamily:"'Courier New',monospace" }}>Nombre del perfil</div>
+          <div style={{ fontSize:9, color:"#777", textTransform:"uppercase", letterSpacing:"0.1em", marginBottom:6, fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>Nombre del perfil</div>
           <div style={{ display:"flex", gap:6 }}>
             <input
               type="text"
@@ -1641,7 +1641,7 @@ function GestorPerfiles({ tabId, datosActuales, onCargarPerfil }) {
               onChange={e => setNombrePerfil(e.target.value)}
               onKeyDown={e => e.key === "Enter" && guardarPerfil()}
               autoFocus
-              style={{ flex:1, background:"#fff", border:"1px solid #d0ccc6", borderRadius:4, color:"#1a1a1a", fontFamily:"'Courier New',monospace", fontSize:12, padding:"7px 10px", outline:"none", colorScheme:"light" }}
+              style={{ flex:1, background:"#fff", border:"1px solid #d0ccc6", borderRadius:4, color:"#1a1a1a", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize:12, padding:"7px 10px", outline:"none", colorScheme:"light" }}
             />
             <button onClick={guardarPerfil} style={{ ...btnStyle("#fff", "#b8864a"), border:"1px solid #b8864a" }}>Guardar</button>
           </div>
@@ -1654,7 +1654,7 @@ function GestorPerfiles({ tabId, datosActuales, onCargarPerfil }) {
           {(esAdmin || perfilEnEdicion) && (
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8, paddingBottom:8, borderBottom:"1px solid #e0ddd8", gap:8, flexWrap:"wrap" }}>
               {esAdmin ? (
-                <label style={{ display:"flex", alignItems:"center", gap:6, fontSize:10, color:"#666", fontFamily:"'Courier New',monospace", cursor:"pointer" }}>
+                <label style={{ display:"flex", alignItems:"center", gap:6, fontSize:10, color:"#666", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", cursor:"pointer" }}>
                   <input
                     type="checkbox"
                     checked={verTodosProyectos}
@@ -1670,13 +1670,13 @@ function GestorPerfiles({ tabId, datosActuales, onCargarPerfil }) {
                   <button
                     onClick={modificarPerfil}
                     title={`Sobrescribir "${perfilEnEdicion.nombre}"`}
-                    style={{ background:"#b8864a", color:"#fff", border:"1px solid #b8864a", padding:"3px 8px", borderRadius:3, cursor:"pointer", fontSize:9, fontFamily:"'Courier New',monospace", fontWeight:700, letterSpacing:"0.1em", textTransform:"uppercase" }}
+                    style={{ background:"#b8864a", color:"#fff", border:"1px solid #b8864a", padding:"3px 8px", borderRadius:3, cursor:"pointer", fontSize:9, fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontWeight:700, letterSpacing:"0.1em", textTransform:"uppercase" }}
                   >🔄 Modificar</button>
                 )}
                 {esAdmin && (
                   <button
                     onClick={() => setMostrarImportador(true)}
-                    style={{ background:"transparent", color:"#b8864a", border:"1px solid #b8864a", padding:"3px 8px", borderRadius:3, cursor:"pointer", fontSize:9, fontFamily:"'Courier New',monospace", fontWeight:700, letterSpacing:"0.1em", textTransform:"uppercase" }}
+                    style={{ background:"transparent", color:"#b8864a", border:"1px solid #b8864a", padding:"3px 8px", borderRadius:3, cursor:"pointer", fontSize:9, fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontWeight:700, letterSpacing:"0.1em", textTransform:"uppercase" }}
                   >📥 Importar antiguos</button>
                 )}
               </div>
@@ -1684,12 +1684,12 @@ function GestorPerfiles({ tabId, datosActuales, onCargarPerfil }) {
           )}
           {/* v46: aviso si Supabase falló */}
           {huboFallbackSupabase && (
-            <div style={{ background:"#fdf0e0", border:"1px solid #e8b878", color:"#7a5a2a", padding:"6px 8px", borderRadius:3, marginBottom:8, fontSize:10, fontFamily:"'Courier New',monospace" }}>
+            <div style={{ background:"#fdf0e0", border:"1px solid #e8b878", color:"#7a5a2a", padding:"6px 8px", borderRadius:3, marginBottom:8, fontSize:10, fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>
               ⚠ Sin conexión con la nube. Mostrando solo perfiles locales.
             </div>
           )}
           {perfiles.length === 0 ? (
-            <div style={{ fontSize:10, color:"#888", textAlign:"center", padding:"12px 0", fontFamily:"'Courier New',monospace" }}>
+            <div style={{ fontSize:10, color:"#888", textAlign:"center", padding:"12px 0", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>
               No hay perfiles guardados todavía
             </div>
           ) : perfiles.map(perfil => (
@@ -1700,7 +1700,7 @@ function GestorPerfiles({ tabId, datosActuales, onCargarPerfil }) {
               onMouseEnter={e => { e.currentTarget.style.borderColor = "#b8864a"; e.currentTarget.style.background = "#fdf8f0"; }}
               onMouseLeave={e => { e.currentTarget.style.borderColor = "#e8e4de"; e.currentTarget.style.background = "#fff"; }}>
               <div style={{ flex:1, minWidth:0 }}>
-                <div style={{ fontSize:11, fontWeight:700, color:"#1a1a1a", fontFamily:"'Courier New',monospace", marginBottom:2, display:"flex", alignItems:"center", gap:6 }}>
+                <div style={{ fontSize:11, fontWeight:700, color:"#1a1a1a", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", marginBottom:2, display:"flex", alignItems:"center", gap:6 }}>
                   {perfil.nombre}
                   {perfil.tabId && (
                     <span style={{ fontSize:8, padding:"1px 5px", borderRadius:2, background: perfil.tabId === tabId ? "#e0d0a8" : "#e8e4de", color: perfil.tabId === tabId ? "#7a5a2a" : "#888", letterSpacing:"0.05em", textTransform:"uppercase", fontWeight:700 }}>
@@ -1714,7 +1714,7 @@ function GestorPerfiles({ tabId, datosActuales, onCargarPerfil }) {
                     </span>
                   )}
                 </div>
-                <div style={{ fontSize:9, color:"#888", fontFamily:"'Courier New',monospace" }}>
+                <div style={{ fontSize:9, color:"#888", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>
                   {perfil.datos?.proyecto && <><span style={{color:"#b8864a",fontWeight:700}}>📁 {perfil.datos.proyecto}</span>{perfil.datos?.productora ? <span style={{color:"#888"}}> · {perfil.datos.productora}</span> : ""} · </>}
                   {perfil.datos?.nombre || "—"} · {perfil.datos?.puesto || "—"}
                   {perfil.datos?.fechaInicio && ` · ${perfil.datos.fechaInicio}→${perfil.datos.fechaFin}`}
@@ -1764,11 +1764,11 @@ function TablaMeses({ porMes, vacAcumulada, indemAcumulada, horasAcumuladas, com
 
   const th = (align, extra) => ({
     padding: "7px 8px", fontSize: 9, letterSpacing: "0.12em", textTransform: "uppercase",
-    color: "#555", fontWeight: 700, textAlign: align, fontFamily: "'Courier New', monospace",
+    color: "#555", fontWeight: 700, textAlign: align, fontFamily: "'Courier Prime', 'Courier New', monospace",
     borderBottom: "1px solid #e0ddd8", whiteSpace: "nowrap", ...extra,
   });
   const td = (align, color, bold) => ({
-    padding: "8px 8px", fontSize: 11, textAlign: align, fontFamily: "'Courier New', monospace",
+    padding: "8px 8px", fontSize: 11, textAlign: align, fontFamily: "'Courier Prime', 'Courier New', monospace",
     color: color || "#1a1a1a", fontWeight: bold ? 600 : 400, borderBottom: "1px solid #eae7e2",
   });
 
@@ -1897,10 +1897,10 @@ function InputsPorMes({ desglose, horasPorMes, setHorasPorMes, vacDiasPorMes, se
   return (
     <div>
       <div style={{ display:"grid", gridTemplateColumns:cols, gap:6, marginBottom:12, padding:"0 2px 6px", borderBottom:"1px solid #eae7e2" }}>
-        <div style={{ fontSize:9, color:"#888", letterSpacing:"0.12em", textTransform:"uppercase", fontFamily:"'Courier New',monospace", fontWeight:700 }}>Mes</div>
-        <div style={{ fontSize:9, color:"#3a6090", letterSpacing:"0.1em", textTransform:"uppercase", fontFamily:"'Courier New',monospace", textAlign:"center", fontWeight:700 }}>H.Ext</div>
-        <div style={{ fontSize:9, color:"#907060", letterSpacing:"0.1em", textTransform:"uppercase", fontFamily:"'Courier New',monospace", textAlign:"center", fontWeight:700 }}>Vac</div>
-        {hasFest && <div style={{ fontSize:9, color:"#6a4a8a", letterSpacing:"0.1em", textTransform:"uppercase", fontFamily:"'Courier New',monospace", textAlign:"center", fontWeight:700 }}>Fest</div>}
+        <div style={{ fontSize:9, color:"#888", letterSpacing:"0.12em", textTransform:"uppercase", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontWeight:700 }}>Mes</div>
+        <div style={{ fontSize:9, color:"#3a6090", letterSpacing:"0.1em", textTransform:"uppercase", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", textAlign:"center", fontWeight:700 }}>H.Ext</div>
+        <div style={{ fontSize:9, color:"#907060", letterSpacing:"0.1em", textTransform:"uppercase", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", textAlign:"center", fontWeight:700 }}>Vac</div>
+        {hasFest && <div style={{ fontSize:9, color:"#6a4a8a", letterSpacing:"0.1em", textTransform:"uppercase", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", textAlign:"center", fontWeight:700 }}>Fest</div>}
       </div>
 
       {desglose.map((d,i) => {
@@ -1910,7 +1910,7 @@ function InputsPorMes({ desglose, horasPorMes, setHorasPorMes, vacDiasPorMes, se
         const anio = partes[1] || "";
         return (
         <div key={i} style={{ display:"grid", gridTemplateColumns:cols, gap:6, marginBottom:8, alignItems:"center" }}>
-          <div style={{ fontFamily:"'Courier New',monospace", lineHeight:1.25, paddingRight:4, paddingTop:11 }}>
+          <div style={{ fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", lineHeight:1.25, paddingRight:4, paddingTop:11 }}>
             <div style={{ fontSize:10.5, color:"#1a1a1a", fontWeight:600, textTransform:"capitalize", letterSpacing:"0.02em" }}>
               {mesNombre}
             </div>
@@ -1927,7 +1927,7 @@ function InputsPorMes({ desglose, horasPorMes, setHorasPorMes, vacDiasPorMes, se
             const esEstimadoOriginal = hasVal && valorActual === autoH;
             return (
               <div style={{ position:"relative", paddingTop:11 }}>
-                <div style={{ position:"absolute", top:0, left:0, right:0, fontSize:8, color: esEstimadoOriginal ? "#4a6a9a" : "#8aa0b8", fontFamily:"'Courier New',monospace", letterSpacing:"0.05em", textAlign:"center", pointerEvents:"none", lineHeight:1, fontWeight: esEstimadoOriginal ? 700 : 400 }}>
+                <div style={{ position:"absolute", top:0, left:0, right:0, fontSize:8, color: esEstimadoOriginal ? "#4a6a9a" : "#8aa0b8", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", letterSpacing:"0.05em", textAlign:"center", pointerEvents:"none", lineHeight:1, fontWeight: esEstimadoOriginal ? 700 : 400 }}>
                   L-V · {autoH}d
                 </div>
                 <input type="number" min="0" step="0.5"
@@ -1939,7 +1939,7 @@ function InputsPorMes({ desglose, horasPorMes, setHorasPorMes, vacDiasPorMes, se
                     setHorasPorMes(a);
                   }}
                   title={`Estimado L-V: ${autoH}h (puedes modificarlo)`}
-                  style={{ background: esEstimadoOriginal?"#eef3f8":"#f0ede8", border:`1px solid ${esEstimadoOriginal?"#b8cce0":"#4a6a9a"}`, borderRadius:4, color:"#2a5a8a", fontFamily:"'Courier New',monospace", fontSize:11, padding:"4px 4px", outline:"none", textAlign:"center", colorScheme:"light", minWidth:0, width:"100%", boxSizing:"border-box" }}
+                  style={{ background: esEstimadoOriginal?"#eef3f8":"#f0ede8", border:`1px solid ${esEstimadoOriginal?"#b8cce0":"#4a6a9a"}`, borderRadius:4, color:"#2a5a8a", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize:11, padding:"4px 4px", outline:"none", textAlign:"center", colorScheme:"light", minWidth:0, width:"100%", boxSizing:"border-box" }}
                   onFocus={e=>e.target.style.borderColor="#4a6a9a"} onBlur={e=>e.target.style.borderColor=esEstimadoOriginal?"#b8cce0":"#4a6a9a"} />
               </div>
             );
@@ -1947,13 +1947,13 @@ function InputsPorMes({ desglose, horasPorMes, setHorasPorMes, vacDiasPorMes, se
           <div style={{ paddingTop:11 }}>
             <input type="number" min="0" step="1" value={vacDiasPorMes[i]||""} placeholder="0"
               onChange={e=>setV(i,parseFloat(e.target.value)||0)}
-              style={{ background:"#f0ede8", border:"1px solid #e0c8b0", borderRadius:4, color:"#8a2a20", fontFamily:"'Courier New',monospace", fontSize:11, padding:"4px 4px", outline:"none", textAlign:"center", colorScheme:"light", minWidth:0, width:"100%", boxSizing:"border-box" }}
+              style={{ background:"#f0ede8", border:"1px solid #e0c8b0", borderRadius:4, color:"#8a2a20", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize:11, padding:"4px 4px", outline:"none", textAlign:"center", colorScheme:"light", minWidth:0, width:"100%", boxSizing:"border-box" }}
               onFocus={e=>e.target.style.borderColor="#8a5030"} onBlur={e=>e.target.style.borderColor="#e0c8b0"} />
           </div>
           {hasFest && <div style={{ paddingTop:11 }}>
             <input type="number" min="0" step="1" value={(festivosPorMes||[])[i]||""} placeholder="0"
               onChange={e=>setF(i,parseFloat(e.target.value)||0)}
-              style={{ background:"#f0ede8", border:"1px solid #c8b0d8", borderRadius:4, color:"#6a3a9a", fontFamily:"'Courier New',monospace", fontSize:11, padding:"4px 4px", outline:"none", textAlign:"center", colorScheme:"light", minWidth:0, width:"100%", boxSizing:"border-box" }}
+              style={{ background:"#f0ede8", border:"1px solid #c8b0d8", borderRadius:4, color:"#6a3a9a", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize:11, padding:"4px 4px", outline:"none", textAlign:"center", colorScheme:"light", minWidth:0, width:"100%", boxSizing:"border-box" }}
               onFocus={e=>e.target.style.borderColor="#8a5aaa"} onBlur={e=>e.target.style.borderColor="#c8b0d8"} />
           </div>}
         </div>
@@ -1961,16 +1961,16 @@ function InputsPorMes({ desglose, horasPorMes, setHorasPorMes, vacDiasPorMes, se
       })}
 
       <div style={{ display:"grid", gridTemplateColumns:cols, gap:6, marginTop:8, paddingTop:8, borderTop:"1px solid #e0ddd8" }}>
-        <div style={{ fontSize:9, color:"#777", textTransform:"uppercase", letterSpacing:"0.1em", fontFamily:"'Courier New',monospace", display:"flex", alignItems:"center" }}>Total</div>
-        <div style={{ textAlign:"center", fontSize:12, fontWeight:700, color:"#2a5a8a", fontFamily:"'Courier New',monospace" }}>
+        <div style={{ fontSize:9, color:"#777", textTransform:"uppercase", letterSpacing:"0.1em", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", display:"flex", alignItems:"center" }}>Total</div>
+        <div style={{ textAlign:"center", fontSize:12, fontWeight:700, color:"#2a5a8a", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>
           {desglose.reduce((s,d,i)=>{
             const v = horasPorMes[i];
             if (v === undefined || v === null || v === "") return s + Math.round(d.semanasLaborables * 5);
             return s + (v || 0);
           },0)}h
         </div>
-        <div style={{ textAlign:"center", fontSize:12, fontWeight:700, color:"#8a2a20", fontFamily:"'Courier New',monospace" }}>{totalV}d</div>
-        {hasFest && <div style={{ textAlign:"center", fontSize:12, fontWeight:700, color:"#6a3a9a", fontFamily:"'Courier New',monospace" }}>{totalF}d</div>}
+        <div style={{ textAlign:"center", fontSize:12, fontWeight:700, color:"#8a2a20", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>{totalV}d</div>
+        {hasFest && <div style={{ textAlign:"center", fontSize:12, fontWeight:700, color:"#6a3a9a", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>{totalF}d</div>}
       </div>
     </div>
   );
@@ -2045,7 +2045,7 @@ function ModalCSV({ contenido, filename, onClose }) {
           background: "#fff", borderRadius: 8,
           maxWidth: 900, width: "100%", maxHeight: "90vh",
           display: "flex", flexDirection: "column",
-          fontFamily: "'Courier New', monospace",
+          fontFamily: "'Courier Prime', 'Courier New', monospace",
           boxShadow: "0 10px 40px rgba(0,0,0,0.5)",
         }}
       >
@@ -2064,7 +2064,7 @@ function ModalCSV({ contenido, filename, onClose }) {
           </div>
           <button onClick={onClose}
             style={{ background: "transparent", border: "1px solid #b8864a", color: "#b8864a",
-              padding: "6px 14px", fontSize: 11, fontFamily: "'Courier New', monospace",
+              padding: "6px 14px", fontSize: 11, fontFamily: "'Courier Prime', 'Courier New', monospace",
               fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase",
               borderRadius: 3, cursor: "pointer" }}>
             ✕ Cerrar
@@ -2083,14 +2083,14 @@ function ModalCSV({ contenido, filename, onClose }) {
         <div style={{ padding: "10px 20px", borderBottom: "1px solid #e0ddd8", display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           <button onClick={descargar}
             style={{ padding: "8px 16px", background: descargado ? "#2a7a50" : "#b8864a", color: "#fff",
-              border: "none", borderRadius: 3, cursor: "pointer", fontFamily: "'Courier New', monospace",
+              border: "none", borderRadius: 3, cursor: "pointer", fontFamily: "'Courier Prime', 'Courier New', monospace",
               fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 700,
               transition: "background 0.2s" }}>
             {descargado ? "✓ Descargado" : "⬇ Descargar archivo"}
           </button>
           <button onClick={copiar}
             style={{ padding: "8px 16px", background: copiado ? "#2a7a50" : "transparent", color: copiado ? "#fff" : "#b8864a",
-              border: "1px solid #b8864a", borderRadius: 3, cursor: "pointer", fontFamily: "'Courier New', monospace",
+              border: "1px solid #b8864a", borderRadius: 3, cursor: "pointer", fontFamily: "'Courier Prime', 'Courier New', monospace",
               fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 700,
               transition: "background 0.2s" }}>
             {copiado ? "✓ Copiado" : "📋 Copiar al portapapeles"}
@@ -2106,7 +2106,7 @@ function ModalCSV({ contenido, filename, onClose }) {
             onFocus={e => e.target.select()}
             style={{
               width: "100%", height: "50vh",
-              fontFamily: "'Courier New', monospace", fontSize: 11, lineHeight: 1.5,
+              fontFamily: "'Courier Prime', 'Courier New', monospace", fontSize: 11, lineHeight: 1.5,
               padding: 12, border: "1px solid #d0ccc6", borderRadius: 4,
               background: "#fafaf7", color: "#1a1a1a",
               resize: "none", outline: "none",
@@ -2277,7 +2277,7 @@ function ModalPDF({ contenidoPrint, onClose, filename = "calculadora_45h.pdf" })
         background: "rgba(0,0,0,0.85)",
         display: "flex", flexDirection: "column",
         zIndex: 9999,
-        fontFamily: "'Courier New', monospace",
+        fontFamily: "'Courier Prime', 'Courier New', monospace",
       }}
     >
       <style>{`
@@ -2314,7 +2314,7 @@ function ModalPDF({ contenidoPrint, onClose, filename = "calculadora_45h.pdf" })
             <span style={{
               fontSize: 10,
               color: estado === "error" ? "#ff8080" : estado === "listo" && mensaje.startsWith("✓") ? "#80ff80" : "#b8864a",
-              fontFamily: "'Courier New', monospace",
+              fontFamily: "'Courier Prime', 'Courier New', monospace",
               maxWidth: 280,
             }}>
               {mensaje}
@@ -2328,7 +2328,7 @@ function ModalPDF({ contenidoPrint, onClose, filename = "calculadora_45h.pdf" })
               background: ocupado || estado === "error" ? "#444" : "#b8864a",
               color: "#fff", border: "none", borderRadius: 3,
               cursor: ocupado ? "wait" : (estado === "error" ? "not-allowed" : "pointer"),
-              fontFamily: "'Courier New', monospace", fontSize: 11,
+              fontFamily: "'Courier Prime', 'Courier New', monospace", fontSize: 11,
               letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 700,
               opacity: estado === "error" ? 0.4 : 1,
             }}>
@@ -2337,7 +2337,7 @@ function ModalPDF({ contenidoPrint, onClose, filename = "calculadora_45h.pdf" })
           <button onClick={imprimirNavegador}
             style={{ padding: "8px 16px", background: "transparent", color: "#b8864a",
               border: "1px solid #b8864a", borderRadius: 3, cursor: "pointer",
-              fontFamily: "'Courier New', monospace", fontSize: 11,
+              fontFamily: "'Courier Prime', 'Courier New', monospace", fontSize: 11,
               letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 700 }}
             title="Plan B: imprimir con el diálogo del navegador">
             🖨 Imprimir
@@ -2345,7 +2345,7 @@ function ModalPDF({ contenidoPrint, onClose, filename = "calculadora_45h.pdf" })
           <button onClick={onClose}
             style={{ padding: "8px 16px", background: "transparent", color: "#888",
               border: "1px solid #888", borderRadius: 3, cursor: "pointer",
-              fontFamily: "'Courier New', monospace", fontSize: 11,
+              fontFamily: "'Courier Prime', 'Courier New', monospace", fontSize: 11,
               letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 700 }}>
             ✕ Cerrar
           </button>
@@ -2446,7 +2446,7 @@ function DocumentoImprimible({
   const tdCell = (extra = {}) => ({
     padding: "4px 6px", fontSize: 9,
     border: "1px solid #e0ddd8",
-    fontFamily: "'Courier New', monospace",
+    fontFamily: "'Courier Prime', 'Courier New', monospace",
     ...extra,
   });
   const tdLabel = {
@@ -2454,19 +2454,19 @@ function DocumentoImprimible({
     background: "#fafaf7",
     border: "1px solid #e0ddd8",
     color: "#1a1a1a",
-    fontFamily: "'Courier New', monospace",
+    fontFamily: "'Courier Prime', 'Courier New', monospace",
   };
   const tdValue = {
     padding: "5px 8px", fontSize: 9,
     border: "1px solid #e0ddd8",
-    fontFamily: "'Courier New', monospace",
+    fontFamily: "'Courier Prime', 'Courier New', monospace",
   };
 
   const tieneCompl = totalCompl > 0;
   const totalConExtras = totFinal + totalFestImport45 + totalCompl;
 
   return (
-    <div style={{ fontFamily: "'Courier New', monospace", color: "#1a1a1a", fontSize: 10, position: "relative" }}>
+    <div style={{ fontFamily: "'Courier Prime', 'Courier New', monospace", color: "#1a1a1a", fontSize: 10, position: "relative" }}>
 
       {/* ═══ MARCA DE AGUA "SIMULACRO DE NOMINA" ═══ */}
       {/* Marca única, centrada en la página, en diagonal a -28°.
@@ -2493,7 +2493,7 @@ function DocumentoImprimible({
             transform: "rotate(-28deg)",
             color: "#1a1a1a",
             opacity: 0.06,
-            fontFamily: "'Courier New', monospace",
+            fontFamily: "'Courier Prime', 'Courier New', monospace",
             fontWeight: 700,
             textAlign: "center",
             lineHeight: 0.95,
@@ -2517,7 +2517,7 @@ function DocumentoImprimible({
           <tr>
             <td style={{ width: "45%", verticalAlign: "middle", padding: 0 }}>
               <div style={{ background: "#1a1a1a", padding: "10px 14px", borderRadius: 3, display: "inline-block" }}>
-                <div style={{ color: "#c8a96e", fontFamily: "'Courier New',monospace", fontWeight: 700, fontSize: 18, letterSpacing: "0.15em", lineHeight: 1 }}>
+                <div style={{ color: "#c8a96e", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontWeight: 700, fontSize: 18, letterSpacing: "0.15em", lineHeight: 1 }}>
                   BD PROD TOOLS
                 </div>
               </div>
@@ -2852,7 +2852,7 @@ function DocumentoImprimible({
                   padding: "10px 8px", textAlign: "right",
                   fontSize: 14, fontWeight: 700, color: "#f0c878",
                   border: "1px solid #1a1a1a",
-                  fontFamily: "'Courier New', monospace",
+                  fontFamily: "'Courier Prime', 'Courier New', monospace",
                 }}>
                   {fmtE(totalConExtras)}
                 </td>
@@ -2862,20 +2862,20 @@ function DocumentoImprimible({
         </tbody>
       </table>
 
-      {/* Aviso orientativo */}
-      <div style={{ marginTop: 16, padding: "10px 14px", background: "#fafaf7", border: "1px solid #e0ddd8", borderRadius: 4, textAlign: "center", fontSize: 10, fontWeight: 700, color: "#1a1a1a", letterSpacing: "0.02em", lineHeight: 1.5 }}>
+      {/* Aviso orientativo — v67 reducido */}
+      <div style={{ marginTop: 10, padding: "6px 10px", background: "#fafaf7", border: "1px solid #e0ddd8", borderRadius: 3, textAlign: "center", fontSize: 8, fontWeight: 700, color: "#1a1a1a", letterSpacing: "0.02em", lineHeight: 1.3 }}>
         Cálculo orientativo del salario mensual bruto, que puede diferir ligeramente de la nómina real generada en cada periodo.
       </div>
 
-      {/* ═══ PIE ═══ */}
-      <div style={{ marginTop: 22, paddingTop: 10, borderTop: "1px solid #e0ddd8", textAlign: "center" }}>
-        <div style={{ fontSize: 8, color: "#888", letterSpacing: "0.15em", textTransform: "uppercase", fontWeight: 700, marginBottom: 4 }}>
+      {/* ═══ PIE ═══ v67 compacto */}
+      <div style={{ marginTop: 10, paddingTop: 6, borderTop: "1px solid #e0ddd8", textAlign: "center" }}>
+        <div style={{ fontSize: 7, color: "#888", letterSpacing: "0.15em", textTransform: "uppercase", fontWeight: 700, marginBottom: 2 }}>
           BD PROD TOOLS · DESIGNED BY EUGENIO PEREZ · ALL RIGHTS RESERVED
         </div>
-        <div style={{ fontSize: 7, color: "#aaa", letterSpacing: "0.03em", marginBottom: 3 }}>
+        <div style={{ fontSize: 6, color: "#aaa", letterSpacing: "0.03em", marginBottom: 2 }}>
           {DISCLAIMER_PDF}
         </div>
-        <div style={{ fontSize: 7, color: "#aaa", letterSpacing: "0.05em", textTransform: "uppercase" }}>
+        <div style={{ fontSize: 6, color: "#aaa", letterSpacing: "0.05em", textTransform: "uppercase" }}>
           BD PROD TOOLS · Generado el {new Date().toLocaleString("es-ES")}
         </div>
       </div>
@@ -3363,7 +3363,7 @@ function App45({ modoTab = "iruna45" }) {
     background: #fff;
     margin: 0;
     padding: 8mm 10mm;
-    font-family: 'Courier New', monospace;
+    font-family: 'Courier Prime', 'Courier New', monospace;
     color: #1a1a1a;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
@@ -3383,7 +3383,7 @@ function App45({ modoTab = "iruna45" }) {
     border: none;
     border-radius: 5px;
     padding: 10px 18px;
-    font-family: 'Courier New', monospace;
+    font-family: 'Courier Prime', 'Courier New', monospace;
     font-size: 12px;
     font-weight: 700;
     letter-spacing: 0.1em;
@@ -3512,7 +3512,7 @@ ${docHTML}
   };
 
   return (
-    <div style={{ color:"#1a1a1a", fontFamily:"'Courier New',monospace", padding:"32px 32px" }}>
+    <div style={{ color:"#1a1a1a", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", padding:"32px 32px" }}>
 
       {/* Header */}
       
@@ -3521,20 +3521,20 @@ ${docHTML}
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center",
                       background:"#1a1a1a", borderRadius:8, padding:"16px 24px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-            <div style={{ background:"#c8a96e", color:"#1a1a1a", padding:"10px 16px", borderRadius:4, fontFamily:"'Courier New',monospace", fontWeight:700, fontSize:16, letterSpacing:"0.15em" }}>
+            <div style={{ background:"#c8a96e", color:"#1a1a1a", padding:"10px 16px", borderRadius:4, fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontWeight:700, fontSize:16, letterSpacing:"0.15em" }}>
               BD PROD TOOLS
             </div>
           </div>
           <div style={{ textAlign:"right" }}>
             <div style={{ fontSize:9, letterSpacing:"0.25em", color:"#b8864a", textTransform:"uppercase", marginBottom:4 }}>Desglose Salarial · {es40h ? "40 Horas" : "45 Horas"}</div>
-            <div style={{ fontSize:18, fontWeight:700, letterSpacing:"0.07em", color:"#f0e6d0", fontFamily:"'Courier New',monospace" }}>CALCULADORA DE SALARIOS</div>
-            {(nombre||puesto) && <div style={{ fontSize:12, color:"#b8864a", marginTop:4, fontFamily:"'Courier New',monospace" }}>{[nombre,puesto].filter(Boolean).join(" · ")}</div>}
+            <div style={{ fontSize:18, fontWeight:700, letterSpacing:"0.07em", color:"#f0e6d0", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>CALCULADORA DE SALARIOS</div>
+            {(nombre||puesto) && <div style={{ fontSize:12, color:"#b8864a", marginTop:4, fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>{[nombre,puesto].filter(Boolean).join(" · ")}</div>}
             <div className="no-print" style={{ display: "flex", gap: 6, marginTop: 8, justifyContent: "flex-end" }}>
               <button
                 onClick={exportarCSV45}
                 disabled={!p || desglose45.length === 0}
                 style={{
-                  padding: "6px 12px", fontSize: 9, fontFamily: "'Courier New', monospace",
+                  padding: "6px 12px", fontSize: 9, fontFamily: "'Courier Prime', 'Courier New', monospace",
                   letterSpacing: "0.1em", textTransform: "uppercase", borderRadius: 3,
                   cursor: (p && desglose45.length) ? "pointer" : "not-allowed", fontWeight: 700,
                   border: "1px solid #b8864a",
@@ -3548,7 +3548,7 @@ ${docHTML}
                 onClick={exportarPDF45}
                 disabled={!p || desglose45.length === 0}
                 style={{
-                  padding: "6px 12px", fontSize: 9, fontFamily: "'Courier New', monospace",
+                  padding: "6px 12px", fontSize: 9, fontFamily: "'Courier Prime', 'Courier New', monospace",
                   letterSpacing: "0.1em", textTransform: "uppercase", borderRadius: 3,
                   cursor: (p && desglose45.length) ? "pointer" : "not-allowed", fontWeight: 700,
                   border: "1px solid #b8864a",
@@ -3646,10 +3646,10 @@ ${docHTML}
                 }}
               >
                 <div>
-                  <div style={{ fontSize: 11, color: esFijoDiscontinuo ? "#7a5a2a" : "#999", fontFamily: "'Courier New', monospace", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 700 }}>
+                  <div style={{ fontSize: 11, color: esFijoDiscontinuo ? "#7a5a2a" : "#999", fontFamily: "'Courier Prime', 'Courier New', monospace", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 700 }}>
                     Fijo discontinuo
                   </div>
-                  <div style={{ fontSize: 9, color: "#777", marginTop: 2, fontFamily: "'Courier New', monospace" }}>
+                  <div style={{ fontSize: 9, color: "#777", marginTop: 2, fontFamily: "'Courier Prime', 'Courier New', monospace" }}>
                     {esFijoDiscontinuo ? "Indemnización × 1,6433333" : "Indemnización estándar × 0,98632"}
                   </div>
                 </div>
@@ -3674,10 +3674,10 @@ ${docHTML}
                 }}
               >
                 <div>
-                  <div style={{ fontSize: 11, color: hxPorRodaje40 ? "#7a5a2a" : "#999", fontFamily: "'Courier New', monospace", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 700 }}>
+                  <div style={{ fontSize: 11, color: hxPorRodaje40 ? "#7a5a2a" : "#999", fontFamily: "'Courier Prime', 'Courier New', monospace", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 700 }}>
                     1 HX por día de rodaje
                   </div>
-                  <div style={{ fontSize: 9, color: "#777", marginTop: 2, fontFamily: "'Courier New', monospace" }}>
+                  <div style={{ fontSize: 9, color: "#777", marginTop: 2, fontFamily: "'Courier Prime', 'Courier New', monospace" }}>
                     {hxPorRodaje40 ? "Rellena horas extra desde el calendario (días de rodaje)" : "Las horas extra no se autorrellenan"}
                   </div>
                 </div>
@@ -3702,7 +3702,7 @@ ${docHTML}
                 <div style={{ width:"100%", height:"100%", borderRadius:9, background:modoInverso45?"#b8864a":"#ddd", transition:"background 0.25s" }} />
                 <div style={{ position:"absolute", top:2, left:modoInverso45?17:2, width:14, height:14, borderRadius:"50%", background:modoInverso45?"#fff":"#aaa", transition:"left 0.25s" }} />
               </div>
-              <span style={{ fontSize:10, color:modoInverso45?"#7a5a2a":"#999", fontFamily:"'Courier New',monospace", letterSpacing:"0.1em", textTransform:"uppercase", fontWeight:700 }}>Cálculo inverso</span>
+              <span style={{ fontSize:10, color:modoInverso45?"#7a5a2a":"#999", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", letterSpacing:"0.1em", textTransform:"uppercase", fontWeight:700 }}>Cálculo inverso</span>
             </div>
 
             {!modoInverso45 ? (
@@ -3712,10 +3712,10 @@ ${docHTML}
                 <label style={LS}>Salario Pactado {es40h ? "40h" : "45h"}</label>
                 <div style={{ padding:"10px 14px", background:"#f0ede8", borderRadius:4, border:"1px solid #c8963a", textAlign:"center", marginBottom:4 }}>
                   {p && p45Inverso
-                    ? <span style={{ fontSize:20, fontWeight:700, color:"#b8864a", fontFamily:"'Courier New',monospace" }}>{fmtE(p45Inverso)}</span>
+                    ? <span style={{ fontSize:20, fontWeight:700, color:"#b8864a", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>{fmtE(p45Inverso)}</span>
                     : <span style={{ fontSize:12, color:"#aaa" }}>— introduce fechas y horas —</span>}
                 </div>
-                <p style={{ margin:"0 0 8px", fontSize:9, color:"#888", fontFamily:"'Courier New',monospace" }}>Para {fmtE(objetivoSemanal45)}/semana</p>
+                <p style={{ margin:"0 0 8px", fontSize:9, color:"#888", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>Para {fmtE(objetivoSemanal45)}/semana</p>
                 <Field label="Objetivo €/semana" value={objetivoSemanal45} onChange={setObjetivoSemanal45} prefix="€" />
               </div>
             )}
@@ -3740,7 +3740,7 @@ ${docHTML}
               </div>
               <div style={{ marginTop:8, display:"flex", justifyContent:"space-between", alignItems:"center", padding:"6px 10px", background:"#fff", borderRadius:4, border:"1px solid #d8d4ce" }}>
                 <span style={{ fontSize:9, color:"#666", textTransform:"uppercase", letterSpacing:"0.1em" }}>{es40h ? "TOTAL ≈ P40" : "TOTAL ≈ P45"}</span>
-                <span style={{ fontSize:15, fontWeight:700, color:"#b8864a", fontFamily:"'Courier New',monospace" }}>{fmt(es40h ? (baseRef + vacRef + indemRef) : sumaRef)} €</span>
+                <span style={{ fontSize:15, fontWeight:700, color:"#b8864a", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>{fmt(es40h ? (baseRef + vacRef + indemRef) : sumaRef)} €</span>
               </div>
             </div>
           </div>
@@ -3753,7 +3753,7 @@ ${docHTML}
                 <span style={{ fontSize: 14 }}>📅</span>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>Calendario del proyecto</div>
-                  <div style={{ marginTop: 2, fontFamily: "'Courier New',monospace" }}>
+                  <div style={{ marginTop: 2, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>
                     {proyectoActivoCtx.__calendario.fecha_inicio} → {proyectoActivoCtx.__calendario.fecha_fin}
                     {proyectoActivoCtx.__calendario.comunidad && (
                       <span style={{ marginLeft: 8, textTransform: "capitalize" }}>· {proyectoActivoCtx.__calendario.comunidad.replace("_", " ")}</span>
@@ -3825,10 +3825,10 @@ ${docHTML}
                     <div style={ST}>▸ Festivos Calendario Laboral</div>
                     <button
                       onClick={() => setMostrarFestivosLegacy(true)}
-                      style={{ background:"transparent", color:"#b8864a", border:"1px solid #b8864a", padding:"3px 8px", borderRadius:3, cursor:"pointer", fontSize:9, fontFamily:"'Courier New',monospace", fontWeight:700, letterSpacing:"0.08em", textTransform:"uppercase" }}
+                      style={{ background:"transparent", color:"#b8864a", border:"1px solid #b8864a", padding:"3px 8px", borderRadius:3, cursor:"pointer", fontSize:9, fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontWeight:700, letterSpacing:"0.08em", textTransform:"uppercase" }}
                     >Ver festivos legacy</button>
                   </div>
-                  <div style={{ fontSize:10, color:"#888", padding:"10px 0 4px", fontFamily:"'Courier New',monospace", lineHeight:1.5 }}>
+                  <div style={{ fontSize:10, color:"#888", padding:"10px 0 4px", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", lineHeight:1.5 }}>
                     Los festivos ya se gestionan desde el calendario del proyecto (marcados como trabajados). Este panel es solo para casos excepcionales.
                   </div>
                 </div>
@@ -3845,11 +3845,11 @@ ${docHTML}
                   {hayCalProy && (
                     <button
                       onClick={() => setMostrarFestivosLegacy(false)}
-                      style={{ background:"transparent", color:"#888", border:"1px solid #ccc", padding:"3px 8px", borderRadius:3, cursor:"pointer", fontSize:9, fontFamily:"'Courier New',monospace" }}
+                      style={{ background:"transparent", color:"#888", border:"1px solid #ccc", padding:"3px 8px", borderRadius:3, cursor:"pointer", fontSize:9, fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}
                     >Ocultar</button>
                   )}
                 </div>
-                <div style={{ fontSize:10, color:"#888", textAlign:"center", padding:"12px 0", fontFamily:"'Courier New',monospace" }}>
+                <div style={{ fontSize:10, color:"#888", textAlign:"center", padding:"12px 0", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>
                   No hay festivos oficiales en este período
                 </div>
               </div>
@@ -3861,11 +3861,11 @@ ${docHTML}
                   {hayCalProy && (
                     <button
                       onClick={() => setMostrarFestivosLegacy(false)}
-                      style={{ background:"transparent", color:"#888", border:"1px solid #ccc", padding:"3px 8px", borderRadius:3, cursor:"pointer", fontSize:9, fontFamily:"'Courier New',monospace" }}
+                      style={{ background:"transparent", color:"#888", border:"1px solid #ccc", padding:"3px 8px", borderRadius:3, cursor:"pointer", fontSize:9, fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}
                     >Ocultar</button>
                   )}
                 </div>
-                <div style={{ fontSize:9, color:"#888", fontFamily:"'Courier New',monospace", marginBottom:10, lineHeight:1.4 }}>
+                <div style={{ fontSize:9, color:"#888", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", marginBottom:10, lineHeight:1.4 }}>
                   Activa sólo los festivos que el trabajador efectivamente trabajó. Cada activación suma +1 al contador del mes correspondiente.
                 </div>
                 {festsRango.map(f => {
@@ -3904,13 +3904,13 @@ ${docHTML}
                         {activo ? "✓" : ""}
                       </div>
                       <div style={{ flex:1, minWidth:0 }}>
-                        <div style={{ fontSize:10, fontFamily:"'Courier New',monospace", color: activo ? "#6a3a9a" : "#1a1a1a", fontWeight:600 }}>
+                        <div style={{ fontSize:10, fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", color: activo ? "#6a3a9a" : "#1a1a1a", fontWeight:600 }}>
                           {dow} {dia} {mes}
                           <span style={{ fontSize:8, marginLeft:6, padding:"1px 5px", borderRadius:2, background: f.tipo==="nacional"?"#e8e0d0":"#d8e8d8", color:"#555", letterSpacing:"0.05em", textTransform:"uppercase", fontWeight:700 }}>
                             {f.tipo==="nacional"?"Nac":"CCAA"}
                           </span>
                         </div>
-                        <div style={{ fontSize:9, color:"#777", fontFamily:"'Courier New',monospace", marginTop:1 }}>
+                        <div style={{ fontSize:9, color:"#777", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", marginTop:1 }}>
                           {f.nombre}
                         </div>
                       </div>
@@ -3918,8 +3918,8 @@ ${docHTML}
                   );
                 })}
                 <div style={{ marginTop:8, padding:"6px 10px", background:"#f0ede8", borderRadius:4, display:"flex", justifyContent:"space-between" }}>
-                  <span style={{ fontSize:9, color:"#888", textTransform:"uppercase", letterSpacing:"0.1em", fontFamily:"'Courier New',monospace" }}>Activos</span>
-                  <span style={{ fontSize:11, fontWeight:700, color:"#6a3a9a", fontFamily:"'Courier New',monospace" }}>
+                  <span style={{ fontSize:9, color:"#888", textTransform:"uppercase", letterSpacing:"0.1em", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>Activos</span>
+                  <span style={{ fontSize:11, fontWeight:700, color:"#6a3a9a", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>
                     {Object.keys(festivosActivos).filter(k=>festsRango.some(f=>f.fecha===k)).length} / {festsRango.length}
                   </span>
                 </div>
@@ -3931,7 +3931,7 @@ ${docHTML}
           {p && plusComida.importeDia > 0 && (
             <div style={P}>
               <div style={ST}>▸ Días de Comida por Mes</div>
-              <div style={{ fontSize:9, color:"#888", fontFamily:"'Courier New',monospace", marginBottom:10 }}>
+              <div style={{ fontSize:9, color:"#888", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", marginBottom:10 }}>
                 Días calculados automáticamente (L-V). Edita si el trabajador no tiene comida algún día.
               </div>
               {p.desglose.map((d,i) => {
@@ -3940,7 +3940,7 @@ ${docHTML}
                 const isOverride = comidaDiasPorMes[i] !== null && comidaDiasPorMes[i] !== undefined && comidaDiasPorMes[i] !== auto;
                 return (
                   <div key={i} style={{ display:"grid", gridTemplateColumns:"1fr 60px 60px", gap:8, marginBottom:5, alignItems:"center" }}>
-                    <div style={{ fontSize:10, color:"#444", textTransform:"capitalize", fontFamily:"'Courier New',monospace" }}>
+                    <div style={{ fontSize:10, color:"#444", textTransform:"capitalize", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>
                       {d.mes}{!d.esCompleto&&<span style={{fontSize:8,color:"#aaa",marginLeft:4}}>{d.desde}–{d.hasta}</span>}
                     </div>
                     <div style={{ textAlign:"center", fontSize:10, color:"#888" }}>auto:{auto}d</div>
@@ -3952,7 +3952,7 @@ ${docHTML}
                         a[i] = isNaN(v) ? null : v;
                         setComidaDiasPorMes(a);
                       }}
-                      style={{ background: isOverride?"#fff8f0":"#f0ede8", border:`1px solid ${isOverride?"#c8963a":"#d0ccc6"}`, borderRadius:4, color:"#1a1a1a", fontFamily:"'Courier New',monospace", fontSize:12, padding:"5px 6px", outline:"none", textAlign:"center", colorScheme:"light", minWidth:0 }}
+                      style={{ background: isOverride?"#fff8f0":"#f0ede8", border:`1px solid ${isOverride?"#c8963a":"#d0ccc6"}`, borderRadius:4, color:"#1a1a1a", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize:12, padding:"5px 6px", outline:"none", textAlign:"center", colorScheme:"light", minWidth:0 }}
                       onFocus={e=>e.target.style.borderColor="#b8864a"} onBlur={e=>e.target.style.borderColor=isOverride?"#c8963a":"#d0ccc6"} />
                   </div>
                 );
@@ -3962,7 +3962,7 @@ ${docHTML}
                 <span style={{ fontSize:12, fontWeight:700, color:"#b8864a" }}>{complementos45.reduce((s,c)=>s+c.diasComida,0)}d</span>
               </div>
               <button onClick={()=>setComidaDiasPorMes(p.desglose.map(()=>null))}
-                style={{ marginTop:8, width:"100%", padding:"6px", fontSize:9, fontFamily:"'Courier New',monospace", letterSpacing:"0.1em", textTransform:"uppercase", background:"transparent", border:"1px solid #d0ccc6", borderRadius:4, cursor:"pointer", color:"#888" }}>
+                style={{ marginTop:8, width:"100%", padding:"6px", fontSize:9, fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", letterSpacing:"0.1em", textTransform:"uppercase", background:"transparent", border:"1px solid #d0ccc6", borderRadius:4, cursor:"pointer", color:"#888" }}>
                 Restablecer automático
               </button>
             </div>
@@ -3972,7 +3972,7 @@ ${docHTML}
             <div style={ST}>▸ Modo de Pago</div>
             <Toggle label="Vacaciones al final"    value={vacAcumulada}   onChange={setVacAcumulada}   sublabel={vacAcumulada?"Total vacaciones en última nómina":"Prorrateadas cada mes"} />
             <Toggle label="Indemnización al final" value={indemAcumulada} onChange={setIndemAcumulada} sublabel={indemAcumulada?"Total indemnización en última nómina":"Prorrateada cada mes"} />
-            <div style={{ fontSize:9, color:"#888", fontFamily:"'Courier New',monospace", marginTop:4, padding:"6px 10px", background:"#f0ede8", borderRadius:4, border:"1px solid #e0ddd8" }}>
+            <div style={{ fontSize:9, color:"#888", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", marginTop:4, padding:"6px 10px", background:"#f0ede8", borderRadius:4, border:"1px solid #e0ddd8" }}>
               ℹ Las horas extra siempre se cobran el mes que se generan
             </div>
           </div>
@@ -3990,7 +3990,7 @@ ${docHTML}
                   <div style={{ display:"flex", gap:3 }}>
                     {["mes","sem"].map(m=>(
                       <button key={m} onClick={()=>set(p=>({...p,modo:m}))}
-                        style={{ padding:"2px 7px", fontSize:9, fontFamily:"'Courier New',monospace", letterSpacing:"0.08em", textTransform:"uppercase", border:"1px solid #d0ccc6", borderRadius:3, cursor:"pointer", fontWeight:700, background:plus.modo===m?"#1a1a1a":"#fff", color:plus.modo===m?"#fff":"#888" }}>
+                        style={{ padding:"2px 7px", fontSize:9, fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", letterSpacing:"0.08em", textTransform:"uppercase", border:"1px solid #d0ccc6", borderRadius:3, cursor:"pointer", fontWeight:700, background:plus.modo===m?"#1a1a1a":"#fff", color:plus.modo===m?"#fff":"#888" }}>
                         {m==="mes"?"€/mes":"€/sem"}
                       </button>
                     ))}
@@ -4012,16 +4012,16 @@ ${docHTML}
           {/* Bloque legal */}
           <div style={{ ...P, background:"#fafaf7", border:"1px solid #e8e4de" }}>
             <div style={{ ...ST, color:"#888", marginBottom:10 }}>▸ Aviso Legal</div>
-            <div style={{ fontSize:10, fontWeight:700, color:"#1a1a1a", fontFamily:"'Courier New',monospace", marginBottom:8, letterSpacing:"0.05em" }}>
+            <div style={{ fontSize:10, fontWeight:700, color:"#1a1a1a", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", marginBottom:8, letterSpacing:"0.05em" }}>
               BD PROD TOOLS
             </div>
-            <div style={{ fontSize:9, color:"#666", fontFamily:"'Courier New',monospace", lineHeight:1.5, marginBottom:8 }}>
+            <div style={{ fontSize:9, color:"#666", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", lineHeight:1.5, marginBottom:8 }}>
               {DISCLAIMER_ES}
             </div>
-            <div style={{ fontSize:8, color:"#888", fontFamily:"'Courier New',monospace", lineHeight:1.5, fontStyle:"italic", marginBottom:8 }}>
+            <div style={{ fontSize:8, color:"#888", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", lineHeight:1.5, fontStyle:"italic", marginBottom:8 }}>
               {DISCLAIMER_EN}
             </div>
-            <div style={{ fontSize:8, color:"#888", fontFamily:"'Courier New',monospace", lineHeight:1.5, fontStyle:"italic" }}>
+            <div style={{ fontSize:8, color:"#888", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", lineHeight:1.5, fontStyle:"italic" }}>
               G &amp; G Enterprises LLC
             </div>
           </div>
@@ -4051,28 +4051,28 @@ ${docHTML}
                 {es40h ? (
                   <div style={{ marginTop:10, display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
                     <div style={{ padding:"10px 14px", background:"rgba(184,134,74,0.08)", borderRadius:6, border:"1px solid #e0ddd8", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                      <span style={{ fontSize:9.5, color:"#7a5a2a", letterSpacing:"0.1em", textTransform:"uppercase", fontFamily:"'Courier New',monospace" }}>Total Mes 40h</span>
-                      <span style={{ fontSize:16, fontWeight:700, color:"#b8864a", fontFamily:"'Courier New',monospace" }}>{fmt(baseRef + vacRef + indemRef)} €</span>
+                      <span style={{ fontSize:9.5, color:"#7a5a2a", letterSpacing:"0.1em", textTransform:"uppercase", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>Total Mes 40h</span>
+                      <span style={{ fontSize:16, fontWeight:700, color:"#b8864a", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>{fmt(baseRef + vacRef + indemRef)} €</span>
                     </div>
                     <div style={{ padding:"10px 14px", background:"rgba(58,104,152,0.08)", borderRadius:6, border:"1px solid #b8cce0", display:"flex", flexDirection:"column" }}>
                       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                        <span style={{ fontSize:9.5, color:"#2a5a8a", letterSpacing:"0.1em", textTransform:"uppercase", fontFamily:"'Courier New',monospace" }}>Salario en Contrato</span>
-                        <span style={{ fontSize:16, fontWeight:700, color:"#3a6898", fontFamily:"'Courier New',monospace" }}>{fmt(vacAcumulada ? baseRef : (baseRef + vacRef))} €</span>
+                        <span style={{ fontSize:9.5, color:"#2a5a8a", letterSpacing:"0.1em", textTransform:"uppercase", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>Salario en Contrato</span>
+                        <span style={{ fontSize:16, fontWeight:700, color:"#3a6898", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>{fmt(vacAcumulada ? baseRef : (baseRef + vacRef))} €</span>
                       </div>
                       {vacAcumulada && (
-                        <div style={{ fontSize:8.5, color:"#5a7a9a", marginTop:2, textAlign:"right", letterSpacing:"0.05em", fontStyle:"italic", fontFamily:"'Courier New',monospace" }}>Base 40h · vacaciones al final</div>
+                        <div style={{ fontSize:8.5, color:"#5a7a9a", marginTop:2, textAlign:"right", letterSpacing:"0.05em", fontStyle:"italic", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>Base 40h · vacaciones al final</div>
                       )}
                     </div>
                   </div>
                 ) : (
                   <div style={{ marginTop:10, display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
                     <div style={{ padding:"10px 14px", background:"rgba(184,134,74,0.08)", borderRadius:6, border:"1px solid #e0ddd8", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                      <span style={{ fontSize:9.5, color:"#7a5a2a", letterSpacing:"0.1em", textTransform:"uppercase", fontFamily:"'Courier New',monospace" }}>Total Mes 45h Todo Incluido</span>
-                      <span style={{ fontSize:16, fontWeight:700, color:"#b8864a", fontFamily:"'Courier New',monospace" }}>{fmt(sumaRef)} €</span>
+                      <span style={{ fontSize:9.5, color:"#7a5a2a", letterSpacing:"0.1em", textTransform:"uppercase", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>Total Mes 45h Todo Incluido</span>
+                      <span style={{ fontSize:16, fontWeight:700, color:"#b8864a", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>{fmt(sumaRef)} €</span>
                     </div>
                     <div style={{ padding:"10px 14px", background:"rgba(58,104,152,0.08)", borderRadius:6, border:"1px solid #b8cce0", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                      <span style={{ fontSize:9.5, color:"#2a5a8a", letterSpacing:"0.1em", textTransform:"uppercase", fontFamily:"'Courier New',monospace" }}>Salario en Contrato</span>
-                      <span style={{ fontSize:16, fontWeight:700, color:"#3a6898", fontFamily:"'Courier New',monospace" }}>{fmt(baseRef + vacRef)} €</span>
+                      <span style={{ fontSize:9.5, color:"#2a5a8a", letterSpacing:"0.1em", textTransform:"uppercase", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>Salario en Contrato</span>
+                      <span style={{ fontSize:16, fontWeight:700, color:"#3a6898", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>{fmt(baseRef + vacRef)} €</span>
                     </div>
                   </div>
                 )}
@@ -4080,7 +4080,7 @@ ${docHTML}
 
               {/* Nota informativa. En 45H siempre se muestra. En 40H solo si vacaciones NO van al final */}
               {(!es40h || !vacAcumulada) && (
-                <div style={{ background:"#fafaf7", padding:"10px 14px", borderRadius:6, border:"1px solid #e0ddd8", marginBottom:20, fontSize:10, color:"#666", fontFamily:"'Courier New',monospace", lineHeight:1.5, fontStyle:"italic" }}>
+                <div style={{ background:"#fafaf7", padding:"10px 14px", borderRadius:6, border:"1px solid #e0ddd8", marginBottom:20, fontSize:10, color:"#666", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", lineHeight:1.5, fontStyle:"italic" }}>
                   <strong style={{ color:"#444", fontStyle:"normal" }}>Nota:</strong> {es40h
                     ? "Salario en contrato es la suma del salario base + las vacaciones."
                     : "El salario que figura en contrato es la suma del salario base 40h más las vacaciones."}
@@ -4118,23 +4118,23 @@ ${docHTML}
                   <table style={{ width:"100%", borderCollapse:"collapse", fontSize:11 }}>
                     <thead>
                       <tr>
-                        <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"left",fontFamily:"'Courier New',monospace",borderBottom:"1px solid #e0ddd8",color:"#555"}}>Mes</th>
-                        <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Courier New',monospace",borderBottom:"1px solid #e0ddd8",color:"#555"}}>Fracc.</th>
-                        <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Courier New',monospace",borderBottom:"1px solid #e0ddd8",color:"#555"}}>Base 40h €</th>
-                        <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Courier New',monospace",borderBottom:"1px solid #e0ddd8",color:"#555"}}>Vac. €</th>
-                        <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Courier New',monospace",borderBottom:"1px solid #e0ddd8",color:"#555"}}>Indem. €</th>
-                        <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Courier New',monospace",borderBottom:"1px solid #e0ddd8",color:"#3a6898"}}>H.Ex h</th>
-                        <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Courier New',monospace",borderBottom:"1px solid #e0ddd8",color:"#3a6898"}}>H.Ex €</th>
-                        {!es40h && <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Courier New',monospace",borderBottom:"1px solid #e0ddd8",color:"#b07030"}}>Plus Act. €</th>}
-                        <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Courier New',monospace",borderBottom:"1px solid #e0ddd8",color:"#1a1a1a"}}>TOTAL MES €</th>
-                        <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Courier New',monospace",borderBottom:"1px solid #e0ddd8",color:"#5a8a5a"}}>Compl. €</th>
-                        <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Courier New',monospace",borderBottom:"1px solid #e0ddd8",color:"#b8864a"}}>TOTAL MES + Compl. €</th>
+                        <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"left",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",borderBottom:"1px solid #e0ddd8",color:"#555"}}>Mes</th>
+                        <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",borderBottom:"1px solid #e0ddd8",color:"#555"}}>Fracc.</th>
+                        <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",borderBottom:"1px solid #e0ddd8",color:"#555"}}>Base 40h €</th>
+                        <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",borderBottom:"1px solid #e0ddd8",color:"#555"}}>Vac. €</th>
+                        <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",borderBottom:"1px solid #e0ddd8",color:"#555"}}>Indem. €</th>
+                        <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",borderBottom:"1px solid #e0ddd8",color:"#3a6898"}}>H.Ex h</th>
+                        <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",borderBottom:"1px solid #e0ddd8",color:"#3a6898"}}>H.Ex €</th>
+                        {!es40h && <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",borderBottom:"1px solid #e0ddd8",color:"#b07030"}}>Plus Act. €</th>}
+                        <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",borderBottom:"1px solid #e0ddd8",color:"#1a1a1a"}}>TOTAL MES €</th>
+                        <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",borderBottom:"1px solid #e0ddd8",color:"#5a8a5a"}}>Compl. €</th>
+                        <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",borderBottom:"1px solid #e0ddd8",color:"#b8864a"}}>TOTAL MES + Compl. €</th>
                       </tr>
                     </thead>
                     <tbody>
                       {desglose45.map((d,i)=>(
                         <tr key={i} style={{ background:i%2===0?"transparent":"rgba(0,0,0,0.015)" }}>
-                          <td style={{padding:"6px 6px",fontSize:10.5,fontFamily:"'Courier New',monospace",color:"#1a1a1a",borderBottom:"1px solid #eae7e2",lineHeight:1.25,whiteSpace:"nowrap"}}>
+                          <td style={{padding:"6px 6px",fontSize:10.5,fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",color:"#1a1a1a",borderBottom:"1px solid #eae7e2",lineHeight:1.25,whiteSpace:"nowrap"}}>
                             {(() => {
                               const partes = d.mes.split(" de ");
                               const mesNom = partes[0] || d.mes;
@@ -4148,31 +4148,31 @@ ${docHTML}
                               );
                             })()}
                           </td>
-                          <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Courier New',monospace",color:"#888",borderBottom:"1px solid #eae7e2"}}>{fmtM(d.fraccion)}</td>
-                          <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Courier New',monospace",color:"#1a1a1a",borderBottom:"1px solid #eae7e2"}}>{fmt(d.base40)}</td>
-                          <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Courier New',monospace",color: d.vacMostrar === 0 ? "#ccc" : (d.vacMostrar < 0 ? "#c04040" : "#1a1a1a"),borderBottom:"1px solid #eae7e2"}}>{d.vacMostrar === 0 ? "—" : fmt(d.vacMostrar)}</td>
-                          <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Courier New',monospace",color:d.indem40===0?"#ccc":"#1a1a1a",borderBottom:"1px solid #eae7e2"}}>{d.indem40===0?"—":fmt(d.indem40)}</td>
-                          <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Courier New',monospace",color:"#3a6898",borderBottom:"1px solid #eae7e2"}}>{d.hMes}h</td>
-                          <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Courier New',monospace",color:"#3a6898",borderBottom:"1px solid #eae7e2"}}>{fmt(d.cobroHx)}</td>
-                          {!es40h && <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Courier New',monospace",color:d.plusAct>0?"#b07030":"#ccc",fontWeight:d.plusAct>0?600:400,borderBottom:"1px solid #eae7e2"}}>{d.plusAct>0?fmt(d.plusAct):"—"}</td>}
-                          <td style={{padding:"6px 6px",fontSize:13,textAlign:"right",fontFamily:"'Courier New',monospace",color:"#1a1a1a",fontWeight:700,borderBottom:"1px solid #eae7e2"}}>{fmt(es40h ? (d.totalMes - (d.plusAct || 0)) : d.totalMes)}</td>
-                          <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Courier New',monospace",color:(complementos45[i]?.total || 0) > 0 ? "#5a8a5a" : "#ccc",fontWeight:(complementos45[i]?.total || 0) > 0 ? 600 : 400,borderBottom:"1px solid #eae7e2"}}>{(complementos45[i]?.total || 0) > 0 ? fmt(complementos45[i].total) : "—"}</td>
-                          <td style={{padding:"6px 6px",fontSize:13,textAlign:"right",fontFamily:"'Courier New',monospace",color:"#b8864a",fontWeight:700,borderBottom:"1px solid #eae7e2"}}>{fmt((es40h ? (d.totalMes - (d.plusAct || 0)) : d.totalMes) + (complementos45[i]?.total || 0))}</td>
+                          <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",color:"#888",borderBottom:"1px solid #eae7e2"}}>{fmtM(d.fraccion)}</td>
+                          <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",color:"#1a1a1a",borderBottom:"1px solid #eae7e2"}}>{fmt(d.base40)}</td>
+                          <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",color: d.vacMostrar === 0 ? "#ccc" : (d.vacMostrar < 0 ? "#c04040" : "#1a1a1a"),borderBottom:"1px solid #eae7e2"}}>{d.vacMostrar === 0 ? "—" : fmt(d.vacMostrar)}</td>
+                          <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",color:d.indem40===0?"#ccc":"#1a1a1a",borderBottom:"1px solid #eae7e2"}}>{d.indem40===0?"—":fmt(d.indem40)}</td>
+                          <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",color:"#3a6898",borderBottom:"1px solid #eae7e2"}}>{d.hMes}h</td>
+                          <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",color:"#3a6898",borderBottom:"1px solid #eae7e2"}}>{fmt(d.cobroHx)}</td>
+                          {!es40h && <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",color:d.plusAct>0?"#b07030":"#ccc",fontWeight:d.plusAct>0?600:400,borderBottom:"1px solid #eae7e2"}}>{d.plusAct>0?fmt(d.plusAct):"—"}</td>}
+                          <td style={{padding:"6px 6px",fontSize:13,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",color:"#1a1a1a",fontWeight:700,borderBottom:"1px solid #eae7e2"}}>{fmt(es40h ? (d.totalMes - (d.plusAct || 0)) : d.totalMes)}</td>
+                          <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",color:(complementos45[i]?.total || 0) > 0 ? "#5a8a5a" : "#ccc",fontWeight:(complementos45[i]?.total || 0) > 0 ? 600 : 400,borderBottom:"1px solid #eae7e2"}}>{(complementos45[i]?.total || 0) > 0 ? fmt(complementos45[i].total) : "—"}</td>
+                          <td style={{padding:"6px 6px",fontSize:13,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",color:"#b8864a",fontWeight:700,borderBottom:"1px solid #eae7e2"}}>{fmt((es40h ? (d.totalMes - (d.plusAct || 0)) : d.totalMes) + (complementos45[i]?.total || 0))}</td>
                         </tr>
                       ))}
                     </tbody>
                     <tfoot>
                       <tr style={{ background:"rgba(184,134,74,0.06)" }}>
-                        <td colSpan={2} style={{padding:"8px",fontSize:10,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,fontFamily:"'Courier New',monospace",color:"#b8864a",borderTop:"1px solid #d8d4ce"}}>TOTAL</td>
-                        <td style={{padding:"8px",fontSize:11,textAlign:"right",fontFamily:"'Courier New',monospace",color:"#666",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{fmt(totBase)}</td>
-                        <td style={{padding:"8px",fontSize:11,textAlign:"right",fontFamily:"'Courier New',monospace",color: totVacMostrar < 0 ? "#c04040" : "#666",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{fmt(totVacMostrar)}</td>
-                        <td style={{padding:"8px",fontSize:11,textAlign:"right",fontFamily:"'Courier New',monospace",color:"#666",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{fmt(totIndem)}</td>
-                        <td style={{padding:"8px",fontSize:11,textAlign:"right",fontFamily:"'Courier New',monospace",color:"#3a6898",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{horasPorMes.reduce((s,v,i)=>{if (v === undefined || v === null || v === "") return s + Math.round((p.desglose[i]?.semanasLaborables||0)*5);return s + (v || 0);},0)}h</td>
-                        <td style={{padding:"8px",fontSize:11,textAlign:"right",fontFamily:"'Courier New',monospace",color:"#3a6898",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{fmt(totHx)}</td>
-                        {!es40h && <td style={{padding:"8px",fontSize:11,textAlign:"right",fontFamily:"'Courier New',monospace",color:totPlus>0?"#b07030":"#ccc",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{totPlus>0?fmt(totPlus):"—"}</td>}
-                        <td style={{padding:"8px",fontSize:13,textAlign:"right",fontFamily:"'Courier New',monospace",color:"#1a1a1a",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{fmt(es40h ? (totFinal - (totPlus || 0)) : totFinal)}</td>
-                        <td style={{padding:"8px",fontSize:11,textAlign:"right",fontFamily:"'Courier New',monospace",color:totalCompl > 0 ? "#5a8a5a" : "#ccc",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{totalCompl > 0 ? fmt(totalCompl) : "—"}</td>
-                        <td style={{padding:"8px",fontSize:13,textAlign:"right",fontFamily:"'Courier New',monospace",color:"#b8864a",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{fmt((es40h ? (totFinal - (totPlus || 0)) : totFinal) + totalCompl)}</td>
+                        <td colSpan={2} style={{padding:"8px",fontSize:10,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",color:"#b8864a",borderTop:"1px solid #d8d4ce"}}>TOTAL</td>
+                        <td style={{padding:"8px",fontSize:11,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",color:"#666",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{fmt(totBase)}</td>
+                        <td style={{padding:"8px",fontSize:11,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",color: totVacMostrar < 0 ? "#c04040" : "#666",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{fmt(totVacMostrar)}</td>
+                        <td style={{padding:"8px",fontSize:11,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",color:"#666",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{fmt(totIndem)}</td>
+                        <td style={{padding:"8px",fontSize:11,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",color:"#3a6898",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{horasPorMes.reduce((s,v,i)=>{if (v === undefined || v === null || v === "") return s + Math.round((p.desglose[i]?.semanasLaborables||0)*5);return s + (v || 0);},0)}h</td>
+                        <td style={{padding:"8px",fontSize:11,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",color:"#3a6898",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{fmt(totHx)}</td>
+                        {!es40h && <td style={{padding:"8px",fontSize:11,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",color:totPlus>0?"#b07030":"#ccc",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{totPlus>0?fmt(totPlus):"—"}</td>}
+                        <td style={{padding:"8px",fontSize:13,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",color:"#1a1a1a",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{fmt(es40h ? (totFinal - (totPlus || 0)) : totFinal)}</td>
+                        <td style={{padding:"8px",fontSize:11,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",color:totalCompl > 0 ? "#5a8a5a" : "#ccc",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{totalCompl > 0 ? fmt(totalCompl) : "—"}</td>
+                        <td style={{padding:"8px",fontSize:13,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",color:"#b8864a",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{fmt((es40h ? (totFinal - (totPlus || 0)) : totFinal) + totalCompl)}</td>
                       </tr>
                     </tfoot>
                   </table>
@@ -4191,7 +4191,7 @@ ${docHTML}
                             <th key={hi} style={{ padding: "7px 10px", fontSize: 9, letterSpacing: "0.12em",
                               textTransform: "uppercase", color: "#555", fontWeight: 700,
                               textAlign: hi === 0 ? "left" : "right",
-                              fontFamily: "'Courier New', monospace", borderBottom: "1px solid #e0ddd8" }}>
+                              fontFamily: "'Courier Prime', 'Courier New', monospace", borderBottom: "1px solid #e0ddd8" }}>
                               {h}
                             </th>
                           ))}
@@ -4200,7 +4200,7 @@ ${docHTML}
                       <tbody>
                         {complementos45.map((c, i) => (
                           <tr key={i} style={{ background: i % 2 === 0 ? "transparent" : "rgba(0,0,0,0.015)" }}>
-                            <td style={{ padding: "8px 10px", fontSize: 11, fontFamily: "'Courier New', monospace", color: "#1a1a1a", textTransform: "capitalize", borderBottom: "1px solid #eae7e2" }}>
+                            <td style={{ padding: "8px 10px", fontSize: 11, fontFamily: "'Courier Prime', 'Courier New', monospace", color: "#1a1a1a", textTransform: "capitalize", borderBottom: "1px solid #eae7e2" }}>
                               {p.desglose[i].mes}
                               {!p.desglose[i].esCompleto && <span style={{ fontSize: 9, color: "#888", marginLeft: 6 }}>{p.desglose[i].desde}–{p.desglose[i].hasta}</span>}
                             </td>
@@ -4213,25 +4213,25 @@ ${docHTML}
                               plusComida.importeDia   ? fmt(c.comida)      : "—",
                             ].map((v, vi) => (
                               <td key={vi} style={{ padding: "8px 10px", fontSize: 11, textAlign: "right",
-                                fontFamily: "'Courier New', monospace", color: v === "—" ? "#ccc" : "#1a1a1a",
+                                fontFamily: "'Courier Prime', 'Courier New', monospace", color: v === "—" ? "#ccc" : "#1a1a1a",
                                 borderBottom: "1px solid #eae7e2" }}>{v}</td>
                             ))}
                             <td style={{ padding: "8px 10px", fontSize: 12, textAlign: "right",
-                              fontFamily: "'Courier New', monospace", color: "#b8864a", fontWeight: 700,
+                              fontFamily: "'Courier Prime', 'Courier New', monospace", color: "#b8864a", fontWeight: 700,
                               borderBottom: "1px solid #eae7e2" }}>{fmt(c.total)}</td>
                           </tr>
                         ))}
                       </tbody>
                       <tfoot>
                         <tr style={{ background:"rgba(184,134,74,0.06)" }}>
-                          <td style={{ padding:"8px 10px", fontSize:10, letterSpacing:"0.1em", textTransform:"uppercase", fontWeight:700, fontFamily:"'Courier New',monospace", color:"#b8864a", borderTop:"1px solid #d8d4ce" }}>TOTAL</td>
-                          <td style={{ padding:"8px 10px", fontSize:11, textAlign:"right", fontFamily:"'Courier New',monospace", color:"#666", fontWeight:700, borderTop:"1px solid #d8d4ce" }}>{plusHerramienta.importe ? fmt(complementos45.reduce((s,c)=>s+c.herramienta,0)) : "—"}</td>
-                          <td style={{ padding:"8px 10px", fontSize:11, textAlign:"right", fontFamily:"'Courier New',monospace", color:"#666", fontWeight:700, borderTop:"1px solid #d8d4ce" }}>{plusCoche.importe ? fmt(complementos45.reduce((s,c)=>s+c.coche,0)) : "—"}</td>
-                          <td style={{ padding:"8px 10px", fontSize:11, textAlign:"right", fontFamily:"'Courier New',monospace", color:"#666", fontWeight:700, borderTop:"1px solid #d8d4ce" }}>{plusVivienda.importe ? fmt(complementos45.reduce((s,c)=>s+c.vivienda,0)) : "—"}</td>
-                          <td style={{ padding:"8px 10px", fontSize:11, textAlign:"right", fontFamily:"'Courier New',monospace", color:"#666", fontWeight:700, borderTop:"1px solid #d8d4ce" }}>{plusSeguroVida.importe ? fmt(complementos45.reduce((s,c)=>s+c.seguroVida,0)) : "—"}</td>
-                          <td style={{ padding:"8px 10px", fontSize:11, textAlign:"right", fontFamily:"'Courier New',monospace", color:"#666", fontWeight:700, borderTop:"1px solid #d8d4ce" }}>{plusComida.importeDia ? `${complementos45.reduce((s,c)=>s+c.diasComida,0)}d` : "—"}</td>
-                          <td style={{ padding:"8px 10px", fontSize:11, textAlign:"right", fontFamily:"'Courier New',monospace", color:"#666", fontWeight:700, borderTop:"1px solid #d8d4ce" }}>{plusComida.importeDia ? fmt(complementos45.reduce((s,c)=>s+c.comida,0)) : "—"}</td>
-                          <td style={{ padding:"8px 10px", fontSize:13, textAlign:"right", fontFamily:"'Courier New',monospace", color:"#b8864a", fontWeight:700, borderTop:"1px solid #d8d4ce" }}>{fmt(totalCompl)}</td>
+                          <td style={{ padding:"8px 10px", fontSize:10, letterSpacing:"0.1em", textTransform:"uppercase", fontWeight:700, fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", color:"#b8864a", borderTop:"1px solid #d8d4ce" }}>TOTAL</td>
+                          <td style={{ padding:"8px 10px", fontSize:11, textAlign:"right", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", color:"#666", fontWeight:700, borderTop:"1px solid #d8d4ce" }}>{plusHerramienta.importe ? fmt(complementos45.reduce((s,c)=>s+c.herramienta,0)) : "—"}</td>
+                          <td style={{ padding:"8px 10px", fontSize:11, textAlign:"right", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", color:"#666", fontWeight:700, borderTop:"1px solid #d8d4ce" }}>{plusCoche.importe ? fmt(complementos45.reduce((s,c)=>s+c.coche,0)) : "—"}</td>
+                          <td style={{ padding:"8px 10px", fontSize:11, textAlign:"right", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", color:"#666", fontWeight:700, borderTop:"1px solid #d8d4ce" }}>{plusVivienda.importe ? fmt(complementos45.reduce((s,c)=>s+c.vivienda,0)) : "—"}</td>
+                          <td style={{ padding:"8px 10px", fontSize:11, textAlign:"right", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", color:"#666", fontWeight:700, borderTop:"1px solid #d8d4ce" }}>{plusSeguroVida.importe ? fmt(complementos45.reduce((s,c)=>s+c.seguroVida,0)) : "—"}</td>
+                          <td style={{ padding:"8px 10px", fontSize:11, textAlign:"right", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", color:"#666", fontWeight:700, borderTop:"1px solid #d8d4ce" }}>{plusComida.importeDia ? `${complementos45.reduce((s,c)=>s+c.diasComida,0)}d` : "—"}</td>
+                          <td style={{ padding:"8px 10px", fontSize:11, textAlign:"right", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", color:"#666", fontWeight:700, borderTop:"1px solid #d8d4ce" }}>{plusComida.importeDia ? fmt(complementos45.reduce((s,c)=>s+c.comida,0)) : "—"}</td>
+                          <td style={{ padding:"8px 10px", fontSize:13, textAlign:"right", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", color:"#b8864a", fontWeight:700, borderTop:"1px solid #d8d4ce" }}>{fmt(totalCompl)}</td>
                         </tr>
                       </tfoot>
                     </table>
@@ -4242,12 +4242,12 @@ ${docHTML}
                     justifyContent: "space-between", alignItems: "center" }}>
                     <div>
                       <div style={{ fontSize: 10, color: "#666", letterSpacing: "0.12em", textTransform: "uppercase",
-                        fontFamily: "'Courier New', monospace", marginBottom: 4 }}>Total a percibir + complementos</div>
-                      <div style={{ fontSize: 10, color: "#999", fontFamily: "'Courier New', monospace" }}>
+                        fontFamily: "'Courier Prime', 'Courier New', monospace", marginBottom: 4 }}>Total a percibir + complementos</div>
+                      <div style={{ fontSize: 10, color: "#999", fontFamily: "'Courier Prime', 'Courier New', monospace" }}>
                         {fmtE(totFinal)} salario {totalFestDias45 > 0 && `+ ${fmtE(totalFestImport45)} festivos `}+ {fmtE(totalCompl)} complementos
                       </div>
                     </div>
-                    <div style={{ fontSize: 22, fontWeight: 700, color: "#b8864a", fontFamily: "'Courier New', monospace" }}>
+                    <div style={{ fontSize: 22, fontWeight: 700, color: "#b8864a", fontFamily: "'Courier Prime', 'Courier New', monospace" }}>
                       {fmtE(totFinal + totalFestImport45 + totalCompl)}
                     </div>
                   </div>
@@ -4274,21 +4274,21 @@ ${docHTML}
                       <div style={{ fontSize:9, color:"#6a3a9a", letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:6 }}>Extras del período</div>
                       {totalFestDias45 > 0 && (
                         <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
-                          <span style={{ fontSize:11, color:"#6a3a9a", fontFamily:"'Courier New',monospace" }}>{totalFestDias45} festivo{totalFestDias45>1?"s":""} (incluido en total)</span>
-                          <span style={{ fontSize:12, fontWeight:700, color:"#6a3a9a", fontFamily:"'Courier New',monospace" }}>+ {fmtE(totalFestImport45)}</span>
+                          <span style={{ fontSize:11, color:"#6a3a9a", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>{totalFestDias45} festivo{totalFestDias45>1?"s":""} (incluido en total)</span>
+                          <span style={{ fontSize:12, fontWeight:700, color:"#6a3a9a", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>+ {fmtE(totalFestImport45)}</span>
                         </div>
                       )}
                       {totalCompl > 0 && (
                         <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
-                          <span style={{ fontSize:11, color:"#5a8a5a", fontFamily:"'Courier New',monospace" }}>Complementos</span>
-                          <span style={{ fontSize:12, fontWeight:700, color:"#5a8a5a", fontFamily:"'Courier New',monospace" }}>+ {fmtE(totalCompl)}</span>
+                          <span style={{ fontSize:11, color:"#5a8a5a", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>Complementos</span>
+                          <span style={{ fontSize:12, fontWeight:700, color:"#5a8a5a", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>+ {fmtE(totalCompl)}</span>
                         </div>
                       )}
                     </div>
                   </>
                 )}
                 {/* Aviso orientativo */}
-                <div style={{ marginTop:16, paddingTop:12, borderTop:"1px solid #e0ddd8", fontSize:10, color:"#666", fontFamily:"'Courier New',monospace", lineHeight:1.5, fontStyle:"italic", textAlign:"center" }}>
+                <div style={{ marginTop:16, paddingTop:12, borderTop:"1px solid #e0ddd8", fontSize:10, color:"#666", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", lineHeight:1.5, fontStyle:"italic", textAlign:"center" }}>
                   Cálculo orientativo del salario mensual bruto, que puede diferir ligeramente de la nómina real generada en cada periodo.
                 </div>
               </div>
@@ -4308,7 +4308,7 @@ ${docHTML}
           onClick={exportarCSV45}
           disabled={!p || desglose45.length === 0}
           style={{
-            padding: "10px 24px", fontSize: 11, fontFamily: "'Courier New', monospace",
+            padding: "10px 24px", fontSize: 11, fontFamily: "'Courier Prime', 'Courier New', monospace",
             letterSpacing: "0.15em", textTransform: "uppercase", borderRadius: 4,
             cursor: (p && desglose45.length) ? "pointer" : "not-allowed", fontWeight: 700,
             border: "1px solid #b8864a",
@@ -4323,7 +4323,7 @@ ${docHTML}
           onClick={exportarPDF45}
           disabled={!p || desglose45.length === 0}
           style={{
-            padding: "10px 24px", fontSize: 11, fontFamily: "'Courier New', monospace",
+            padding: "10px 24px", fontSize: 11, fontFamily: "'Courier Prime', 'Courier New', monospace",
             letterSpacing: "0.15em", textTransform: "uppercase", borderRadius: 4,
             cursor: (p && desglose45.length) ? "pointer" : "not-allowed", fontWeight: 700,
             border: "1px solid #b8864a",
@@ -4343,7 +4343,7 @@ ${docHTML}
           background: exportError.tipo === "ok" ? "#e8f5e8" : "#fdf0f0",
           border: `1px solid ${exportError.tipo === "ok" ? "#c0e0c0" : "#e8c0c0"}`,
           borderRadius: 5, color: exportError.tipo === "ok" ? "#2a7a50" : "#b02020",
-          fontFamily: "'Courier New', monospace", fontSize: 11, textAlign: "center",
+          fontFamily: "'Courier Prime', 'Courier New', monospace", fontSize: 11, textAlign: "center",
         }}>
           {typeof exportError === "string" ? exportError : exportError.mensaje}
         </div>
@@ -5174,7 +5174,7 @@ function PantallaSelectorProyecto({ usuario, onSeleccionar, onLogout, onGestiona
       minHeight: "100vh",
       background: "linear-gradient(135deg, #1a1a1a 0%, #2a2520 100%)",
       display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
-      fontFamily: "'Courier New', monospace",
+      fontFamily: "'Courier Prime', 'Courier New', monospace",
     }}>
       <div style={{
         background: "#f0ede8", borderRadius: 12, padding: "40px 36px",
@@ -5196,7 +5196,7 @@ function PantallaSelectorProyecto({ usuario, onSeleccionar, onLogout, onGestiona
           <div style={{ fontSize: 10, color: "#888", marginTop: 4, letterSpacing: "0.12em", textTransform: "uppercase" }}>
             {usuario.nombre}{usuario.es_admin ? " · Admin" : ""}
           </div>
-          <div style={{ fontSize: 9, color: "#c8a96e", marginTop: 6, letterSpacing: "0.12em", fontWeight: 700, fontFamily: "'Courier New', monospace" }} title="Versión de la app">
+          <div style={{ fontSize: 9, color: "#c8a96e", marginTop: 6, letterSpacing: "0.12em", fontWeight: 700, fontFamily: "'Courier Prime', 'Courier New', monospace" }} title="Versión de la app">
             {APP_VERSION}
           </div>
         </div>
@@ -5237,7 +5237,7 @@ function PantallaSelectorProyecto({ usuario, onSeleccionar, onLogout, onGestiona
                 style={{
                   background: "#fff", border: "1px solid #d0ccc6",
                   borderRadius: 6, padding: "14px 16px", cursor: "pointer",
-                  textAlign: "left", fontFamily: "'Courier New', monospace",
+                  textAlign: "left", fontFamily: "'Courier Prime', 'Courier New', monospace",
                   transition: "all 0.15s", color: "#1a1a1a",
                   display: "flex", justifyContent: "space-between", alignItems: "center",
                 }}
@@ -5266,7 +5266,7 @@ function PantallaSelectorProyecto({ usuario, onSeleccionar, onLogout, onGestiona
               style={{
                 flex: 1, background: "#c8a96e", color: "#1a1a1a", border: "none",
                 padding: "10px 14px", borderRadius: 5, cursor: "pointer",
-                fontFamily: "'Courier New', monospace", fontSize: 10, fontWeight: 700,
+                fontFamily: "'Courier Prime', 'Courier New', monospace", fontSize: 10, fontWeight: 700,
                 letterSpacing: "0.12em", textTransform: "uppercase",
               }}
             >⚙ Gestionar proyectos</button>
@@ -5276,7 +5276,7 @@ function PantallaSelectorProyecto({ usuario, onSeleccionar, onLogout, onGestiona
             style={{
               flex: 1, background: "transparent", color: "#888", border: "1px solid #ccc",
               padding: "10px 14px", borderRadius: 5, cursor: "pointer",
-              fontFamily: "'Courier New', monospace", fontSize: 10, fontWeight: 700,
+              fontFamily: "'Courier Prime', 'Courier New', monospace", fontSize: 10, fontWeight: 700,
               letterSpacing: "0.12em", textTransform: "uppercase",
             }}
           >Cerrar sesión</button>
@@ -5339,7 +5339,7 @@ function PantallaLogin({ onAcierto }) {
       minHeight: "100vh",
       background: "linear-gradient(135deg, #1a1a1a 0%, #2a2520 100%)",
       display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
-      fontFamily: "'Courier New', monospace",
+      fontFamily: "'Courier Prime', 'Courier New', monospace",
     }}>
       <div style={{
         background: "#f0ede8", borderRadius: 12, padding: "40px 36px",
@@ -5368,7 +5368,7 @@ function PantallaLogin({ onAcierto }) {
           <div style={{ fontSize: 10, color: "#888", marginTop: 4, letterSpacing: "0.12em", textTransform: "uppercase" }}>
             Acceso restringido
           </div>
-          <div style={{ fontSize: 9, color: "#c8a96e", marginTop: 6, letterSpacing: "0.12em", fontWeight: 700, fontFamily: "'Courier New', monospace" }} title="Versión de la app">
+          <div style={{ fontSize: 9, color: "#c8a96e", marginTop: 6, letterSpacing: "0.12em", fontWeight: 700, fontFamily: "'Courier Prime', 'Courier New', monospace" }} title="Versión de la app">
             {APP_VERSION}
           </div>
         </div>
@@ -5393,7 +5393,7 @@ function PantallaLogin({ onAcierto }) {
                 style={{
                   width: "100%", padding: "12px 14px", fontSize: 16,
                   border: "1px solid #c0bcb5", borderRadius: 6, background: "#fff",
-                  boxSizing: "border-box", fontFamily: "'Courier New', monospace",
+                  boxSizing: "border-box", fontFamily: "'Courier Prime', 'Courier New', monospace",
                   color: "#1a1a1a", outline: "none",
                 }}
               >
@@ -5418,7 +5418,7 @@ function PantallaLogin({ onAcierto }) {
                     width: "100%", padding: "12px 44px 12px 14px", fontSize: 16,
                     border: `1px solid ${error ? "#a04545" : "#c0bcb5"}`,
                     borderRadius: 6, background: "#fff", boxSizing: "border-box",
-                    fontFamily: "'Courier New', monospace", color: "#1a1a1a",
+                    fontFamily: "'Courier Prime', 'Courier New', monospace", color: "#1a1a1a",
                     letterSpacing: mostrarPin ? "normal" : "0.2em", outline: "none",
                   }}
                 />
@@ -5459,7 +5459,7 @@ function PantallaLogin({ onAcierto }) {
                 background: verificando ? "#666" : "#1a1a1a", color: "#f0ede8",
                 border: "none", borderRadius: 6, cursor: verificando ? "wait" : "pointer",
                 fontSize: 11, fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase",
-                fontFamily: "'Courier New', monospace",
+                fontFamily: "'Courier Prime', 'Courier New', monospace",
               }}
             >
               {verificando ? "Verificando..." : "Acceder"}
@@ -5549,17 +5549,17 @@ function PanelAdmin({ usuarioActual, onCerrar }) {
   const usuariosInactivos = usuarios.filter(u => u.activo === false);
   const usuariosOrdenados = [...usuariosActivos, ...usuariosInactivos];
 
-  const C = { padding: "8px 10px", fontSize: 11, fontFamily: "'Courier New',monospace", borderBottom: "1px solid #eae7e2" };
+  const C = { padding: "8px 10px", fontSize: 11, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", borderBottom: "1px solid #eae7e2" };
   const TH = { ...C, fontSize: 9, letterSpacing: "0.12em", textTransform: "uppercase", color: "#666", fontWeight: 700, textAlign: "left", borderBottom: "1px solid #d0ccc6" };
-  const inp = { padding: "6px 8px", fontSize: 11, border: "1px solid #c0bcb5", borderRadius: 4, fontFamily: "'Courier New',monospace", boxSizing: "border-box" };
-  const btn = (bg, color = "#fff") => ({ padding: "6px 12px", fontSize: 10, fontFamily: "'Courier New',monospace", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", background: bg, color, border: "none", borderRadius: 4, cursor: "pointer" });
-  const btnSm = (bg, color = "#fff") => ({ padding: "4px 9px", fontSize: 9, fontFamily: "'Courier New',monospace", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", background: bg, color, border: "none", borderRadius: 3, cursor: "pointer" });
+  const inp = { padding: "6px 8px", fontSize: 11, border: "1px solid #c0bcb5", borderRadius: 4, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", boxSizing: "border-box" };
+  const btn = (bg, color = "#fff") => ({ padding: "6px 12px", fontSize: 10, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", background: bg, color, border: "none", borderRadius: 4, cursor: "pointer" });
+  const btnSm = (bg, color = "#fff") => ({ padding: "4px 9px", fontSize: 9, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", background: bg, color, border: "none", borderRadius: 3, cursor: "pointer" });
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 1000, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: 20, overflowY: "auto" }}>
       <div style={{ background: "#f0ede8", borderRadius: 10, padding: 24, maxWidth: 900, width: "100%", marginTop: 40, boxShadow: "0 20px 60px rgba(0,0,0,0.5)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-          <h2 style={{ margin: 0, fontSize: 14, letterSpacing: "0.15em", textTransform: "uppercase", color: "#1a1a1a", fontFamily: "'Courier New',monospace" }}>⚙ Gestión de Usuarios</h2>
+          <h2 style={{ margin: 0, fontSize: 14, letterSpacing: "0.15em", textTransform: "uppercase", color: "#1a1a1a", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>⚙ Gestión de Usuarios</h2>
           <button onClick={onCerrar} style={btn("#1a1a1a")}>✕ Cerrar</button>
         </div>
 
@@ -5572,7 +5572,7 @@ function PanelAdmin({ usuarioActual, onCerrar }) {
             <div style={{ padding: 12, background: "#fff", borderRadius: 6, border: "1px solid #d0ccc6", display: "grid", gridTemplateColumns: "1fr 100px auto auto auto", gap: 8, alignItems: "center" }}>
               <input style={inp} placeholder="Nombre" value={nuevoForm.nombre} onChange={e => setNuevoForm({ ...nuevoForm, nombre: e.target.value })} />
               <input style={inp} placeholder="PIN" value={nuevoForm.pin} onChange={e => setNuevoForm({ ...nuevoForm, pin: e.target.value })} />
-              <label style={{ fontSize: 10, fontFamily: "'Courier New',monospace", display: "flex", alignItems: "center", gap: 4 }}>
+              <label style={{ fontSize: 10, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", display: "flex", alignItems: "center", gap: 4 }}>
                 <input type="checkbox" checked={nuevoForm.es_admin} onChange={e => setNuevoForm({ ...nuevoForm, es_admin: e.target.checked })} /> Admin
               </label>
               <button onClick={onAdd} style={btn("#5a8a5a")}>Guardar</button>
@@ -5644,7 +5644,7 @@ function PanelAdmin({ usuarioActual, onCerrar }) {
           </div>
         )}
 
-        <div style={{ marginTop: 14, fontSize: 9, color: "#888", fontFamily: "'Courier New',monospace", letterSpacing: "0.05em", textAlign: "center" }}>
+        <div style={{ marginTop: 14, fontSize: 9, color: "#888", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", letterSpacing: "0.05em", textAlign: "center" }}>
           {usuariosActivos.length} activo{usuariosActivos.length !== 1 ? "s" : ""} · {usuariosInactivos.length} inactivo{usuariosInactivos.length !== 1 ? "s" : ""} · {usuarios.length} total{usuarios.length !== 1 ? "es" : ""}
         </div>
       </div>
@@ -5725,10 +5725,10 @@ function PanelLogs({ usuarioActual, onCerrar }) {
     } catch (err) { alert("Error: " + err.message); }
   };
 
-  const C = { padding: "7px 10px", fontSize: 10.5, fontFamily: "'Courier New',monospace", borderBottom: "1px solid #eae7e2", verticalAlign: "top" };
+  const C = { padding: "7px 10px", fontSize: 10.5, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", borderBottom: "1px solid #eae7e2", verticalAlign: "top" };
   const TH = { ...C, fontSize: 9, letterSpacing: "0.12em", textTransform: "uppercase", color: "#666", fontWeight: 700, textAlign: "left", borderBottom: "1px solid #d0ccc6", whiteSpace: "nowrap" };
-  const inp = { padding: "6px 8px", fontSize: 11, border: "1px solid #c0bcb5", borderRadius: 4, fontFamily: "'Courier New',monospace", background: "#fff" };
-  const btn = (bg, color = "#fff") => ({ padding: "6px 12px", fontSize: 10, fontFamily: "'Courier New',monospace", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", background: bg, color, border: "none", borderRadius: 4, cursor: "pointer" });
+  const inp = { padding: "6px 8px", fontSize: 11, border: "1px solid #c0bcb5", borderRadius: 4, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", background: "#fff" };
+  const btn = (bg, color = "#fff") => ({ padding: "6px 12px", fontSize: 10, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", background: bg, color, border: "none", borderRadius: 4, cursor: "pointer" });
 
   // Lista de usuarios únicos para el dropdown
   const usuariosUnicos = [...new Set(logs.map(l => l.usuario_nombre).filter(Boolean))].sort();
@@ -5737,7 +5737,7 @@ function PanelLogs({ usuarioActual, onCerrar }) {
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 1000, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: 20, overflowY: "auto" }}>
       <div style={{ background: "#f0ede8", borderRadius: 10, padding: 24, maxWidth: 1000, width: "100%", marginTop: 40, boxShadow: "0 20px 60px rgba(0,0,0,0.5)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-          <h2 style={{ margin: 0, fontSize: 14, letterSpacing: "0.15em", textTransform: "uppercase", color: "#1a1a1a", fontFamily: "'Courier New',monospace" }}>📊 Logs de Actividad</h2>
+          <h2 style={{ margin: 0, fontSize: 14, letterSpacing: "0.15em", textTransform: "uppercase", color: "#1a1a1a", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>📊 Logs de Actividad</h2>
           <button onClick={onCerrar} style={btn("#1a1a1a")}>✕ Cerrar</button>
         </div>
 
@@ -5798,7 +5798,7 @@ function PanelLogs({ usuarioActual, onCerrar }) {
           </div>
         )}
 
-        <div style={{ marginTop: 12, fontSize: 9, color: "#888", fontFamily: "'Courier New',monospace", letterSpacing: "0.05em", textAlign: "center" }}>
+        <div style={{ marginTop: 12, fontSize: 9, color: "#888", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", letterSpacing: "0.05em", textAlign: "center" }}>
           Mostrando {logs.length} registro{logs.length !== 1 ? "s" : ""}
         </div>
       </div>
@@ -6000,7 +6000,7 @@ function PanelPuestos({ usuarioActual, onCerrar }) {
   };
   const modalStyle = {
     background: "#f0ede8", borderRadius: 8, maxWidth: 1100, width: "100%",
-    fontFamily: "'Courier New',monospace", color: "#1a1a1a",
+    fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", color: "#1a1a1a",
     boxShadow: "0 10px 40px rgba(0,0,0,0.5)",
   };
   const headerStyle = {
@@ -6011,14 +6011,14 @@ function PanelPuestos({ usuarioActual, onCerrar }) {
   const btnStyle = {
     background: "transparent", color: "#c8a96e", border: "1px solid #c8a96e",
     padding: "5px 12px", borderRadius: 4, cursor: "pointer",
-    fontSize: 10, fontFamily: "'Courier New',monospace",
+    fontSize: 10, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace",
     fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase",
   };
   const btnDanger = { ...btnStyle, color: "#c85050", borderColor: "#c85050" };
   const btnOk = { ...btnStyle, color: "#5a8a5a", borderColor: "#5a8a5a" };
   const inp = {
     padding: "7px 10px", border: "1px solid #c0bcb5", borderRadius: 4,
-    fontFamily: "'Courier New',monospace", fontSize: 11, background: "#fff",
+    fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize: 11, background: "#fff",
   };
 
   return (
@@ -6029,7 +6029,7 @@ function PanelPuestos({ usuarioActual, onCerrar }) {
             <div style={{ fontSize: 9, color: "#c8a96e", letterSpacing: "0.2em", textTransform: "uppercase" }}>Panel admin</div>
             <div style={{ fontSize: 14, fontWeight: 700, marginTop: 2 }}>📋 Puestos COAC</div>
           </div>
-          <button onClick={onCerrar} style={{ background: "transparent", color: "#aaa", border: "1px solid #444", padding: "6px 14px", borderRadius: 4, cursor: "pointer", fontSize: 10, fontFamily: "'Courier New',monospace", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>Cerrar</button>
+          <button onClick={onCerrar} style={{ background: "transparent", color: "#aaa", border: "1px solid #444", padding: "6px 14px", borderRadius: 4, cursor: "pointer", fontSize: 10, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>Cerrar</button>
         </div>
 
         <div style={{ padding: 20 }}>
@@ -6131,7 +6131,7 @@ function PanelPuestos({ usuarioActual, onCerrar }) {
                   </div>
                 ) : (
                   <div key={p.id} style={{ display: "grid", gridTemplateColumns: "130px 1fr 1fr 110px", gap: 8, padding: "7px 12px", borderBottom: "1px solid #eae7e2", fontSize: 11, alignItems: "center" }}>
-                    <div style={{ color: "#888", fontFamily: "'Courier New',monospace" }}>{p.codigo}</div>
+                    <div style={{ color: "#888", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>{p.codigo}</div>
                     <div style={{ fontWeight: 700 }}>{p.nombre}</div>
                     <div style={{ color: "#666", fontSize: 10 }}>{p.categoria}</div>
                     <div style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}>
@@ -6579,7 +6579,7 @@ function CosteEmpresa() {
 <title>${generarFilename()}</title>
 <style>
   @page { size: A4 portrait; margin: 10mm; }
-  body { font-family: 'Courier New', monospace; color: #1a1a1a; font-size: 8.5px; margin: 0; padding: 0; position: relative; }
+  body { font-family: 'Courier Prime', 'Courier New', monospace; color: #1a1a1a; font-size: 8.5px; margin: 0; padding: 0; position: relative; }
   .watermark { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-28deg); font-weight: 900; color: rgba(160, 69, 69, 0.10); letter-spacing: 0.15em; z-index: 9999; pointer-events: none; text-align: center; white-space: nowrap; line-height: 0.95; }
   .watermark .wm1 { font-size: 90px; display: block; }
   .watermark .wm2 { font-size: 38px; display: block; letter-spacing: 0.20em; margin-top: 6px; }
@@ -6633,7 +6633,7 @@ function CosteEmpresa() {
   .footer-pdf { margin-top: 10px; text-align: center; font-size: 7px; color: #aaa; letter-spacing: 0.05em; }
   @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } .no-print { display: none; } }
   .no-print { background: #faf6ee; border: 1px solid #d8c8a0; border-radius: 4px; padding: 10px 14px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
-  .no-print button { background: #1a1a1a; color: #fff; border: none; padding: 8px 16px; border-radius: 4px; font-family: 'Courier New', monospace; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; font-size: 10px; cursor: pointer; }
+  .no-print button { background: #1a1a1a; color: #fff; border: none; padding: 8px 16px; border-radius: 4px; font-family: 'Courier Prime', 'Courier New', monospace; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; font-size: 10px; cursor: pointer; }
 </style>
 </head>
 <body>
@@ -6916,7 +6916,7 @@ function CosteEmpresa() {
   // === Si no hay perfil cargado: solo selector ===
   if (!perfilCargado) {
     return (
-      <div style={{ color: "#1a1a1a", fontFamily: "'Courier New',monospace", padding: "32px 32px" }}>
+      <div style={{ color: "#1a1a1a", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", padding: "32px 32px" }}>
         <div style={{ maxWidth: 1400, margin: "0 auto 24px" }}>
           <div style={{ background: "#1a1a1a", padding: "18px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", color: "#f0e6d0", borderRadius: 8 }}>
             <div style={{ background: "#c8a96e", color: "#1a1a1a", padding: "8px 14px", borderRadius: 4, fontSize: 12, fontWeight: 700, letterSpacing: "0.1em" }}>BD PROD TOOLS</div>
@@ -6937,12 +6937,12 @@ function CosteEmpresa() {
                 placeholder="🔍 Buscar perfil, trabajador o proyecto..."
                 value={busqueda}
                 onChange={e => setBusqueda(e.target.value)}
-                style={{ flex: 1, minWidth: 200, padding: "8px 12px", border: "1px solid #c0bcb5", borderRadius: 4, fontFamily: "'Courier New',monospace", fontSize: 11, background: "#f0ede8" }}
+                style={{ flex: 1, minWidth: 200, padding: "8px 12px", border: "1px solid #c0bcb5", borderRadius: 4, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize: 11, background: "#f0ede8" }}
               />
               <select
                 value={filtroTipo}
                 onChange={e => setFiltroTipo(e.target.value)}
-                style={{ padding: "8px 12px", border: "1px solid #c0bcb5", borderRadius: 4, fontFamily: "'Courier New',monospace", fontSize: 11, background: "#f0ede8" }}
+                style={{ padding: "8px 12px", border: "1px solid #c0bcb5", borderRadius: 4, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize: 11, background: "#f0ede8" }}
               >
                 <option value="todos">Todos los tipos</option>
                 <option value="45h">Solo 45H</option>
@@ -6976,7 +6976,7 @@ function CosteEmpresa() {
                       </div>
                       <button
                         onClick={(e) => { e.stopPropagation(); cargarPerfil(p); }}
-                        style={{ background: "transparent", color: "#b8864a", border: "1px solid #b8864a", padding: "5px 12px", borderRadius: 3, fontSize: 9, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Courier New',monospace" }}
+                        style={{ background: "transparent", color: "#b8864a", border: "1px solid #b8864a", padding: "5px 12px", borderRadius: 3, fontSize: 9, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}
                       >
                         Cargar
                       </button>
@@ -7012,7 +7012,7 @@ function CosteEmpresa() {
   const complementosGuardado = d._calculado?.complementos45 || d.complementos45 || d.complementos || [];
 
   return (
-    <div style={{ color: "#1a1a1a", fontFamily: "'Courier New',monospace", padding: "32px 32px" }}>
+    <div style={{ color: "#1a1a1a", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", padding: "32px 32px" }}>
       <div style={{ maxWidth: 1400, margin: "0 auto 24px" }}>
         <div style={{ background: "#1a1a1a", padding: "18px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", color: "#f0e6d0", borderRadius: 8 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
@@ -7030,35 +7030,35 @@ function CosteEmpresa() {
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
             <button
               onClick={exportarCSV}
-              style={{ background: "transparent", color: "#5a8a5a", border: "1px solid #5a8a5a", padding: "6px 12px", borderRadius: 4, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Courier New',monospace" }}
+              style={{ background: "transparent", color: "#5a8a5a", border: "1px solid #5a8a5a", padding: "6px 12px", borderRadius: 4, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}
               title="Descargar CSV"
             >
               📊 CSV
             </button>
             <button
               onClick={exportarPDF}
-              style={{ background: "transparent", color: "#d8a0a0", border: "1px solid #a04545", padding: "6px 12px", borderRadius: 4, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Courier New',monospace" }}
+              style={{ background: "transparent", color: "#d8a0a0", border: "1px solid #a04545", padding: "6px 12px", borderRadius: 4, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}
               title="Generar PDF (se abre en otra ventana para imprimir o guardar como PDF)"
             >
               📄 PDF
             </button>
             <button
               onClick={abrirModalExportMaster}
-              style={{ background: "transparent", color: "#c8a96e", border: "1px solid #c8a96e", padding: "6px 12px", borderRadius: 4, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Courier New',monospace" }}
+              style={{ background: "transparent", color: "#c8a96e", border: "1px solid #c8a96e", padding: "6px 12px", borderRadius: 4, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}
               title="Rellenar fila en el Excel Master (EQUIPO TÉCNICO)"
             >
               📋 Excel Master
             </button>
             <button
               onClick={guardarConfigCosteEmpresa}
-              style={{ background: "transparent", color: "#3a6898", border: "1px solid #3a6898", padding: "6px 12px", borderRadius: 4, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Courier New',monospace" }}
+              style={{ background: "transparent", color: "#3a6898", border: "1px solid #3a6898", padding: "6px 12px", borderRadius: 4, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}
               title="Guardar la configuración actual (IRPF, firma, baja) en el perfil"
             >
               💾 Guardar Config
             </button>
             <button
               onClick={() => setPerfilCargado(null)}
-              style={{ background: "transparent", color: "#aaa", border: "1px solid #555", padding: "6px 12px", borderRadius: 4, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Courier New',monospace" }}
+              style={{ background: "transparent", color: "#aaa", border: "1px solid #555", padding: "6px 12px", borderRadius: 4, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}
             >
               ← Cambiar perfil
             </button>
@@ -7109,7 +7109,7 @@ function CosteEmpresa() {
                     if (v === "" || /^\d*\.?\d*$/.test(v)) setPctIRPF(v);
                   }}
                   placeholder="ej: 18"
-                  style={{ width: 60, padding: "5px 8px", border: "1px solid #c0bcb5", borderRadius: 4, fontFamily: "'Courier New',monospace", fontSize: 11, fontWeight: 700, textAlign: "right" }}
+                  style={{ width: 60, padding: "5px 8px", border: "1px solid #c0bcb5", borderRadius: 4, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize: 11, fontWeight: 700, textAlign: "right" }}
                 />
                 <span style={{ fontSize: 11, color: "#666", fontWeight: 700 }}>%</span>
               </div>
@@ -7155,7 +7155,7 @@ function CosteEmpresa() {
                       if (v === "" || /^\d*\.?\d*$/.test(v)) setImporteExento(v);
                     }}
                     placeholder="ej: 600"
-                    style={{ width: 80, padding: "5px 8px", border: "1px solid #c0bcb5", borderRadius: 4, fontFamily: "'Courier New',monospace", fontSize: 11, fontWeight: 700, textAlign: "right" }}
+                    style={{ width: 80, padding: "5px 8px", border: "1px solid #c0bcb5", borderRadius: 4, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize: 11, fontWeight: 700, textAlign: "right" }}
                   />
                   <span style={{ fontSize: 11, color: "#666", fontWeight: 700 }}>€</span>
                 </div>
@@ -7311,7 +7311,7 @@ function CosteEmpresa() {
           }), { ssPrincipal: 0, ssVacaciones: 0, ssHorasExtra: 0, imei: 0, solidaridad: 0, irpfVivienda: 0, gestoria: 0, exento: 0, totalCosteEmpresa: 0 });
 
           const cellNum = (v, color) => (
-            <td style={{ padding: "7px 5px", textAlign: "right", color: v === 0 ? "#ccc" : (color || "#1a1a1a"), fontFamily: "'Courier New',monospace" }}>
+            <td style={{ padding: "7px 5px", textAlign: "right", color: v === 0 ? "#ccc" : (color || "#1a1a1a"), fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>
               {v === 0 ? "—" : fmt(v)}
             </td>
           );
@@ -7348,8 +7348,8 @@ function CosteEmpresa() {
                         {cellNum(f.imei)}
                         {cellNum(f.solidaridad, "#6a3a9a")}
                         {cellNum(f.irpfVivienda, "#b07030")}
-                        <td style={{ padding: "7px 5px", textAlign: "right", color: "#5a8a5a", fontFamily: "'Courier New',monospace" }}>{fmt(f.gestoria)}</td>
-                        <td style={{ padding: "7px 5px", textAlign: "right", fontWeight: 700, color: "#a04545", fontFamily: "'Courier New',monospace" }}>{fmt(f.totalCosteEmpresa)}</td>
+                        <td style={{ padding: "7px 5px", textAlign: "right", color: "#5a8a5a", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>{fmt(f.gestoria)}</td>
+                        <td style={{ padding: "7px 5px", textAlign: "right", fontWeight: 700, color: "#a04545", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>{fmt(f.totalCosteEmpresa)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -7362,8 +7362,8 @@ function CosteEmpresa() {
                       {cellNum(T.imei)}
                       {cellNum(T.solidaridad, "#6a3a9a")}
                       {cellNum(T.irpfVivienda, "#b07030")}
-                      <td style={{ padding: "9px 5px", textAlign: "right", fontWeight: 700, color: "#5a8a5a", fontFamily: "'Courier New',monospace" }}>{fmt(T.gestoria)}</td>
-                      <td style={{ padding: "9px 5px", textAlign: "right", fontWeight: 700, color: "#a04545", fontSize: 12, fontFamily: "'Courier New',monospace" }}>{fmt(T.totalCosteEmpresa)}</td>
+                      <td style={{ padding: "9px 5px", textAlign: "right", fontWeight: 700, color: "#5a8a5a", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>{fmt(T.gestoria)}</td>
+                      <td style={{ padding: "9px 5px", textAlign: "right", fontWeight: 700, color: "#a04545", fontSize: 12, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>{fmt(T.totalCosteEmpresa)}</td>
                     </tr>
                   </tfoot>
                 </table>
@@ -7399,7 +7399,7 @@ function CosteEmpresa() {
                   ].map(it => (
                     <div key={it.l} style={{ background: "#f0ede8", borderRadius: 6, padding: "10px 14px", border: "1px solid #e0ddd8", textAlign: "center" }}>
                       <div style={{ fontSize: 9, color: "#666", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 4 }}>{it.l}</div>
-                      <div style={{ fontSize: it.bold ? 16 : 14, fontWeight: 700, color: it.color, fontFamily: "'Courier New',monospace" }}>{it.v}</div>
+                      <div style={{ fontSize: it.bold ? 16 : 14, fontWeight: 700, color: it.color, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>{it.v}</div>
                     </div>
                   ));
                 })()}
@@ -7411,16 +7411,16 @@ function CosteEmpresa() {
         {/* Aviso Legal (solo visible cuando hay perfil cargado) */}
         <div style={{ ...P, background: "#fafaf7", border: "1px solid #e8e4de" }}>
           <div style={{ ...ST, color: "#888", marginBottom: 10 }}>▸ Aviso Legal</div>
-          <div style={{ fontSize: 10, fontWeight: 700, color: "#1a1a1a", fontFamily: "'Courier New',monospace", marginBottom: 8, letterSpacing: "0.05em" }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: "#1a1a1a", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", marginBottom: 8, letterSpacing: "0.05em" }}>
             BD PROD TOOLS
           </div>
-          <div style={{ fontSize: 9, color: "#666", fontFamily: "'Courier New',monospace", lineHeight: 1.5, marginBottom: 8 }}>
+          <div style={{ fontSize: 9, color: "#666", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", lineHeight: 1.5, marginBottom: 8 }}>
             {DISCLAIMER_ES}
           </div>
-          <div style={{ fontSize: 8, color: "#888", fontFamily: "'Courier New',monospace", lineHeight: 1.5, fontStyle: "italic", marginBottom: 8 }}>
+          <div style={{ fontSize: 8, color: "#888", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", lineHeight: 1.5, fontStyle: "italic", marginBottom: 8 }}>
             {DISCLAIMER_EN}
           </div>
-          <div style={{ fontSize: 8, color: "#888", fontFamily: "'Courier New',monospace", lineHeight: 1.5, fontStyle: "italic" }}>
+          <div style={{ fontSize: 8, color: "#888", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", lineHeight: 1.5, fontStyle: "italic" }}>
             G &amp; G Enterprises LLC
           </div>
         </div>
@@ -7432,7 +7432,7 @@ function CosteEmpresa() {
           onClick={(e) => { if (e.target === e.currentTarget && !procesandoMaster) setMostrarExportMaster(false); }}
           style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 1000, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "40px 16px", overflowY: "auto" }}
         >
-          <div style={{ background: "#f0ede8", borderRadius: 8, maxWidth: 600, width: "100%", fontFamily: "'Courier New',monospace", color: "#1a1a1a", boxShadow: "0 10px 40px rgba(0,0,0,0.5)" }}>
+          <div style={{ background: "#f0ede8", borderRadius: 8, maxWidth: 600, width: "100%", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", color: "#1a1a1a", boxShadow: "0 10px 40px rgba(0,0,0,0.5)" }}>
             <div style={{ background: "#1a1a1a", color: "#f0e6d0", padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", borderRadius: "8px 8px 0 0" }}>
               <div>
                 <div style={{ fontSize: 9, color: "#c8a96e", letterSpacing: "0.2em", textTransform: "uppercase" }}>Coste empresa</div>
@@ -7441,7 +7441,7 @@ function CosteEmpresa() {
               <button
                 onClick={() => !procesandoMaster && setMostrarExportMaster(false)}
                 disabled={procesandoMaster}
-                style={{ background: "transparent", color: "#aaa", border: "1px solid #444", padding: "6px 14px", borderRadius: 4, cursor: procesandoMaster ? "not-allowed" : "pointer", fontSize: 10, fontFamily: "'Courier New',monospace", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", opacity: procesandoMaster ? 0.5 : 1 }}
+                style={{ background: "transparent", color: "#aaa", border: "1px solid #444", padding: "6px 14px", borderRadius: 4, cursor: procesandoMaster ? "not-allowed" : "pointer", fontSize: 10, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", opacity: procesandoMaster ? 0.5 : 1 }}
               >
                 Cerrar
               </button>
@@ -7472,7 +7472,7 @@ function CosteEmpresa() {
                   <button
                     onClick={() => inputMasterRef.current?.click()}
                     disabled={procesandoMaster}
-                    style={{ background: "transparent", color: "#c8a96e", border: "1px solid #c8a96e", padding: "6px 14px", borderRadius: 4, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Courier New',monospace" }}
+                    style={{ background: "transparent", color: "#c8a96e", border: "1px solid #c8a96e", padding: "6px 14px", borderRadius: 4, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}
                   >
                     📤 Seleccionar archivo
                   </button>
@@ -7493,7 +7493,7 @@ function CosteEmpresa() {
                     value={filaDestinoExcel}
                     onChange={(e) => setFilaDestinoExcel(e.target.value)}
                     disabled={procesandoMaster}
-                    style={{ width: 80, padding: "6px 10px", border: "1px solid #c0bcb5", borderRadius: 4, fontFamily: "'Courier New',monospace", fontSize: 12, fontWeight: 700, textAlign: "center" }}
+                    style={{ width: 80, padding: "6px 10px", border: "1px solid #c0bcb5", borderRadius: 4, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize: 12, fontWeight: 700, textAlign: "center" }}
                   />
                   <div style={{ fontSize: 10, color: "#666", lineHeight: 1.5 }}>
                     En qué fila del Excel se rellenan los datos.<br/>
@@ -7512,14 +7512,14 @@ function CosteEmpresa() {
                 <button
                   onClick={() => setMostrarExportMaster(false)}
                   disabled={procesandoMaster}
-                  style={{ background: "transparent", color: "#666", border: "1px solid #888", padding: "8px 16px", borderRadius: 4, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Courier New',monospace", opacity: procesandoMaster ? 0.5 : 1 }}
+                  style={{ background: "transparent", color: "#666", border: "1px solid #888", padding: "8px 16px", borderRadius: 4, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", opacity: procesandoMaster ? 0.5 : 1 }}
                 >
                   Cancelar
                 </button>
                 <button
                   onClick={procesarExcelMaster}
                   disabled={procesandoMaster || !archivoMaster}
-                  style={{ background: archivoMaster && !procesandoMaster ? "#c8a96e" : "#ddd", color: archivoMaster && !procesandoMaster ? "#1a1a1a" : "#888", border: "none", padding: "8px 20px", borderRadius: 4, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", cursor: archivoMaster && !procesandoMaster ? "pointer" : "not-allowed", fontFamily: "'Courier New',monospace" }}
+                  style={{ background: archivoMaster && !procesandoMaster ? "#c8a96e" : "#ddd", color: archivoMaster && !procesandoMaster ? "#1a1a1a" : "#888", border: "none", padding: "8px 20px", borderRadius: 4, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", cursor: archivoMaster && !procesandoMaster ? "pointer" : "not-allowed", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}
                 >
                   {procesandoMaster ? "Procesando..." : "✓ Generar y descargar"}
                 </button>
@@ -7622,23 +7622,23 @@ function PanelProyectos({ usuarioActual, onCerrar }) {
   const modal = {
     background: "#faf7f2", padding: 20, borderRadius: 6, maxWidth: 850, width: "90%",
     maxHeight: "88vh", overflowY: "auto", color: "#1a1a1a",
-    fontFamily: "'Courier New',monospace", border: "1px solid #b8864a",
+    fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", border: "1px solid #b8864a",
   };
   const btnGold = {
     background: "#b8864a", color: "#fff", border: "none",
     padding: "6px 12px", borderRadius: 4, cursor: "pointer",
-    fontFamily: "'Courier New',monospace", fontSize: 11, fontWeight: 700,
+    fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize: 11, fontWeight: 700,
     letterSpacing: "0.1em", textTransform: "uppercase",
   };
   const btnGhost = {
     background: "transparent", color: "#b8864a", border: "1px solid #b8864a",
     padding: "6px 12px", borderRadius: 4, cursor: "pointer",
-    fontFamily: "'Courier New',monospace", fontSize: 10, fontWeight: 700,
+    fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize: 10, fontWeight: 700,
     letterSpacing: "0.1em", textTransform: "uppercase",
   };
   const inp = {
     padding: "6px 8px", border: "1px solid #d0ccc6", borderRadius: 4,
-    fontFamily: "'Courier New',monospace", fontSize: 12, background: "#fff",
+    fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize: 12, background: "#fff",
     color: "#1a1a1a", colorScheme: "light",
   };
 
@@ -7647,7 +7647,7 @@ function PanelProyectos({ usuarioActual, onCerrar }) {
       <div style={modal} onClick={e => e.stopPropagation()}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, borderBottom: "1px solid #e0ddd8", paddingBottom: 10 }}>
           <h2 style={{ margin: 0, fontSize: 14, letterSpacing: "0.15em", textTransform: "uppercase", color: "#1a1a1a" }}>📁 Gestión de Proyectos</h2>
-          <button onClick={onCerrar} style={{ background: "transparent", color: "#888", border: "1px solid #ccc", padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontFamily: "'Courier New',monospace" }}>Cerrar</button>
+          <button onClick={onCerrar} style={{ background: "transparent", color: "#888", border: "1px solid #ccc", padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>Cerrar</button>
         </div>
 
         {error && <div style={{ background: "#fee", color: "#900", padding: 8, borderRadius: 4, marginBottom: 10, fontSize: 11 }}>Error: {error}</div>}
@@ -8020,10 +8020,10 @@ function PanelCalendarioProyecto({ proyecto, usuarioActual, onCerrar }) {
 
   // ── Estilos comunes
   const overlay = { position: "fixed", inset: 0, background: "rgba(20,20,20,0.8)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100 };
-  const modal = { background: "#faf7f2", padding: 20, borderRadius: 6, maxWidth: 900, width: "94%", maxHeight: "92vh", overflowY: "auto", color: "#1a1a1a", fontFamily: "'Courier New',monospace", border: "1px solid #b8864a" };
-  const btnGold = { background: "#b8864a", color: "#fff", border: "none", padding: "8px 14px", borderRadius: 4, cursor: "pointer", fontFamily: "'Courier New',monospace", fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" };
-  const btnGhost = { background: "transparent", color: "#b8864a", border: "1px solid #b8864a", padding: "6px 12px", borderRadius: 4, cursor: "pointer", fontFamily: "'Courier New',monospace", fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" };
-  const inp = { padding: "8px 10px", border: "1px solid #d0ccc6", borderRadius: 4, fontFamily: "'Courier New',monospace", fontSize: 12, background: "#fff", color: "#1a1a1a", colorScheme: "light", width: "100%" };
+  const modal = { background: "#faf7f2", padding: 20, borderRadius: 6, maxWidth: 900, width: "94%", maxHeight: "92vh", overflowY: "auto", color: "#1a1a1a", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", border: "1px solid #b8864a" };
+  const btnGold = { background: "#b8864a", color: "#fff", border: "none", padding: "8px 14px", borderRadius: 4, cursor: "pointer", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" };
+  const btnGhost = { background: "transparent", color: "#b8864a", border: "1px solid #b8864a", padding: "6px 12px", borderRadius: 4, cursor: "pointer", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" };
+  const inp = { padding: "8px 10px", border: "1px solid #d0ccc6", borderRadius: 4, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize: 12, background: "#fff", color: "#1a1a1a", colorScheme: "light", width: "100%" };
   const labelStyle = { display: "block", fontSize: 9, color: "#666", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 4 };
 
   return (
@@ -8034,7 +8034,7 @@ function PanelCalendarioProyecto({ proyecto, usuarioActual, onCerrar }) {
             <h2 style={{ margin: 0, fontSize: 14, letterSpacing: "0.15em", textTransform: "uppercase", color: "#1a1a1a" }}>📅 Calendario del proyecto</h2>
             <div style={{ fontSize: 11, color: "#888", marginTop: 3, fontWeight: 700 }}>{proyecto.nombre} · {proyecto.productora}</div>
           </div>
-          <button onClick={onCerrar} style={{ background: "transparent", color: "#888", border: "1px solid #ccc", padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontFamily: "'Courier New',monospace" }}>Cerrar</button>
+          <button onClick={onCerrar} style={{ background: "transparent", color: "#888", border: "1px solid #ccc", padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>Cerrar</button>
         </div>
 
         {cargando && <div style={{ padding: 20, textAlign: "center", color: "#888" }}>Cargando...</div>}
@@ -8451,23 +8451,23 @@ function PanelFestivos({ usuarioActual, onCerrar, onCambios }) {
   const modal = {
     background: "#faf7f2", padding: 20, borderRadius: 6, maxWidth: 900, width: "92%",
     maxHeight: "88vh", overflowY: "auto", color: "#1a1a1a",
-    fontFamily: "'Courier New',monospace", border: "1px solid #b8864a",
+    fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", border: "1px solid #b8864a",
   };
   const btnGold = {
     background: "#b8864a", color: "#fff", border: "none",
     padding: "6px 12px", borderRadius: 4, cursor: "pointer",
-    fontFamily: "'Courier New',monospace", fontSize: 11, fontWeight: 700,
+    fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize: 11, fontWeight: 700,
     letterSpacing: "0.1em", textTransform: "uppercase",
   };
   const btnGhost = {
     background: "transparent", color: "#b8864a", border: "1px solid #b8864a",
     padding: "6px 12px", borderRadius: 4, cursor: "pointer",
-    fontFamily: "'Courier New',monospace", fontSize: 10, fontWeight: 700,
+    fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize: 10, fontWeight: 700,
     letterSpacing: "0.1em", textTransform: "uppercase",
   };
   const inp = {
     padding: "6px 8px", border: "1px solid #d0ccc6", borderRadius: 4,
-    fontFamily: "'Courier New',monospace", fontSize: 12, background: "#fff",
+    fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize: 12, background: "#fff",
     color: "#1a1a1a", colorScheme: "light",
   };
   const tipoColores = {
@@ -8489,7 +8489,7 @@ function PanelFestivos({ usuarioActual, onCerrar, onCambios }) {
       <div style={modal} onClick={e => e.stopPropagation()}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, borderBottom: "1px solid #e0ddd8", paddingBottom: 10 }}>
           <h2 style={{ margin: 0, fontSize: 14, letterSpacing: "0.15em", textTransform: "uppercase", color: "#1a1a1a" }}>📅 Calendario de Festivos</h2>
-          <button onClick={onCerrar} style={{ background: "transparent", color: "#888", border: "1px solid #ccc", padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontFamily: "'Courier New',monospace" }}>Cerrar</button>
+          <button onClick={onCerrar} style={{ background: "transparent", color: "#888", border: "1px solid #ccc", padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>Cerrar</button>
         </div>
 
         {error && <div style={{ background: "#fee", color: "#900", padding: 8, borderRadius: 4, marginBottom: 10, fontSize: 11 }}>Error: {error}</div>}
@@ -8511,7 +8511,7 @@ function PanelFestivos({ usuarioActual, onCerrar, onCambios }) {
                   padding: "6px 10px",
                   borderRadius: 3,
                   cursor: "pointer",
-                  fontFamily: "'Courier New',monospace",
+                  fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace",
                   fontSize: 10,
                   fontWeight: 700,
                   letterSpacing: "0.08em",
@@ -8597,7 +8597,7 @@ function PanelFestivos({ usuarioActual, onCerrar, onCambios }) {
               </div>
             ) : (
               <div style={{ display: "grid", gridTemplateColumns: "180px 1fr auto auto auto", gap: 8, alignItems: "center" }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: "#1a1a1a", fontFamily: "'Courier New',monospace" }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#1a1a1a", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>
                   {fmtFecha(f.fecha)}
                 </div>
                 <div style={{ fontSize: 12, color: "#1a1a1a" }}>{f.nombre}</div>
@@ -8640,7 +8640,7 @@ function BannerSesion({ usuario, proyectoActivo, onLogout, onAdmin, onLogs, onPu
           borderRadius: 4,
           cursor: "pointer",
           fontSize: 10,
-          fontFamily: "'Courier New',monospace",
+          fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace",
           fontWeight: 700,
           letterSpacing: "0.12em",
           textTransform: "uppercase",
@@ -8675,7 +8675,7 @@ function BannerSesion({ usuario, proyectoActivo, onLogout, onAdmin, onLogs, onPu
           borderRadius: 4,
           cursor: "pointer",
           fontSize: 10,
-          fontFamily: "'Courier New',monospace",
+          fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace",
           fontWeight: 700,
           letterSpacing: "0.12em",
           textTransform: "uppercase",
@@ -8692,7 +8692,7 @@ function BannerSesion({ usuario, proyectoActivo, onLogout, onAdmin, onLogs, onPu
     <div className="no-print" style={{
       background: "#1a1a1a", color: "#f0ede8", padding: "8px 16px",
       display: "flex", alignItems: "center", justifyContent: "space-between",
-      fontFamily: "'Courier New',monospace", fontSize: 11, letterSpacing: "0.08em",
+      fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize: 11, letterSpacing: "0.08em",
       gap: 12, flexWrap: "wrap",
     }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -8718,19 +8718,19 @@ function BannerSesion({ usuario, proyectoActivo, onLogout, onAdmin, onLogs, onPu
           style={{
             background: "#c8a96e", color: "#1a1a1a", border: "1px solid #c8a96e",
             padding: "4px 12px", borderRadius: 4, cursor: "pointer", fontSize: 10,
-            fontFamily: "'Courier New',monospace", fontWeight: 700,
+            fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontWeight: 700,
             letterSpacing: "0.12em", textTransform: "uppercase",
           }}
         >📁 {proyectoActivo?.nombre || "Proyectos"}</button>
         {usuario.es_admin && (
           <>
-            <button onClick={onAdmin} style={{ background: "transparent", color: "#c8a96e", border: "1px solid #c8a96e", padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontSize: 10, fontFamily: "'Courier New',monospace", fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" }}>⚙ Usuarios</button>
-            <button onClick={onLogs} style={{ background: "transparent", color: "#c8a96e", border: "1px solid #c8a96e", padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontSize: 10, fontFamily: "'Courier New',monospace", fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" }}>📊 Logs</button>
-            <button onClick={onPuestos} style={{ background: "transparent", color: "#c8a96e", border: "1px solid #c8a96e", padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontSize: 10, fontFamily: "'Courier New',monospace", fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" }}>📋 Puestos</button>
-            <button onClick={onFestivos} style={{ background: "transparent", color: "#c8a96e", border: "1px solid #c8a96e", padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontSize: 10, fontFamily: "'Courier New',monospace", fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" }}>📅 Festivos</button>
+            <button onClick={onAdmin} style={{ background: "transparent", color: "#c8a96e", border: "1px solid #c8a96e", padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontSize: 10, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" }}>⚙ Usuarios</button>
+            <button onClick={onLogs} style={{ background: "transparent", color: "#c8a96e", border: "1px solid #c8a96e", padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontSize: 10, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" }}>📊 Logs</button>
+            <button onClick={onPuestos} style={{ background: "transparent", color: "#c8a96e", border: "1px solid #c8a96e", padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontSize: 10, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" }}>📋 Puestos</button>
+            <button onClick={onFestivos} style={{ background: "transparent", color: "#c8a96e", border: "1px solid #c8a96e", padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontSize: 10, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" }}>📅 Festivos</button>
           </>
         )}
-        <button onClick={onLogout} style={{ background: "transparent", color: "#aaa", border: "1px solid #444", padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontSize: 10, fontFamily: "'Courier New',monospace", letterSpacing: "0.1em", textTransform: "uppercase" }}>Cerrar sesión</button>
+        <button onClick={onLogout} style={{ background: "transparent", color: "#aaa", border: "1px solid #444", padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontSize: 10, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", letterSpacing: "0.1em", textTransform: "uppercase" }}>Cerrar sesión</button>
       </div>
     </div>
   );
@@ -8752,6 +8752,27 @@ export default function App() {
   const [proyectoActivo, setProyectoActivo] = useState(null); // v45: proyecto seleccionado
   const [calendarioActivo, setCalendarioActivo] = useState(null); // v59: calendario del proyecto activo
   const [tab, setTab] = useState("iruna45"); // "iruna45" | "tab40"
+
+  // v67: inyectar Courier Prime desde Google Fonts para que Chrome la incruste bien en PDFs
+  // (evita el aviso "No se puede extraer la fuente T3Font_0" al abrir en Adobe Reader)
+  useEffect(() => {
+    const id = "bd-google-fonts-courier";
+    if (document.getElementById(id)) return;
+    const link1 = document.createElement("link");
+    link1.rel = "preconnect";
+    link1.href = "https://fonts.googleapis.com";
+    document.head.appendChild(link1);
+    const link2 = document.createElement("link");
+    link2.rel = "preconnect";
+    link2.href = "https://fonts.gstatic.com";
+    link2.crossOrigin = "anonymous";
+    document.head.appendChild(link2);
+    const link3 = document.createElement("link");
+    link3.id = id;
+    link3.rel = "stylesheet";
+    link3.href = "https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400;1,700&display=swap";
+    document.head.appendChild(link3);
+  }, []);
 
   // v59: cargar calendario cuando cambia el proyecto activo
   useEffect(() => {
