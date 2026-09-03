@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v65";
+const APP_VERSION = "v66";
 
 // v54: Festivos por defecto (fallback si Supabase falla). El array activo se
 // rellena desde Supabase en el arranque; ver cargarFestivosSupabase()
@@ -2811,7 +2811,7 @@ function DocumentoImprimible({
               TOTAL A PERCIBIR ({es40h ? "40h" : "45h"}) {tieneCompl ? "(sin extras)" : ""} <span style={{ display: "inline-block", background: "#b8864a", color: "#fff", fontSize: 8, fontWeight: 700, letterSpacing: "0.12em", padding: "1px 6px", borderRadius: 3, marginLeft: 6, verticalAlign: "middle", textTransform: "uppercase" }}>Importe Bruto</span>
             </td>
             <td style={{ ...tdValue, background: "#fdf8f0", textAlign: "right", fontSize: 13, fontWeight: 700, color: "#b8864a", padding: "8px 8px" }}>
-              {fmtE(es40h ? (totFinal - (totPlus || 0)) : totFinal)}
+              {fmtE((es40h ? (totFinal - (totPlus || 0)) : totFinal) + (totalFestImport45 || 0))}
             </td>
           </tr>
           <tr>
@@ -4264,7 +4264,7 @@ ${docHTML}
                 {totPlus > 0 && !es40h && <Row label="+ Plus de Actividad" value={`+ ${fmtE(totPlus)}`} />}
                 {totVd  > 0 && <Row label={`− Vac. disfrutadas (${totalVdDias}d)`} value={`− ${fmtE(totVd)}`} />}
                 <Div />
-                <Row label={`TOTAL A PERCIBIR (${es40h ? "40h" : "45h"})`} value={fmtE(es40h ? (totFinal - (totPlus || 0)) : totFinal)} highlight />
+                <Row label={`TOTAL A PERCIBIR (${es40h ? "40h" : "45h"})`} value={fmtE((es40h ? (totFinal - (totPlus || 0)) : totFinal) + (totalFestImport45 || 0))} highlight />
                 <Row label="Promedio mensual" value={fmtE((es40h ? (totFinal - (totPlus || 0)) : totFinal)/p.mesesTotales)} sub={`sobre ${fmtM(p.mesesTotales)} meses`} green />
                 <Row label="Promedio semanal" value={fmtE((es40h ? (totFinal - (totPlus || 0)) : totFinal)/p.semanasTotales)} sub={`sobre ${p.semanasTotales} sem. L-V`} />
                 {(totalCompl > 0 || totalFestDias45 > 0) && (
@@ -4274,7 +4274,7 @@ ${docHTML}
                       <div style={{ fontSize:9, color:"#6a3a9a", letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:6 }}>Extras del período</div>
                       {totalFestDias45 > 0 && (
                         <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
-                          <span style={{ fontSize:11, color:"#6a3a9a", fontFamily:"'Courier New',monospace" }}>{totalFestDias45} festivo{totalFestDias45>1?"s":""}</span>
+                          <span style={{ fontSize:11, color:"#6a3a9a", fontFamily:"'Courier New',monospace" }}>{totalFestDias45} festivo{totalFestDias45>1?"s":""} (incluido en total)</span>
                           <span style={{ fontSize:12, fontWeight:700, color:"#6a3a9a", fontFamily:"'Courier New',monospace" }}>+ {fmtE(totalFestImport45)}</span>
                         </div>
                       )}
@@ -4284,17 +4284,6 @@ ${docHTML}
                           <span style={{ fontSize:12, fontWeight:700, color:"#5a8a5a", fontFamily:"'Courier New',monospace" }}>+ {fmtE(totalCompl)}</span>
                         </div>
                       )}
-                      {/* v64: TOTAL CON FESTIVOS/EXTRAS incluidos */}
-                      {totalFestDias45 > 0 && (() => {
-                        const baseFinal = es40h ? (totFinal - (totPlus || 0)) : totFinal;
-                        const totalConFestivos = baseFinal + (totalFestImport45 || 0);
-                        return (
-                          <div style={{ marginTop:8, paddingTop:8, borderTop:"1px solid #d8c8e8", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                            <span style={{ fontSize:10, color:"#4a2a7a", fontFamily:"'Courier New',monospace", fontWeight:700, letterSpacing:"0.1em", textTransform:"uppercase" }}>Total con festivos</span>
-                            <span style={{ fontSize:14, fontWeight:700, color:"#4a2a7a", fontFamily:"'Courier New',monospace" }}>{fmtE(totalConFestivos)}</span>
-                          </div>
-                        );
-                      })()}
                     </div>
                   </>
                 )}
