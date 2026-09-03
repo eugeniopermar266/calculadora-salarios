@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v58";
+const APP_VERSION = "v59";
 
 // v54: Festivos por defecto (fallback si Supabase falla). El array activo se
 // rellena desde Supabase en el arranque; ver cargarFestivosSupabase()
@@ -51,6 +51,50 @@ const FESTIVOS_CANARIAS_GETTER = () => FESTIVOS_BILBAO;
 function festivosEnRango(fechaInicio, fechaFin) {
   if (!fechaInicio || !fechaFin) return [];
   return FESTIVOS_BILBAO.filter(f => f.fecha >= fechaInicio && f.fecha <= fechaFin);
+}
+
+// v59: Helpers para trabajar con el calendario del proyecto en 45H/40H
+// Cuenta días con una propiedad concreta dentro de [inicio, fin] agrupados por mes.
+// Devuelve un objeto { "YYYY-MM": N }
+function contarDiasCalendarioPorMes(calendario, propiedad, fechaInicio, fechaFin) {
+  const resultado = {};
+  if (!calendario || !calendario.dias) return resultado;
+  const dias = calendario.dias;
+  for (const [fecha, info] of Object.entries(dias)) {
+    if (fecha < fechaInicio || fecha > fechaFin) continue;
+    if (!info || !info[propiedad]) continue;
+    const ym = fecha.slice(0, 7);
+    resultado[ym] = (resultado[ym] || 0) + 1;
+  }
+  return resultado;
+}
+
+// Cuenta festivos trabajados (info.festivo_trabajado === true) por mes
+function contarFestivosTrabajadosPorMes(calendario, festivosComunidadFechas, fechaInicio, fechaFin) {
+  const resultado = {};
+  if (!calendario || !calendario.dias) return resultado;
+  const setFest = new Set(festivosComunidadFechas || []);
+  for (const [fecha, info] of Object.entries(calendario.dias)) {
+    if (fecha < fechaInicio || fecha > fechaFin) continue;
+    if (!setFest.has(fecha)) continue; // solo si es festivo real
+    if (!info?.festivo_trabajado) continue;
+    const ym = fecha.slice(0, 7);
+    resultado[ym] = (resultado[ym] || 0) + 1;
+  }
+  return resultado;
+}
+
+// Dado un desglose (array de meses) y un objeto { "YYYY-MM": N },
+// devuelve un array de longitud desglose.length con el valor N en cada posición
+function mapearContadoresADesglose(desglose, contadoresPorMes) {
+  if (!desglose) return [];
+  return desglose.map(d => {
+    if (!d.mes) return 0;
+    // d.mes es tipo "Septiembre De 2026" → convertimos a YYYY-MM usando d.desde
+    const ym = d.desde ? d.desde.slice(0, 7) : null;
+    if (!ym) return 0;
+    return contadoresPorMes[ym] || 0;
+  });
 }
 
 // Devuelve qué mes (índice del desglose) le corresponde a una fecha YYYY-MM-DD
@@ -889,7 +933,7 @@ const BadgeBrutos = ({ size = "normal" }) => {
 };
 const LS = { display: "block", fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#555", marginBottom: 6, fontFamily: "'Courier New', monospace" };
 
-function Field({ label, value, onChange, type = "number", prefix, hint, small, readOnly, lockHint }) {
+function Field({ label, value, onChange, type = "number", prefix, hint, small, readOnly, lockHint, min, max }) {
   return (
     <div style={{ marginBottom: small ? 8 : 14, minWidth: 0 }}>
       {label && (
@@ -905,7 +949,9 @@ function Field({ label, value, onChange, type = "number", prefix, hint, small, r
           onChange={e => readOnly ? null : onChange(type === "text" || type === "date" ? e.target.value : parseFloat(e.target.value) || 0)}
           readOnly={!!readOnly}
           tabIndex={readOnly ? -1 : undefined}
-          step="any" min="0"
+          step="any"
+          min={type === "date" ? (min || undefined) : "0"}
+          max={type === "date" ? (max || undefined) : undefined}
           style={{
             width: "100%",
             background: readOnly ? "#e5e2dd" : "#f0ede8",
@@ -2852,6 +2898,7 @@ function App45({ modoTab = "iruna45" }) {
   const [festivosActivos,  setFestivosActivos] = useState({});
   const [vacAcumulada,     setVacAcumulada]    = useState(false);
   const [indemAcumulada,   setIndemAcumulada]  = useState(false);
+  const [hxPorRodaje40,    setHxPorRodaje40]   = useState(false); // v59: solo 40H, 1 HX por día de rodaje del calendario
   const [plusHerramienta,  setPlusHerramienta] = useState({ importe: 0, modo: "mes" });
   const [plusCoche,        setPlusCoche]       = useState({ importe: 0, modo: "mes" });
   const [plusVivienda,     setPlusVivienda]    = useState({ importe: 0, modo: "mes" });
@@ -2871,17 +2918,54 @@ function App45({ modoTab = "iruna45" }) {
     setPeriodo(p);
     if (p) {
       const n = p.desglose.length;
-      // horasPorMes: pre-rellenar con estimado de días L-V × 5 (modificable)
-      setHorasPorMes(prev => Array.from({ length: n }, (_, i) => {
-        // Si ya había un valor previo (incluye 0 explícito y números), respetarlo
-        if (prev[i] !== undefined && prev[i] !== null && prev[i] !== "") return prev[i];
-        // Si no, calcular estimado L-V × 5
-        return Math.round((p.desglose[i]?.semanasLaborables || 0) * 5);
-      }));
-      setVacDiasPorMes(prev    => Array.from({ length: n }, (_, i) => prev[i] ?? 0));
-      setComidaDiasPorMes(prev => Array.from({ length: n }, (_, i) => prev[i] ?? null));
+      const cal = proyectoActivoCtx?.__calendario;
+      const hayCalendario = cal && cal.dias && Object.keys(cal.dias).length > 0;
+
+      // v59: si hay calendario, autorrellenar horas y festivos desde el calendario del proyecto
+      if (hayCalendario) {
+        // v59: en 45H usamos días laborales. En 40H usamos días de rodaje SOLO si el checkbox está activo.
+        let contadoresHoras;
+        if (es40h) {
+          if (hxPorRodaje40) {
+            contadoresHoras = contarDiasCalendarioPorMes(cal, "rodaje", fechaInicio, fechaFin);
+          } else {
+            contadoresHoras = {}; // no auto-rellenar
+          }
+        } else {
+          contadoresHoras = contarDiasCalendarioPorMes(cal, "laboral", fechaInicio, fechaFin);
+        }
+        const nuevasHoras = mapearContadoresADesglose(p.desglose, contadoresHoras);
+
+        // Festivos trabajados por mes (aplica siempre, sea 45H o 40H)
+        const festTrabajadosPorMes = {};
+        for (const [fecha, info] of Object.entries(cal.dias || {})) {
+          if (fecha < fechaInicio || fecha > fechaFin) continue;
+          if (!info?.festivo_trabajado) continue;
+          const ym = fecha.slice(0, 7);
+          festTrabajadosPorMes[ym] = (festTrabajadosPorMes[ym] || 0) + 1;
+        }
+        const nuevosFestivos = mapearContadoresADesglose(p.desglose, festTrabajadosPorMes);
+
+        // En 40H sin checkbox: no tocamos horas (deja lo que había o vacío)
+        if (es40h && !hxPorRodaje40) {
+          setHorasPorMes(prev => Array.from({ length: n }, (_, i) => prev[i] ?? 0));
+        } else {
+          setHorasPorMes(nuevasHoras);
+        }
+        setFestivosPorMes(nuevosFestivos);
+        setVacDiasPorMes(prev => Array.from({ length: n }, (_, i) => prev[i] ?? 0));
+        setComidaDiasPorMes(prev => Array.from({ length: n }, (_, i) => prev[i] ?? null));
+      } else {
+        // Comportamiento original si no hay calendario
+        setHorasPorMes(prev => Array.from({ length: n }, (_, i) => {
+          if (prev[i] !== undefined && prev[i] !== null && prev[i] !== "") return prev[i];
+          return Math.round((p.desglose[i]?.semanasLaborables || 0) * 5);
+        }));
+        setVacDiasPorMes(prev    => Array.from({ length: n }, (_, i) => prev[i] ?? 0));
+        setComidaDiasPorMes(prev => Array.from({ length: n }, (_, i) => prev[i] ?? null));
+      }
     }
-  }, [fechaInicio, fechaFin]);
+  }, [fechaInicio, fechaFin, proyectoActivoCtx?.__calendario?.id, es40h, hxPorRodaje40]);
 
   const p = periodo;
 
@@ -3362,7 +3446,7 @@ ${docHTML}
           <GestorPerfiles
             tabId={modoTab === "tab40" ? "40h" : "45h"}
             datosActuales={{
-              proyecto, productora, nombre, puesto, codigoContable, esFijoDiscontinuo, salario45, horasRef, modoInverso45, objetivoSemanal45,
+              proyecto, productora, nombre, puesto, codigoContable, esFijoDiscontinuo, hxPorRodaje40, salario45, horasRef, modoInverso45, objetivoSemanal45,
               fechaInicio, fechaFin, vacAcumulada, indemAcumulada,
               horasPorMes, vacDiasPorMes, festivosPorMes, festivosActivos, comidaDiasPorMes,
               plusHerramienta, plusCoche, plusVivienda, plusSeguroVida, plusComida,
@@ -3390,6 +3474,7 @@ ${docHTML}
               if (d.puesto !== undefined) setPuesto(d.puesto);
               if (d.codigoContable !== undefined) setCodigoContable(d.codigoContable);
               if (d.esFijoDiscontinuo !== undefined) setEsFijoDiscontinuo(d.esFijoDiscontinuo);
+              if (d.hxPorRodaje40 !== undefined) setHxPorRodaje40(d.hxPorRodaje40);
               if (d.salario45 !== undefined) setSalario45(d.salario45);
               if (d.horasRef !== undefined) setHorasRef(d.horasRef);
               if (d.modoInverso45 !== undefined) setModoInverso45(d.modoInverso45);
@@ -3446,6 +3531,34 @@ ${docHTML}
                 <div style={{ position: "relative", width: 38, height: 20, flexShrink: 0, marginLeft: 12 }}>
                   <div style={{ width: "100%", height: "100%", borderRadius: 10, background: esFijoDiscontinuo ? "#c8a96e" : "#222", transition: "background 0.25s" }} />
                   <div style={{ position: "absolute", top: 3, left: esFijoDiscontinuo ? 19 : 3, width: 14, height: 14, borderRadius: "50%", background: esFijoDiscontinuo ? "#fff" : "#aaa", transition: "left 0.25s", boxShadow: "0 1px 3px rgba(0,0,0,0.5)" }} />
+                </div>
+              </div>
+            )}
+
+            {/* v59: Toggle 40H "1 HX por día de rodaje" — solo si hay calendario del proyecto */}
+            {es40h && proyectoActivoCtx?.__calendario?.dias && Object.keys(proyectoActivoCtx.__calendario.dias).length > 0 && (
+              <div
+                onClick={() => setHxPorRodaje40(v => !v)}
+                style={{
+                  display: "flex", justifyContent: "space-between", alignItems: "center",
+                  padding: "11px 13px",
+                  background: hxPorRodaje40 ? "#faf1e0" : "#f0ede8",
+                  borderRadius: 6,
+                  border: `1px solid ${hxPorRodaje40 ? "#c8963a" : "#e0ddd8"}`,
+                  marginTop: 10, cursor: "pointer",
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: 11, color: hxPorRodaje40 ? "#7a5a2a" : "#999", fontFamily: "'Courier New', monospace", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 700 }}>
+                    1 HX por día de rodaje
+                  </div>
+                  <div style={{ fontSize: 9, color: "#777", marginTop: 2, fontFamily: "'Courier New', monospace" }}>
+                    {hxPorRodaje40 ? "Rellena horas extra desde el calendario (días de rodaje)" : "Las horas extra no se autorrellenan"}
+                  </div>
+                </div>
+                <div style={{ position: "relative", width: 38, height: 20, flexShrink: 0, marginLeft: 12 }}>
+                  <div style={{ width: "100%", height: "100%", borderRadius: 10, background: hxPorRodaje40 ? "#c8a96e" : "#222", transition: "background 0.25s" }} />
+                  <div style={{ position: "absolute", top: 3, left: hxPorRodaje40 ? 19 : 3, width: 14, height: 14, borderRadius: "50%", background: hxPorRodaje40 ? "#fff" : "#aaa", transition: "left 0.25s", boxShadow: "0 1px 3px rgba(0,0,0,0.5)" }} />
                 </div>
               </div>
             )}
@@ -3509,9 +3622,32 @@ ${docHTML}
 
           <div style={P}>
             <div style={ST}>▸ Período de Contratación</div>
+            {/* v59: indicador de calendario del proyecto activo */}
+            {proyectoActivoCtx?.__calendario?.fecha_inicio && proyectoActivoCtx?.__calendario?.fecha_fin && (
+              <div style={{ marginBottom: 10, padding: "8px 12px", background: "#f5efe0", border: "1px solid #c8a96e", borderRadius: 4, fontSize: 10, color: "#7a5a2a", display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: 14 }}>📅</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>Calendario del proyecto</div>
+                  <div style={{ marginTop: 2, fontFamily: "'Courier New',monospace" }}>
+                    {proyectoActivoCtx.__calendario.fecha_inicio} → {proyectoActivoCtx.__calendario.fecha_fin}
+                    {proyectoActivoCtx.__calendario.comunidad && (
+                      <span style={{ marginLeft: 8, textTransform: "capitalize" }}>· {proyectoActivoCtx.__calendario.comunidad.replace("_", " ")}</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, overflow:"hidden" }}>
-              <Field label="Inicio" value={fechaInicio} onChange={setFechaInicio} type="date" hint="Primer día" />
-              <Field label="Fin"    value={fechaFin}    onChange={setFechaFin}    type="date" hint="Último día" />
+              <Field
+                label="Inicio" value={fechaInicio} onChange={setFechaInicio} type="date" hint="Primer día"
+                min={proyectoActivoCtx?.__calendario?.fecha_inicio || undefined}
+                max={proyectoActivoCtx?.__calendario?.fecha_fin || undefined}
+              />
+              <Field
+                label="Fin" value={fechaFin} onChange={setFechaFin} type="date" hint="Último día"
+                min={proyectoActivoCtx?.__calendario?.fecha_inicio || undefined}
+                max={proyectoActivoCtx?.__calendario?.fecha_fin || undefined}
+              />
             </div>
             {p ? (
               <div style={{ marginTop:8, padding:12, background:"#f0ede8", borderRadius:6, border:"1px solid #e0ddd8" }}>
@@ -7553,6 +7689,31 @@ function PanelCalendarioProyecto({ proyecto, usuarioActual, onCerrar }) {
     if (!form.fechaInicio || !form.fechaFin) { alert("Fechas obligatorias"); return; }
     if (form.fechaInicio > form.fechaFin) { alert("La fecha de inicio no puede ser posterior a la fecha fin"); return; }
     if (!form.comunidad) { alert("Selecciona comunidad"); return; }
+
+    // v59: si estamos actualizando (no creando), avisar de perfiles afectados
+    if (calendario && calendario.id) {
+      try {
+        const perfilesDelProyecto = await listarPerfilesSupabase({
+          tabId: null, // ambos 45H y 40H
+          proyectoId: proyecto.id,
+          verTodos: false,
+          adminPin: usuarioActual.pin,
+        });
+        if (Array.isArray(perfilesDelProyecto) && perfilesDelProyecto.length > 0) {
+          const nombres = perfilesDelProyecto.map(p => {
+            const tipo = p.tab_id === "40h" ? "40H" : (p.tab_id === "45h" ? "45H" : "");
+            return `• ${p.nombre}${tipo ? " (" + tipo + ")" : ""}`;
+          }).join("\n");
+          const ok = confirm(
+            `Este calendario tiene ${perfilesDelProyecto.length} perfil(es) guardado(s) que pueden verse afectados:\n\n${nombres}\n\nLos perfiles ya guardados NO se recalculan automáticamente. Al abrirlos de nuevo, tomarán los nuevos valores del calendario.\n\n¿Guardar los cambios?`
+          );
+          if (!ok) return;
+        }
+      } catch (err) {
+        console.warn("No se pudo verificar perfiles afectados:", err.message);
+      }
+    }
+
     setGuardando(true); setError(null);
     try {
       if (calendario && calendario.id) {
@@ -8427,7 +8588,22 @@ export default function App() {
   const [mostrarProyectos, setMostrarProyectos] = useState(false);
   const [mostrarFestivos, setMostrarFestivos] = useState(false); // v54
   const [proyectoActivo, setProyectoActivo] = useState(null); // v45: proyecto seleccionado
+  const [calendarioActivo, setCalendarioActivo] = useState(null); // v59: calendario del proyecto activo
   const [tab, setTab] = useState("iruna45"); // "iruna45" | "tab40"
+
+  // v59: cargar calendario cuando cambia el proyecto activo
+  useEffect(() => {
+    (async () => {
+      if (!proyectoActivo?.id) { setCalendarioActivo(null); return; }
+      try {
+        const cal = await obtenerCalendarioProyecto(proyectoActivo.id);
+        setCalendarioActivo(cal || null);
+      } catch (err) {
+        console.warn("Error cargando calendario proyecto activo:", err);
+        setCalendarioActivo(null);
+      }
+    })();
+  }, [proyectoActivo?.id]);
 
   // v54: Cargar festivos desde Supabase al arrancar. Si falla, se queda el array por defecto.
   useEffect(() => {
@@ -8605,7 +8781,7 @@ export default function App() {
 
   return (
     <UsuarioContext.Provider value={usuario}>
-      <ProyectoContext.Provider value={proyectoActivo}>
+      <ProyectoContext.Provider value={proyectoActivo ? { ...proyectoActivo, __calendario: calendarioActivo } : null}>
       <div style={{ minHeight: "100vh", background: "#f0ede8" }}>
         <BannerSesion
           usuario={usuario}
