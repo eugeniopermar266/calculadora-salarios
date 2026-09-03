@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v74";
+const APP_VERSION = "v75";
 
 // v73: importe fijo por jornada especial (se paga POR ENCIMA del salario pactado)
 const IMPORTE_JORNADA_ESPECIAL = 20;
@@ -1898,8 +1898,8 @@ function InputsPorMes({ desglose, horasPorMes, setHorasPorMes, vacDiasPorMes, se
   const hasFest = !!setFestivosPorMes;
   const hasJE = !!setJornadasEspecialesPorMes;
 
-  // v73: si hay JE, añadir columna
-  const cols = hasFest && hasJE ? "1fr 56px 56px 56px 56px" : hasFest ? "1fr 56px 56px 56px" : "1fr 70px 70px";
+  // v75: ancho fijo mes + resto uniforme para no descentrar según largo del nombre
+  const cols = hasFest && hasJE ? "95px 1fr 1fr 1fr 1fr" : hasFest ? "95px 1fr 1fr 1fr" : "95px 1fr 1fr";
 
   return (
     <div>
@@ -1916,7 +1916,7 @@ function InputsPorMes({ desglose, horasPorMes, setHorasPorMes, vacDiasPorMes, se
         const mesNombre = partes[0] || d.mes;
         const anio = partes[1] || "";
         return (
-        <div key={i} style={{ display:"grid", gridTemplateColumns:cols, gap:6, marginBottom:8, alignItems:"end" }}>
+        <div key={i} style={{ display:"grid", gridTemplateColumns:cols, gap:6, marginBottom:8, alignItems:"center", minHeight:44 }}>
           <div style={{ fontFamily:"'Courier Prime', 'Courier New', monospace", lineHeight:1.25, paddingRight:4 }}>
             <div style={{ fontSize:10.5, color:"#1a1a1a", fontWeight:600, textTransform:"capitalize", letterSpacing:"0.02em" }}>
               {mesNombre}
@@ -1951,6 +1951,7 @@ function InputsPorMes({ desglose, horasPorMes, setHorasPorMes, vacDiasPorMes, se
             );
           })()}
           {hasJE && <div>
+            <div style={{ fontSize:8, lineHeight:1, marginBottom:2, visibility:"hidden" }}>·</div>
             <input type="number" min="0" step="1" value={(jornadasEspecialesPorMes||[])[i]||""} placeholder="0"
               onChange={e=>setJE(i,parseFloat(e.target.value)||0)}
               title="Jornadas especiales (cada una = 1 HX + 20€)"
@@ -1958,12 +1959,14 @@ function InputsPorMes({ desglose, horasPorMes, setHorasPorMes, vacDiasPorMes, se
               onFocus={e=>e.target.style.borderColor="#d63a7a"} onBlur={e=>e.target.style.borderColor="#f0b0d0"} />
           </div>}
           <div>
+            <div style={{ fontSize:8, lineHeight:1, marginBottom:2, visibility:"hidden" }}>·</div>
             <input type="number" min="0" step="1" value={vacDiasPorMes[i]||""} placeholder="0"
               onChange={e=>setV(i,parseFloat(e.target.value)||0)}
               style={{ background:"#f0ede8", border:"1px solid #e0c8b0", borderRadius:4, color:"#8a2a20", fontFamily:"'Courier Prime', 'Courier New', monospace", fontSize:11, padding:"4px 4px", outline:"none", textAlign:"center", colorScheme:"light", minWidth:0, width:"100%", boxSizing:"border-box" }}
               onFocus={e=>e.target.style.borderColor="#8a5030"} onBlur={e=>e.target.style.borderColor="#e0c8b0"} />
           </div>
           {hasFest && <div>
+            <div style={{ fontSize:8, lineHeight:1, marginBottom:2, visibility:"hidden" }}>·</div>
             <input type="number" min="0" step="1" value={(festivosPorMes||[])[i]||""} placeholder="0"
               onChange={e=>setF(i,parseFloat(e.target.value)||0)}
               style={{ background:"#f0ede8", border:"1px solid #c8b0d8", borderRadius:4, color:"#6a3a9a", fontFamily:"'Courier Prime', 'Courier New', monospace", fontSize:11, padding:"4px 4px", outline:"none", textAlign:"center", colorScheme:"light", minWidth:0, width:"100%", boxSizing:"border-box" }}
@@ -4034,7 +4037,7 @@ ${docHTML}
 
           {p && (
             <div style={P}>
-              <div style={ST}>▸ Horas Extra, Vacaciones, Festivos</div>
+              <div style={ST}>▸ Horas Extra, Jornadas Especiales, Vacaciones, Festivos</div>
               <InputsPorMes
                 desglose={p.desglose}
                 horasPorMes={horasPorMes}       setHorasPorMes={setHorasPorMes}
