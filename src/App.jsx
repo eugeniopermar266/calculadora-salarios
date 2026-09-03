@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v76";
+const APP_VERSION = "v77";
 
 // v73: importe fijo por jornada especial (se paga POR ENCIMA del salario pactado)
 const IMPORTE_JORNADA_ESPECIAL = 20;
@@ -3802,6 +3802,11 @@ ${docHTML}
                 totBase, totVac, totIndem, totHx, totPlus, totVd,
                 totFinal, totalCompl,
                 totalVac45, totalIndem45, totalFestDias45, totalFestImport45,
+                // v77: festivos e importes JE por mes (Coste Empresa los necesita)
+                importeFestMes45: importeFestMes45 || [],
+                festivosPorMesSnapshot: festivosPorMes || [],
+                jornadasEspecialesPorMesSnapshot: jornadasEspecialesPorMes || [],
+                totJEDias, totJEImporte,
               },
             }}
             onCargarPerfil={(d) => {
@@ -6655,6 +6660,7 @@ function CosteEmpresa() {
     const d = perfilCargado.datos || {};
     const desglose = d._calculado?.desglose45 || d.desglose45 || d.desglose || [];
     const complementos = d._calculado?.complementos45 || d.complementos45 || d.complementos || [];
+    const importeFestMes = d._calculado?.importeFestMes45 || []; // v77: importes festivos por mes
     const esT40 = perfilCargado.tabId === "tab40";
     const pctIRPFNum = parseFloat(pctIRPF) || 0;
     const importeExentoNum = parseFloat(importeExento) || 0;
@@ -6662,7 +6668,12 @@ function CosteEmpresa() {
     const filas = desglose.map((mes, i) => {
       const c = complementos[i] || {};
       const plusAct = esT40 ? 0 : (mes.plusAct || 0);
-      const total = (mes.base40 || 0) + (mes.vac40 || 0) + (mes.indem40 || 0) + (mes.cobroHx || 0) + plusAct + (c.herramienta || 0) + (c.coche || 0) + (c.vivienda || 0) + (c.seguroVida || 0) + (c.comida || 0);
+      const festImp = importeFestMes[i] || 0;  // v77
+      const jeImp   = mes.importeJE || 0;      // v77 (viene en desglose desde v73)
+      // v77: sumar festivos y JE al total percibido
+      const total = (mes.base40 || 0) + (mes.vac40 || 0) + (mes.indem40 || 0) + (mes.cobroHx || 0) + plusAct
+                  + festImp + jeImp
+                  + (c.herramienta || 0) + (c.coche || 0) + (c.vivienda || 0) + (c.seguroVida || 0) + (c.comida || 0);
 
       // Determinar si este mes tiene exención aplicada
       const parsed = parseMesEspañol(mes.mes);
@@ -6694,6 +6705,9 @@ function CosteEmpresa() {
         indem: mes.indem40 || 0,
         hx: mes.cobroHx || 0,
         plusAct,
+        festivos: festImp,          // v77
+        jeImporte: jeImp,           // v77
+        jeDias: mes.totalJEDias || 0, // v77
         coche: c.coche || 0,
         vivienda: c.vivienda || 0,
         seguroVida: c.seguroVida || 0,
@@ -6710,6 +6724,9 @@ function CosteEmpresa() {
       indem: acc.indem + f.indem,
       hx: acc.hx + f.hx,
       plusAct: acc.plusAct + f.plusAct,
+      festivos: acc.festivos + (f.festivos || 0),   // v77
+      jeImporte: acc.jeImporte + (f.jeImporte || 0), // v77
+      jeDias: acc.jeDias + (f.jeDias || 0),          // v77
       coche: acc.coche + f.coche,
       vivienda: acc.vivienda + f.vivienda,
       seguroVida: acc.seguroVida + f.seguroVida,
@@ -6724,7 +6741,7 @@ function CosteEmpresa() {
       irpfVivienda: acc.irpfVivienda + f.irpfVivienda,
       gestoria: acc.gestoria + f.gestoria,
       totalCosteEmpresa: acc.totalCosteEmpresa + f.totalCosteEmpresa,
-    }), { base: 0, vac: 0, indem: 0, hx: 0, plusAct: 0, coche: 0, vivienda: 0, seguroVida: 0, comida: 0, total: 0, exento: 0, ssPrincipal: 0, ssVacaciones: 0, ssHorasExtra: 0, imei: 0, solidaridad: 0, irpfVivienda: 0, gestoria: 0, totalCosteEmpresa: 0 });
+    }), { base: 0, vac: 0, indem: 0, hx: 0, plusAct: 0, festivos: 0, jeImporte: 0, jeDias: 0, coche: 0, vivienda: 0, seguroVida: 0, comida: 0, total: 0, exento: 0, ssPrincipal: 0, ssVacaciones: 0, ssHorasExtra: 0, imei: 0, solidaridad: 0, irpfVivienda: 0, gestoria: 0, totalCosteEmpresa: 0 });
 
     return { filas, totales, totalBruto: totales.total };
   };
@@ -7302,6 +7319,7 @@ function CosteEmpresa() {
   // si el perfil los guardó (lo hace el GestorPerfiles).
   const desgloseGuardado = d._calculado?.desglose45 || d.desglose45 || d.desglose || [];
   const complementosGuardado = d._calculado?.complementos45 || d.complementos45 || d.complementos || [];
+  const importeFestGuardado = d._calculado?.importeFestMes45 || []; // v77
 
   return (
     <div style={{ color: "#1a1a1a", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", padding: "32px 32px" }}>
@@ -7515,8 +7533,8 @@ function CosteEmpresa() {
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 10.5 }}>
                 <thead>
                   <tr style={{ background: "#f0ede8" }}>
-                    {["Mes", "Salario Base", "Vacaciones", "Indemnización", "H.Extra €", "Plus Act.", "Coche", "Vivienda", "Seguro Vida", "Comida", "Exento", "TOTAL"].map(h => (
-                      <th key={h} style={{ padding: "8px 6px", fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 700, textAlign: h === "Mes" ? "left" : "right", color: h === "TOTAL" ? "#b8864a" : (h === "Exento" ? "#a04545" : "#666"), borderBottom: "1px solid #d0ccc6", whiteSpace: "nowrap" }}>{h}</th>
+                    {["Mes", "Salario Base", "Vacaciones", "Indemnización", "H.Extra €", "Plus Act.", "Festivos €", "Jorn.Esp €", "Coche", "Vivienda", "Seguro Vida", "Comida", "Exento", "TOTAL"].map(h => (
+                      <th key={h} style={{ padding: "8px 6px", fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 700, textAlign: h === "Mes" ? "left" : "right", color: h === "TOTAL" ? "#b8864a" : (h === "Exento" ? "#a04545" : (h === "Festivos €" ? "#6a3a9a" : (h === "Jorn.Esp €" ? "#8a1e4a" : "#666"))), borderBottom: "1px solid #d0ccc6", whiteSpace: "nowrap" }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -7524,7 +7542,9 @@ function CosteEmpresa() {
                   {desgloseGuardado.map((mes, i) => {
                     const c = complementosGuardado[i] || {};
                     const plusAct = esTab40 ? 0 : (mes.plusAct || 0);
-                    const totalMes = (mes.base40 || 0) + (mes.vac40 || 0) + (mes.indem40 || 0) + (mes.cobroHx || 0) + plusAct + (c.herramienta || 0) + (c.coche || 0) + (c.vivienda || 0) + (c.seguroVida || 0) + (c.comida || 0);
+                    const festImp = importeFestGuardado[i] || 0; // v77
+                    const jeImp = mes.importeJE || 0; // v77
+                    const totalMes = (mes.base40 || 0) + (mes.vac40 || 0) + (mes.indem40 || 0) + (mes.cobroHx || 0) + plusAct + festImp + jeImp + (c.herramienta || 0) + (c.coche || 0) + (c.vivienda || 0) + (c.seguroVida || 0) + (c.comida || 0);
 
                     // Exención del mes
                     const parsed = parseMesEspañol(mes.mes);
@@ -7543,6 +7563,8 @@ function CosteEmpresa() {
                         <td style={{ padding: "7px 6px", textAlign: "right", color: (mes.indem40 || 0) === 0 ? "#bbb" : "#1a1a1a" }}>{(mes.indem40 || 0) === 0 ? "—" : fmt(mes.indem40)}</td>
                         <td style={{ padding: "7px 6px", textAlign: "right", color: (mes.cobroHx || 0) === 0 ? "#bbb" : "#3a6898" }}>{(mes.cobroHx || 0) === 0 ? "—" : fmt(mes.cobroHx)}</td>
                         <td style={{ padding: "7px 6px", textAlign: "right", color: plusAct === 0 ? "#bbb" : "#b07030" }}>{plusAct === 0 ? "—" : fmt(plusAct)}</td>
+                        <td style={{ padding: "7px 6px", textAlign: "right", color: festImp === 0 ? "#bbb" : "#6a3a9a" }}>{festImp === 0 ? "—" : fmt(festImp)}</td>
+                        <td style={{ padding: "7px 6px", textAlign: "right", color: jeImp === 0 ? "#bbb" : "#8a1e4a" }} title={jeImp > 0 ? `${mes.totalJEDias || 0} JE` : ""}>{jeImp === 0 ? "—" : fmt(jeImp)}</td>
                         <td style={{ padding: "7px 6px", textAlign: "right", color: (c.coche || 0) === 0 ? "#bbb" : "#5a8a5a" }}>{(c.coche || 0) === 0 ? "—" : fmt(c.coche)}</td>
                         <td style={{ padding: "7px 6px", textAlign: "right", color: (c.vivienda || 0) === 0 ? "#bbb" : "#5a8a5a" }}>{(c.vivienda || 0) === 0 ? "—" : fmt(c.vivienda)}</td>
                         <td style={{ padding: "7px 6px", textAlign: "right", color: (c.seguroVida || 0) === 0 ? "#bbb" : "#5a8a5a" }}>{(c.seguroVida || 0) === 0 ? "—" : fmt(c.seguroVida)}</td>
