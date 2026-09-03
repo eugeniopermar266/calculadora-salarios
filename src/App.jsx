@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v77";
+const APP_VERSION = "v78";
 
 // v73: importe fijo por jornada especial (se paga POR ENCIMA del salario pactado)
 const IMPORTE_JORNADA_ESPECIAL = 20;
@@ -684,6 +684,7 @@ function calcularCosteEmpresaMes({
   esPrimerMes,   // boolean: ¿es el primer mes del contrato?
   importeExento = 0, // importe a restar de las bases SS/IMEI/Solidaridad (por baja médica)
   firmaContrato = true, // boolean: ¿hay firma de contrato este primer mes? (afecta solo si esPrimerMes)
+  incluirGestoria = false, // v78: si false, la gestoría no suma al total (aparece con importe 0 en el total)
 }) {
   const exento = Math.max(0, importeExento || 0);
 
@@ -730,7 +731,7 @@ function calcularCosteEmpresaMes({
     ? (CE_GESTORIA_ALTA + CE_GESTORIA_MES)
     : CE_GESTORIA_MES;
 
-  const totalCosteEmpresa = ssPrincipal + ssVacaciones + ssHorasExtra + imeiCalc + solidaridad + irpfVivienda + gestoria;
+  const totalCosteEmpresa = ssPrincipal + ssVacaciones + ssHorasExtra + imeiCalc + solidaridad + irpfVivienda + (incluirGestoria ? gestoria : 0);
 
   return {
     baseSSPrincipal, ssPrincipal,
@@ -6478,6 +6479,7 @@ function CosteEmpresa() {
   // Por defecto SÍ (32€ primer mes = 6 alta + 26 nómina)
   // Si se desactiva: primer mes = 26€ (solo nómina)
   const [firmaContrato, setFirmaContrato] = useState(true);
+  const [incluirGestoria, setIncluirGestoria] = useState(false); // v78: por defecto OFF, la gestoría aparece pero no suma al total
 
   // Importe exento por baja médica (no suma a base SS/IMEI/Solidaridad)
   const [bajaActiva, setBajaActiva] = useState(false);
@@ -6692,6 +6694,7 @@ function CosteEmpresa() {
         esPrimerMes: i === 0,
         importeExento: exentoMes,
         firmaContrato,
+        incluirGestoria,
       });
       return {
         mes: mes.mes,
@@ -7125,6 +7128,7 @@ function CosteEmpresa() {
         irpfActivo,
         pctIRPF: parseFloat(pctIRPF) || 0,
         firmaContrato,
+        incluirGestoria,
         bajaActiva,
         importeExento: parseFloat(importeExento) || 0,
         mesesExentos,
@@ -7426,20 +7430,41 @@ function CosteEmpresa() {
             )}
           </div>
 
-          {/* Toggle Firma de Contrato (afecta gestoría del primer mes) */}
-          <div style={{ background: "#f0f5ee", border: "1px solid #c8d8b8", borderRadius: 6, padding: "10px 14px", marginTop: 8, display: "flex", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
-            <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", flex: "0 0 auto" }}>
-              <span style={{ position: "relative", display: "inline-block", width: 38, height: 20, background: firmaContrato ? "#2a6e2a" : "#bbb", borderRadius: 10, transition: "background 0.15s" }}>
-                <span style={{ position: "absolute", top: 2, left: firmaContrato ? 20 : 2, width: 16, height: 16, background: "#fff", borderRadius: "50%", transition: "left 0.15s" }} />
-              </span>
-              <input type="checkbox" checked={firmaContrato} onChange={e => setFirmaContrato(e.target.checked)} style={{ display: "none" }} />
-              <span style={{ fontSize: 11, fontWeight: 700, color: "#555", letterSpacing: "0.05em" }}>
-                Firma de contrato en primer mes
-              </span>
-            </label>
-            <div style={{ fontSize: 9.5, color: "#666", marginLeft: "auto", fontStyle: "italic" }}>
-              {firmaContrato ? "Primer mes: 32 € (6 alta + 26 nómina)" : "Primer mes: 26 € (sólo nómina)"}
+          {/* Fila dividida: Firma de Contrato + Incluir Gestoría */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 8 }}>
+
+            {/* Toggle Firma de Contrato (afecta gestoría del primer mes) */}
+            <div style={{ background: "#f0f5ee", border: "1px solid #c8d8b8", borderRadius: 6, padding: "10px 14px", display: "flex", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", flex: "0 0 auto" }}>
+                <span style={{ position: "relative", display: "inline-block", width: 38, height: 20, background: firmaContrato ? "#2a6e2a" : "#bbb", borderRadius: 10, transition: "background 0.15s" }}>
+                  <span style={{ position: "absolute", top: 2, left: firmaContrato ? 20 : 2, width: 16, height: 16, background: "#fff", borderRadius: "50%", transition: "left 0.15s" }} />
+                </span>
+                <input type="checkbox" checked={firmaContrato} onChange={e => setFirmaContrato(e.target.checked)} style={{ display: "none" }} />
+                <span style={{ fontSize: 11, fontWeight: 700, color: "#555", letterSpacing: "0.05em" }}>
+                  Firma de contrato
+                </span>
+              </label>
+              <div style={{ fontSize: 9, color: "#666", marginTop: 4, width: "100%", lineHeight: 1.4 }}>
+                Firma contrato 6 € · Nómina 22 €/mes
+              </div>
             </div>
+
+            {/* v78: Toggle Incluir Gestoría (por defecto OFF: aparece pero no suma al total) */}
+            <div style={{ background: incluirGestoria ? "#f0f5ee" : "#f5f4f0", border: `1px solid ${incluirGestoria ? "#c8d8b8" : "#d8d4ce"}`, borderRadius: 6, padding: "10px 14px", display: "flex", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", flex: "0 0 auto" }}>
+                <span style={{ position: "relative", display: "inline-block", width: 38, height: 20, background: incluirGestoria ? "#2a6e2a" : "#bbb", borderRadius: 10, transition: "background 0.15s" }}>
+                  <span style={{ position: "absolute", top: 2, left: incluirGestoria ? 20 : 2, width: 16, height: 16, background: "#fff", borderRadius: "50%", transition: "left 0.15s" }} />
+                </span>
+                <input type="checkbox" checked={incluirGestoria} onChange={e => setIncluirGestoria(e.target.checked)} style={{ display: "none" }} />
+                <span style={{ fontSize: 11, fontWeight: 700, color: "#555", letterSpacing: "0.05em" }}>
+                  Incluir Gestoría en total
+                </span>
+              </label>
+              <div style={{ fontSize: 9, color: "#666", marginTop: 4, width: "100%", lineHeight: 1.4 }}>
+                {incluirGestoria ? "Se suma al coste total de empresa" : "Aparece pero no suma al total"}
+              </div>
+            </div>
+
           </div>
 
           {/* Toggle Baja médica (importe exento de SS/IMEI/Solidaridad) */}
@@ -7607,6 +7632,8 @@ function CosteEmpresa() {
               esPrimerMes: i === 0,
               importeExento: exentoMes,
               firmaContrato,
+              incluirGestoria,
+        incluirGestoria,
             });
             return { mes: mes.mes, claveMes, ...ce, total };
           });
@@ -7662,7 +7689,7 @@ function CosteEmpresa() {
                         {cellNum(f.imei)}
                         {cellNum(f.solidaridad, "#6a3a9a")}
                         {cellNum(f.irpfVivienda, "#b07030")}
-                        <td style={{ padding: "7px 5px", textAlign: "right", color: "#5a8a5a", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>{fmt(f.gestoria)}</td>
+                        <td style={{ padding: "7px 5px", textAlign: "right", color: incluirGestoria ? "#5a8a5a" : "#bbb", textDecoration: incluirGestoria ? "none" : "line-through", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>{fmt(f.gestoria)}</td>
                         <td style={{ padding: "7px 5px", textAlign: "right", fontWeight: 700, color: "#a04545", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>{fmt(f.totalCosteEmpresa)}</td>
                       </tr>
                     ))}
@@ -7676,7 +7703,7 @@ function CosteEmpresa() {
                       {cellNum(T.imei)}
                       {cellNum(T.solidaridad, "#6a3a9a")}
                       {cellNum(T.irpfVivienda, "#b07030")}
-                      <td style={{ padding: "9px 5px", textAlign: "right", fontWeight: 700, color: "#5a8a5a", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>{fmt(T.gestoria)}</td>
+                      <td style={{ padding: "9px 5px", textAlign: "right", fontWeight: 700, color: incluirGestoria ? "#5a8a5a" : "#bbb", textDecoration: incluirGestoria ? "none" : "line-through", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>{fmt(T.gestoria)}</td>
                       <td style={{ padding: "9px 5px", textAlign: "right", fontWeight: 700, color: "#a04545", fontSize: 12, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>{fmt(T.totalCosteEmpresa)}</td>
                     </tr>
                   </tfoot>
