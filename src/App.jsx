@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v61";
+const APP_VERSION = "v62";
 
 // v54: Festivos por defecto (fallback si Supabase falla). El array activo se
 // rellena desde Supabase en el arranque; ver cargarFestivosSupabase()
@@ -2905,6 +2905,7 @@ function App45({ modoTab = "iruna45" }) {
   const [vacAcumulada,     setVacAcumulada]    = useState(false);
   const [indemAcumulada,   setIndemAcumulada]  = useState(false);
   const [hxPorRodaje40,    setHxPorRodaje40]   = useState(false); // v59: solo 40H, 1 HX por día de rodaje del calendario
+  const [mostrarFestivosLegacy, setMostrarFestivosLegacy] = useState(false); // v62: panel viejo festivos oculto por defecto si hay calendario
   const [plusHerramienta,  setPlusHerramienta] = useState({ importe: 0, modo: "mes" });
   const [plusCoche,        setPlusCoche]       = useState({ importe: 0, modo: "mes" });
   const [plusVivienda,     setPlusVivienda]    = useState({ importe: 0, modo: "mes" });
@@ -3020,8 +3021,11 @@ function App45({ modoTab = "iruna45" }) {
   };
 
   const setFechaInicioSeguro = (nueva) => {
-    // Si el input está a medio teclear (año incompleto), lo dejamos pasar sin validar rango duro
+    // Si el input está a medio teclear (año incompleto), lo dejamos pasar sin validar
     if (!nueva || !/^\d{4}-\d{2}-\d{2}$/.test(nueva)) { setFechaInicio(nueva); return; }
+    // v62: si el año es < 2000, aún se está tecleando (0027, 0201...) — dejar pasar sin avisar
+    const anio = parseInt(nueva.slice(0, 4), 10);
+    if (anio < 2000) { setFechaInicio(nueva); return; }
     const v1 = validarFechaContraCalendario(nueva);
     if (!v1.ok) { alert(v1.motivo); return; }
     const v2 = validarRangoDuro(nueva, fechaFin);
@@ -3031,6 +3035,9 @@ function App45({ modoTab = "iruna45" }) {
 
   const setFechaFinSeguro = (nueva) => {
     if (!nueva || !/^\d{4}-\d{2}-\d{2}$/.test(nueva)) { setFechaFin(nueva); return; }
+    // v62: si el año es < 2000, aún se está tecleando — dejar pasar sin avisar
+    const anio = parseInt(nueva.slice(0, 4), 10);
+    if (anio < 2000) { setFechaFin(nueva); return; }
     const v1 = validarFechaContraCalendario(nueva);
     if (!v1.ok) { alert(v1.motivo); return; }
     const v2 = validarRangoDuro(fechaInicio, nueva);
@@ -3760,12 +3767,38 @@ ${docHTML}
             </div>
           )}
 
-          {/* Festivos del calendario laboral */}
+          {/* Festivos del calendario laboral — v62: oculto si hay calendario del proyecto, con toggle */}
           {p && (() => {
+            const hayCalProy = proyectoActivoCtx?.__calendario?.dias && Object.keys(proyectoActivoCtx.__calendario.dias).length > 0;
+            // Si hay calendario del proyecto y el usuario no ha pedido verlos → botón para expandir
+            if (hayCalProy && !mostrarFestivosLegacy) {
+              return (
+                <div style={P}>
+                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                    <div style={ST}>▸ Festivos Calendario Laboral</div>
+                    <button
+                      onClick={() => setMostrarFestivosLegacy(true)}
+                      style={{ background:"transparent", color:"#b8864a", border:"1px solid #b8864a", padding:"3px 8px", borderRadius:3, cursor:"pointer", fontSize:9, fontFamily:"'Courier New',monospace", fontWeight:700, letterSpacing:"0.08em", textTransform:"uppercase" }}
+                    >Ver festivos legacy</button>
+                  </div>
+                  <div style={{ fontSize:10, color:"#888", padding:"10px 0 4px", fontFamily:"'Courier New',monospace", lineHeight:1.5 }}>
+                    Los festivos ya se gestionan desde el calendario del proyecto (marcados como trabajados). Este panel es solo para casos excepcionales.
+                  </div>
+                </div>
+              );
+            }
             const festsRango = festivosEnRango(fechaInicio, fechaFin);
             if (festsRango.length === 0) return (
               <div style={P}>
-                <div style={ST}>▸ Festivos Calendario Laboral</div>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                  <div style={ST}>▸ Festivos Calendario Laboral</div>
+                  {hayCalProy && (
+                    <button
+                      onClick={() => setMostrarFestivosLegacy(false)}
+                      style={{ background:"transparent", color:"#888", border:"1px solid #ccc", padding:"3px 8px", borderRadius:3, cursor:"pointer", fontSize:9, fontFamily:"'Courier New',monospace" }}
+                    >Ocultar</button>
+                  )}
+                </div>
                 <div style={{ fontSize:10, color:"#888", textAlign:"center", padding:"12px 0", fontFamily:"'Courier New',monospace" }}>
                   No hay festivos oficiales en este período
                 </div>
@@ -3773,7 +3806,15 @@ ${docHTML}
             );
             return (
               <div style={P}>
-                <div style={ST}>▸ Festivos Calendario Laboral</div>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                  <div style={ST}>▸ Festivos Calendario Laboral</div>
+                  {hayCalProy && (
+                    <button
+                      onClick={() => setMostrarFestivosLegacy(false)}
+                      style={{ background:"transparent", color:"#888", border:"1px solid #ccc", padding:"3px 8px", borderRadius:3, cursor:"pointer", fontSize:9, fontFamily:"'Courier New',monospace" }}
+                    >Ocultar</button>
+                  )}
+                </div>
                 <div style={{ fontSize:9, color:"#888", fontFamily:"'Courier New',monospace", marginBottom:10, lineHeight:1.4 }}>
                   Activa sólo los festivos que el trabajador efectivamente trabajó. Cada activación suma +1 al contador del mes correspondiente.
                 </div>
