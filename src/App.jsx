@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v62";
+const APP_VERSION = "v63";
 
 // v54: Festivos por defecto (fallback si Supabase falla). El array activo se
 // rellena desde Supabase en el arranque; ver cargarFestivosSupabase()
@@ -56,13 +56,21 @@ function festivosEnRango(fechaInicio, fechaFin) {
 // v59: Helpers para trabajar con el calendario del proyecto en 45H/40H
 // Cuenta días con una propiedad concreta dentro de [inicio, fin] agrupados por mes.
 // Devuelve un objeto { "YYYY-MM": N }
-function contarDiasCalendarioPorMes(calendario, propiedad, fechaInicio, fechaFin) {
+// v63: si contamos "laboral" o "rodaje", excluir los que ADEMÁS son festivo (aunque sea festivo trabajado o no)
+// y también excluir los que son vacaciones (el trabajador no está trabajando esos días)
+function contarDiasCalendarioPorMes(calendario, propiedad, fechaInicio, fechaFin, festivosComunidadFechas = []) {
   const resultado = {};
   if (!calendario || !calendario.dias) return resultado;
+  const setFest = new Set(festivosComunidadFechas || []);
   const dias = calendario.dias;
   for (const [fecha, info] of Object.entries(dias)) {
     if (fecha < fechaInicio || fecha > fechaFin) continue;
     if (!info || !info[propiedad]) continue;
+    // v63: si estamos contando laborales o rodaje, excluir festivos (se cuentan aparte como festivo trabajado)
+    if (propiedad === "laboral" || propiedad === "rodaje") {
+      if (setFest.has(fecha)) continue;
+      if (info.vacaciones) continue; // el trabajador de vacaciones no cuenta esas HX
+    }
     const ym = fecha.slice(0, 7);
     resultado[ym] = (resultado[ym] || 0) + 1;
   }
@@ -939,7 +947,7 @@ const BadgeBrutos = ({ size = "normal" }) => {
 };
 const LS = { display: "block", fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#555", marginBottom: 6, fontFamily: "'Courier New', monospace" };
 
-function Field({ label, value, onChange, type = "number", prefix, hint, small, readOnly, lockHint, min, max }) {
+function Field({ label, value, onChange, onBlur, type = "number", prefix, hint, small, readOnly, lockHint, min, max }) {
   return (
     <div style={{ marginBottom: small ? 8 : 14, minWidth: 0 }}>
       {label && (
@@ -972,7 +980,10 @@ function Field({ label, value, onChange, type = "number", prefix, hint, small, r
             cursor: readOnly ? "not-allowed" : "text",
           }}
           onFocus={e => { if (!readOnly) e.target.style.borderColor = "#c8a96e"; }}
-          onBlur={e  => { if (!readOnly) e.target.style.borderColor = "#2a2a2a"; }}
+          onBlur={e  => {
+            if (!readOnly) e.target.style.borderColor = "#2a2a2a";
+            if (onBlur) onBlur(e.target.value);
+          }}
         />
       </div>
       {hint && <p style={{ margin: "3px 0 0", fontSize: 9, color: "#777", fontFamily: "'Courier New', monospace" }}>{hint}</p>}
@@ -2906,6 +2917,19 @@ function App45({ modoTab = "iruna45" }) {
   const [indemAcumulada,   setIndemAcumulada]  = useState(false);
   const [hxPorRodaje40,    setHxPorRodaje40]   = useState(false); // v59: solo 40H, 1 HX por día de rodaje del calendario
   const [mostrarFestivosLegacy, setMostrarFestivosLegacy] = useState(false); // v62: panel viejo festivos oculto por defecto si hay calendario
+  const [festivosComunidadCal, setFestivosComunidadCal] = useState([]); // v63: fechas de festivos de la comunidad del calendario del proyecto
+
+  // v63: cargar festivos de la comunidad del calendario del proyecto activo
+  useEffect(() => {
+    (async () => {
+      const cal = proyectoActivoCtx?.__calendario;
+      if (!cal?.comunidad) { setFestivosComunidadCal([]); return; }
+      try {
+        const lista = await listarFestivosSupabase(cal.comunidad);
+        setFestivosComunidadCal((lista || []).map(f => f.fecha));
+      } catch { setFestivosComunidadCal([]); }
+    })();
+  }, [proyectoActivoCtx?.__calendario?.id, proyectoActivoCtx?.__calendario?.comunidad]);
   const [plusHerramienta,  setPlusHerramienta] = useState({ importe: 0, modo: "mes" });
   const [plusCoche,        setPlusCoche]       = useState({ importe: 0, modo: "mes" });
   const [plusVivienda,     setPlusVivienda]    = useState({ importe: 0, modo: "mes" });
@@ -2930,16 +2954,17 @@ function App45({ modoTab = "iruna45" }) {
 
       // v59: si hay calendario, autorrellenar horas y festivos desde el calendario del proyecto
       if (hayCalendario) {
-        // v59: en 45H usamos días laborales. En 40H usamos días de rodaje SOLO si el checkbox está activo.
+        // v63: en 45H usamos días laborales (excluyendo festivos y vacaciones).
+        // En 40H usamos días de rodaje SOLO si el checkbox está activo (también excluye festivos y vacaciones).
         let contadoresHoras;
         if (es40h) {
           if (hxPorRodaje40) {
-            contadoresHoras = contarDiasCalendarioPorMes(cal, "rodaje", fechaInicio, fechaFin);
+            contadoresHoras = contarDiasCalendarioPorMes(cal, "rodaje", fechaInicio, fechaFin, festivosComunidadCal);
           } else {
             contadoresHoras = {}; // no auto-rellenar
           }
         } else {
-          contadoresHoras = contarDiasCalendarioPorMes(cal, "laboral", fechaInicio, fechaFin);
+          contadoresHoras = contarDiasCalendarioPorMes(cal, "laboral", fechaInicio, fechaFin, festivosComunidadCal);
         }
         const nuevasHoras = mapearContadoresADesglose(p.desglose, contadoresHoras);
 
@@ -2953,6 +2978,16 @@ function App45({ modoTab = "iruna45" }) {
         }
         const nuevosFestivos = mapearContadoresADesglose(p.desglose, festTrabajadosPorMes);
 
+        // v63: vacaciones del calendario por mes → vacDiasPorMes
+        const vacacionesPorMes = {};
+        for (const [fecha, info] of Object.entries(cal.dias || {})) {
+          if (fecha < fechaInicio || fecha > fechaFin) continue;
+          if (!info?.vacaciones) continue;
+          const ym = fecha.slice(0, 7);
+          vacacionesPorMes[ym] = (vacacionesPorMes[ym] || 0) + 1;
+        }
+        const nuevasVac = mapearContadoresADesglose(p.desglose, vacacionesPorMes);
+
         // En 40H sin checkbox: no tocamos horas (deja lo que había o vacío)
         if (es40h && !hxPorRodaje40) {
           setHorasPorMes(prev => Array.from({ length: n }, (_, i) => prev[i] ?? 0));
@@ -2960,7 +2995,7 @@ function App45({ modoTab = "iruna45" }) {
           setHorasPorMes(nuevasHoras);
         }
         setFestivosPorMes(nuevosFestivos);
-        setVacDiasPorMes(prev => Array.from({ length: n }, (_, i) => prev[i] ?? 0));
+        setVacDiasPorMes(nuevasVac);
         setComidaDiasPorMes(prev => Array.from({ length: n }, (_, i) => prev[i] ?? null));
       } else {
         // Comportamiento original si no hay calendario
@@ -2972,7 +3007,7 @@ function App45({ modoTab = "iruna45" }) {
         setComidaDiasPorMes(prev => Array.from({ length: n }, (_, i) => prev[i] ?? null));
       }
     }
-  }, [fechaInicio, fechaFin, proyectoActivoCtx?.__calendario?.id, es40h, hxPorRodaje40]);
+  }, [fechaInicio, fechaFin, proyectoActivoCtx?.__calendario?.id, es40h, hxPorRodaje40, festivosComunidadCal]);
 
   // v61: cuando llega el calendario del proyecto, precargar fechas si el usuario NO ha tocado nada
   // (para evitar sobrescribir un perfil cargado o cambios manuales)
@@ -3021,28 +3056,38 @@ function App45({ modoTab = "iruna45" }) {
   };
 
   const setFechaInicioSeguro = (nueva) => {
-    // Si el input está a medio teclear (año incompleto), lo dejamos pasar sin validar
-    if (!nueva || !/^\d{4}-\d{2}-\d{2}$/.test(nueva)) { setFechaInicio(nueva); return; }
-    // v62: si el año es < 2000, aún se está tecleando (0027, 0201...) — dejar pasar sin avisar
-    const anio = parseInt(nueva.slice(0, 4), 10);
-    if (anio < 2000) { setFechaInicio(nueva); return; }
-    const v1 = validarFechaContraCalendario(nueva);
-    if (!v1.ok) { alert(v1.motivo); return; }
-    const v2 = validarRangoDuro(nueva, fechaFin);
-    if (!v2.ok) { alert(v2.motivo); return; }
+    // v63: onChange nunca bloquea (permite escribir libremente). La validación se hace en onBlur.
     setFechaInicio(nueva);
   };
 
   const setFechaFinSeguro = (nueva) => {
-    if (!nueva || !/^\d{4}-\d{2}-\d{2}$/.test(nueva)) { setFechaFin(nueva); return; }
-    // v62: si el año es < 2000, aún se está tecleando — dejar pasar sin avisar
-    const anio = parseInt(nueva.slice(0, 4), 10);
-    if (anio < 2000) { setFechaFin(nueva); return; }
-    const v1 = validarFechaContraCalendario(nueva);
-    if (!v1.ok) { alert(v1.motivo); return; }
-    const v2 = validarRangoDuro(fechaInicio, nueva);
-    if (!v2.ok) { alert(v2.motivo); return; }
     setFechaFin(nueva);
+  };
+
+  // v63: validar al perder el foco (blur). Si falla, avisar y revertir a valor válido más cercano.
+  const [fechaInicioAnterior, setFechaInicioAnterior] = useState(fechaInicio);
+  const [fechaFinAnterior, setFechaFinAnterior] = useState(fechaFin);
+
+  const validarFechaInicioBlur = (nueva) => {
+    if (!nueva || !/^\d{4}-\d{2}-\d{2}$/.test(nueva)) { setFechaInicio(fechaInicioAnterior); return; }
+    const anio = parseInt(nueva.slice(0, 4), 10);
+    if (anio < 2000 || anio > 2100) { alert("Año fuera de rango razonable"); setFechaInicio(fechaInicioAnterior); return; }
+    const v1 = validarFechaContraCalendario(nueva);
+    if (!v1.ok) { alert(v1.motivo); setFechaInicio(fechaInicioAnterior); return; }
+    const v2 = validarRangoDuro(nueva, fechaFin);
+    if (!v2.ok) { alert(v2.motivo); setFechaInicio(fechaInicioAnterior); return; }
+    setFechaInicioAnterior(nueva);
+  };
+
+  const validarFechaFinBlur = (nueva) => {
+    if (!nueva || !/^\d{4}-\d{2}-\d{2}$/.test(nueva)) { setFechaFin(fechaFinAnterior); return; }
+    const anio = parseInt(nueva.slice(0, 4), 10);
+    if (anio < 2000 || anio > 2100) { alert("Año fuera de rango razonable"); setFechaFin(fechaFinAnterior); return; }
+    const v1 = validarFechaContraCalendario(nueva);
+    if (!v1.ok) { alert(v1.motivo); setFechaFin(fechaFinAnterior); return; }
+    const v2 = validarRangoDuro(fechaInicio, nueva);
+    if (!v2.ok) { alert(v2.motivo); setFechaFin(fechaFinAnterior); return; }
+    setFechaFinAnterior(nueva);
   };
 
   const p = periodo;
@@ -3717,12 +3762,12 @@ ${docHTML}
             )}
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, overflow:"hidden" }}>
               <Field
-                label="Inicio" value={fechaInicio} onChange={setFechaInicioSeguro} type="date" hint="Primer día"
+                label="Inicio" value={fechaInicio} onChange={setFechaInicioSeguro} onBlur={validarFechaInicioBlur} type="date" hint="Primer día"
                 min={proyectoActivoCtx?.__calendario?.fecha_inicio || undefined}
                 max={proyectoActivoCtx?.__calendario?.fecha_fin || undefined}
               />
               <Field
-                label="Fin" value={fechaFin} onChange={setFechaFinSeguro} type="date" hint="Último día"
+                label="Fin" value={fechaFin} onChange={setFechaFinSeguro} onBlur={validarFechaFinBlur} type="date" hint="Último día"
                 min={proyectoActivoCtx?.__calendario?.fecha_inicio || undefined}
                 max={proyectoActivoCtx?.__calendario?.fecha_fin || undefined}
               />
@@ -3787,7 +3832,10 @@ ${docHTML}
                 </div>
               );
             }
-            const festsRango = festivosEnRango(fechaInicio, fechaFin);
+            // v63: filtrar por la comunidad del calendario del proyecto (si existe)
+            const comCal = proyectoActivoCtx?.__calendario?.comunidad;
+            let festsRango = festivosEnRango(fechaInicio, fechaFin);
+            if (comCal) festsRango = festsRango.filter(f => f.comunidad === comCal);
             if (festsRango.length === 0) return (
               <div style={P}>
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
@@ -8239,7 +8287,7 @@ function PanelFestivos({ usuarioActual, onCerrar, onCambios }) {
       if (Array.isArray(lista) && lista.length > 0) {
         const bilbao = lista.filter(f => f.comunidad === "bilbao");
         if (bilbao.length > 0) {
-          FESTIVOS_BILBAO = bilbao.map(f => ({ fecha: f.fecha, nombre: f.nombre, tipo: f.tipo || "nacional" }));
+          FESTIVOS_BILBAO = lista.map(f => ({ fecha: f.fecha, nombre: f.nombre, tipo: f.tipo || "nacional", comunidad: f.comunidad || "bilbao" }));
         }
       }
     } catch (err) { setError(err.message); }
@@ -8726,6 +8774,7 @@ export default function App() {
           fecha: f.fecha,
           nombre: f.nombre,
           tipo: f.tipo || "nacional",
+          comunidad: f.comunidad || "bilbao",
         }));
       }
     })();
