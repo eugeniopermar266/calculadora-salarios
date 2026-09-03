@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v64";
+const APP_VERSION = "v65";
 
 // v54: Festivos por defecto (fallback si Supabase falla). El array activo se
 // rellena desde Supabase en el arranque; ver cargarFestivosSupabase()
@@ -56,8 +56,10 @@ function festivosEnRango(fechaInicio, fechaFin) {
 // v59: Helpers para trabajar con el calendario del proyecto en 45H/40H
 // Cuenta días con una propiedad concreta dentro de [inicio, fin] agrupados por mes.
 // Devuelve un objeto { "YYYY-MM": N }
-// v63: si contamos "laboral" o "rodaje", excluir los que ADEMÁS son festivo (aunque sea festivo trabajado o no)
-// y también excluir los que son vacaciones (el trabajador no está trabajando esos días)
+// v63/v65: si contamos "laboral" o "rodaje":
+//   - excluir festivos NO trabajados (el trabajador no trabaja ese día)
+//   - incluir festivos SÍ trabajados (el trabajador sí trabaja, cuentan como día laboral con su HX)
+//   - excluir vacaciones (el trabajador no está)
 function contarDiasCalendarioPorMes(calendario, propiedad, fechaInicio, fechaFin, festivosComunidadFechas = []) {
   const resultado = {};
   if (!calendario || !calendario.dias) return resultado;
@@ -66,10 +68,10 @@ function contarDiasCalendarioPorMes(calendario, propiedad, fechaInicio, fechaFin
   for (const [fecha, info] of Object.entries(dias)) {
     if (fecha < fechaInicio || fecha > fechaFin) continue;
     if (!info || !info[propiedad]) continue;
-    // v63: si estamos contando laborales o rodaje, excluir festivos (se cuentan aparte como festivo trabajado)
     if (propiedad === "laboral" || propiedad === "rodaje") {
-      if (setFest.has(fecha)) continue;
-      if (info.vacaciones) continue; // el trabajador de vacaciones no cuenta esas HX
+      // v65: solo excluir festivos NO trabajados (los trabajados sí cuentan como día laboral)
+      if (setFest.has(fecha) && !info.festivo_trabajado) continue;
+      if (info.vacaciones) continue;
     }
     const ym = fecha.slice(0, 7);
     resultado[ym] = (resultado[ym] || 0) + 1;
