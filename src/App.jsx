@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v60";
+const APP_VERSION = "v61";
 
 // v54: Festivos por defecto (fallback si Supabase falla). El array activo se
 // rellena desde Supabase en el arranque; ver cargarFestivosSupabase()
@@ -737,6 +737,13 @@ function calcularPeriodo(fechaInicio, fechaFin) {
   const inicio = new Date(fechaInicio + "T00:00:00");
   const fin    = new Date(fechaFin    + "T00:00:00");
   if (fin <= inicio) return null;
+  // v61: salvaguarda contra fechas absurdas (typos que causan cuelgues)
+  if (isNaN(inicio.getTime()) || isNaN(fin.getTime())) return null;
+  const diffMeses = (fin.getFullYear() - inicio.getFullYear()) * 12 + (fin.getMonth() - inicio.getMonth());
+  if (diffMeses > 30) {
+    console.warn(`calcularPeriodo: rango demasiado largo (${diffMeses} meses), rechazado`);
+    return null;
+  }
 
   const diaInicio  = inicio.getDate();
   const mesInicio  = inicio.getMonth();
@@ -2889,8 +2896,8 @@ function App45({ modoTab = "iruna45" }) {
   const [horasRef,         setHorasRef]        = useState(22);
   const [modoInverso45,    setModoInverso45]   = useState(false);
   const [objetivoSemanal45,setObjetivoSemanal45]=useState(1500);
-  const [fechaInicio,      setFechaInicio]     = useState("2026-01-05");
-  const [fechaFin,         setFechaFin]        = useState("2026-03-20");
+  const [fechaInicio,      setFechaInicio]     = useState(proyectoActivoCtx?.__calendario?.fecha_inicio || "2026-01-05");
+  const [fechaFin,         setFechaFin]        = useState(proyectoActivoCtx?.__calendario?.fecha_fin || "2026-03-20");
   const [horasPorMes,      setHorasPorMes]     = useState([]);
   const [vacDiasPorMes,    setVacDiasPorMes]   = useState([]);
   const [festivosPorMes,   setFestivosPorMes]  = useState([]);
@@ -2965,6 +2972,71 @@ function App45({ modoTab = "iruna45" }) {
       }
     }
   }, [fechaInicio, fechaFin, proyectoActivoCtx?.__calendario?.id, es40h, hxPorRodaje40]);
+
+  // v61: cuando llega el calendario del proyecto, precargar fechas si el usuario NO ha tocado nada
+  // (para evitar sobrescribir un perfil cargado o cambios manuales)
+  const [fechasInicializadasDesdeCal, setFechasInicializadasDesdeCal] = useState(false);
+  useEffect(() => {
+    const cal = proyectoActivoCtx?.__calendario;
+    if (!cal || !cal.fecha_inicio || !cal.fecha_fin) return;
+    if (fechasInicializadasDesdeCal) return;
+    // Solo si las fechas siguen siendo las de por defecto (no las han cambiado)
+    if (fechaInicio === "2026-01-05" && fechaFin === "2026-03-20") {
+      setFechaInicio(cal.fecha_inicio);
+      setFechaFin(cal.fecha_fin);
+      setFechasInicializadasDesdeCal(true);
+    }
+  }, [proyectoActivoCtx?.__calendario?.id]);
+
+  // v61: validación segura de fechas — evita cuelgues por typos (ej. año 22026) y respeta rango del calendario
+  const RANGO_MAX_ANIOS = 2; // límite duro entre inicio y fin
+
+  const validarFechaContraCalendario = (nuevaFecha) => {
+    const cal = proyectoActivoCtx?.__calendario;
+    if (!cal || !cal.fecha_inicio || !cal.fecha_fin) return { ok: true };
+    if (nuevaFecha < cal.fecha_inicio || nuevaFecha > cal.fecha_fin) {
+      return { ok: false, motivo: `La fecha está fuera del rango del calendario (${cal.fecha_inicio} → ${cal.fecha_fin})` };
+    }
+    return { ok: true };
+  };
+
+  const validarRangoDuro = (fIni, fFin) => {
+    if (!fIni || !fFin) return { ok: true };
+    // Formato válido YYYY-MM-DD
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(fIni) || !/^\d{4}-\d{2}-\d{2}$/.test(fFin)) return { ok: true }; // aún tecleando
+    const anioI = parseInt(fIni.slice(0, 4), 10);
+    const anioF = parseInt(fFin.slice(0, 4), 10);
+    if (anioI < 2000 || anioI > 2100) return { ok: false, motivo: `Año de inicio fuera de rango razonable (${anioI})` };
+    if (anioF < 2000 || anioF > 2100) return { ok: false, motivo: `Año de fin fuera de rango razonable (${anioF})` };
+    if (fIni > fFin) return { ok: false, motivo: "La fecha de inicio no puede ser posterior a la de fin" };
+    const dI = new Date(fIni + "T12:00:00");
+    const dF = new Date(fFin + "T12:00:00");
+    const diffMs = dF - dI;
+    const diffAnios = diffMs / (365.25 * 24 * 60 * 60 * 1000);
+    if (diffAnios > RANGO_MAX_ANIOS) {
+      return { ok: false, motivo: `El rango entre inicio y fin supera los ${RANGO_MAX_ANIOS} años (posible error de tecleo)` };
+    }
+    return { ok: true };
+  };
+
+  const setFechaInicioSeguro = (nueva) => {
+    // Si el input está a medio teclear (año incompleto), lo dejamos pasar sin validar rango duro
+    if (!nueva || !/^\d{4}-\d{2}-\d{2}$/.test(nueva)) { setFechaInicio(nueva); return; }
+    const v1 = validarFechaContraCalendario(nueva);
+    if (!v1.ok) { alert(v1.motivo); return; }
+    const v2 = validarRangoDuro(nueva, fechaFin);
+    if (!v2.ok) { alert(v2.motivo); return; }
+    setFechaInicio(nueva);
+  };
+
+  const setFechaFinSeguro = (nueva) => {
+    if (!nueva || !/^\d{4}-\d{2}-\d{2}$/.test(nueva)) { setFechaFin(nueva); return; }
+    const v1 = validarFechaContraCalendario(nueva);
+    if (!v1.ok) { alert(v1.motivo); return; }
+    const v2 = validarRangoDuro(fechaInicio, nueva);
+    if (!v2.ok) { alert(v2.motivo); return; }
+    setFechaFin(nueva);
+  };
 
   const p = periodo;
 
@@ -3638,12 +3710,12 @@ ${docHTML}
             )}
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, overflow:"hidden" }}>
               <Field
-                label="Inicio" value={fechaInicio} onChange={setFechaInicio} type="date" hint="Primer día"
+                label="Inicio" value={fechaInicio} onChange={setFechaInicioSeguro} type="date" hint="Primer día"
                 min={proyectoActivoCtx?.__calendario?.fecha_inicio || undefined}
                 max={proyectoActivoCtx?.__calendario?.fecha_fin || undefined}
               />
               <Field
-                label="Fin" value={fechaFin} onChange={setFechaFin} type="date" hint="Último día"
+                label="Fin" value={fechaFin} onChange={setFechaFinSeguro} type="date" hint="Último día"
                 min={proyectoActivoCtx?.__calendario?.fecha_inicio || undefined}
                 max={proyectoActivoCtx?.__calendario?.fecha_fin || undefined}
               />
