@@ -15,7 +15,10 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v72";
+const APP_VERSION = "v73";
+
+// v73: importe fijo por jornada especial (se paga POR ENCIMA del salario pactado)
+const IMPORTE_JORNADA_ESPECIAL = 20;
 
 // v54: Festivos por defecto (fallback si Supabase falla). El array activo se
 // rellena desde Supabase en el arranque; ver cargarFestivosSupabase()
@@ -1880,37 +1883,41 @@ function TablaMeses({ porMes, vacAcumulada, indemAcumulada, horasAcumuladas, com
 }
 
 // ─── INPUTS POR MES (horas extra y días vacaciones) ─────────────────────────
-function InputsPorMes({ desglose, horasPorMes, setHorasPorMes, vacDiasPorMes, setVacDiasPorMes, festivosPorMes, setFestivosPorMes }) {
+function InputsPorMes({ desglose, horasPorMes, setHorasPorMes, vacDiasPorMes, setVacDiasPorMes, festivosPorMes, setFestivosPorMes, jornadasEspecialesPorMes, setJornadasEspecialesPorMes }) {
   if (!desglose || desglose.length === 0) return null;
 
   const setH = (i,v) => { const a=[...horasPorMes];   a[i]=v; setHorasPorMes(a); };
   const setV = (i,v) => { const a=[...vacDiasPorMes]; a[i]=v; setVacDiasPorMes(a); };
   const setF = (i,v) => { const a=[...(festivosPorMes||[])]; a[i]=v; setFestivosPorMes(a); };
+  const setJE = (i,v) => { const a=[...(jornadasEspecialesPorMes||[])]; a[i]=v; setJornadasEspecialesPorMes(a); };
 
   const totalH = horasPorMes.reduce((s,v)=>s+(v||0),0);
   const totalV = vacDiasPorMes.reduce((s,v)=>s+(v||0),0);
   const totalF = (festivosPorMes||[]).reduce((s,v)=>s+(v||0),0);
+  const totalJE = (jornadasEspecialesPorMes||[]).reduce((s,v)=>s+(v||0),0);
   const hasFest = !!setFestivosPorMes;
+  const hasJE = !!setJornadasEspecialesPorMes;
 
-  const cols = hasFest ? "1fr 56px 56px 56px" : "1fr 70px 70px";
+  // v73: si hay JE, añadir columna
+  const cols = hasFest && hasJE ? "1fr 56px 56px 56px 56px" : hasFest ? "1fr 56px 56px 56px" : "1fr 70px 70px";
 
   return (
     <div>
       <div style={{ display:"grid", gridTemplateColumns:cols, gap:6, marginBottom:12, padding:"0 2px 6px", borderBottom:"1px solid #eae7e2" }}>
-        <div style={{ fontSize:9, color:"#888", letterSpacing:"0.12em", textTransform:"uppercase", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontWeight:700 }}>Mes</div>
-        <div style={{ fontSize:9, color:"#3a6090", letterSpacing:"0.1em", textTransform:"uppercase", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", textAlign:"center", fontWeight:700 }}>H.Ext</div>
-        <div style={{ fontSize:9, color:"#907060", letterSpacing:"0.1em", textTransform:"uppercase", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", textAlign:"center", fontWeight:700 }}>Vac</div>
-        {hasFest && <div style={{ fontSize:9, color:"#6a4a8a", letterSpacing:"0.1em", textTransform:"uppercase", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", textAlign:"center", fontWeight:700 }}>Fest</div>}
+        <div style={{ fontSize:9, color:"#888", letterSpacing:"0.12em", textTransform:"uppercase", fontFamily:"'Courier Prime', 'Courier New', monospace", fontWeight:700 }}>Mes</div>
+        <div style={{ fontSize:9, color:"#3a6090", letterSpacing:"0.1em", textTransform:"uppercase", fontFamily:"'Courier Prime', 'Courier New', monospace", textAlign:"center", fontWeight:700 }}>H.Ext</div>
+        {hasJE && <div style={{ fontSize:9, color:"#8a1e4a", letterSpacing:"0.1em", textTransform:"uppercase", fontFamily:"'Courier Prime', 'Courier New', monospace", textAlign:"center", fontWeight:700 }} title="Jornadas Especiales">J.Esp</div>}
+        <div style={{ fontSize:9, color:"#907060", letterSpacing:"0.1em", textTransform:"uppercase", fontFamily:"'Courier Prime', 'Courier New', monospace", textAlign:"center", fontWeight:700 }}>Vac</div>
+        {hasFest && <div style={{ fontSize:9, color:"#6a4a8a", letterSpacing:"0.1em", textTransform:"uppercase", fontFamily:"'Courier Prime', 'Courier New', monospace", textAlign:"center", fontWeight:700 }}>Fest</div>}
       </div>
 
       {desglose.map((d,i) => {
-        // Separar "enero de 2026" en mes y año para mostrarlos en 2 líneas
         const partes = d.mes.split(" de ");
         const mesNombre = partes[0] || d.mes;
         const anio = partes[1] || "";
         return (
         <div key={i} style={{ display:"grid", gridTemplateColumns:cols, gap:6, marginBottom:8, alignItems:"center" }}>
-          <div style={{ fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", lineHeight:1.25, paddingRight:4, paddingTop:11 }}>
+          <div style={{ fontFamily:"'Courier Prime', 'Courier New', monospace", lineHeight:1.25, paddingRight:4, paddingTop:11 }}>
             <div style={{ fontSize:10.5, color:"#1a1a1a", fontWeight:600, textTransform:"capitalize", letterSpacing:"0.02em" }}>
               {mesNombre}
             </div>
@@ -1922,12 +1929,11 @@ function InputsPorMes({ desglose, horasPorMes, setHorasPorMes, vacDiasPorMes, se
             const autoH = Math.round(d.semanasLaborables * 5);
             const valorActual = horasPorMes[i];
             const hasVal = valorActual !== undefined && valorActual !== null && valorActual !== "";
-            // Mostrar el valor real (que viene pre-rellenado con el estimado)
             const valorMostrar = hasVal ? valorActual : autoH;
             const esEstimadoOriginal = hasVal && valorActual === autoH;
             return (
               <div style={{ position:"relative", paddingTop:11 }}>
-                <div style={{ position:"absolute", top:0, left:0, right:0, fontSize:8, color: esEstimadoOriginal ? "#4a6a9a" : "#8aa0b8", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", letterSpacing:"0.05em", textAlign:"center", pointerEvents:"none", lineHeight:1, fontWeight: esEstimadoOriginal ? 700 : 400 }}>
+                <div style={{ position:"absolute", top:0, left:0, right:0, fontSize:8, color: esEstimadoOriginal ? "#4a6a9a" : "#8aa0b8", fontFamily:"'Courier Prime', 'Courier New', monospace", letterSpacing:"0.05em", textAlign:"center", pointerEvents:"none", lineHeight:1, fontWeight: esEstimadoOriginal ? 700 : 400 }}>
                   L-V · {autoH}d
                 </div>
                 <input type="number" min="0" step="0.5"
@@ -1939,21 +1945,28 @@ function InputsPorMes({ desglose, horasPorMes, setHorasPorMes, vacDiasPorMes, se
                     setHorasPorMes(a);
                   }}
                   title={`Estimado L-V: ${autoH}h (puedes modificarlo)`}
-                  style={{ background: esEstimadoOriginal?"#eef3f8":"#f0ede8", border:`1px solid ${esEstimadoOriginal?"#b8cce0":"#4a6a9a"}`, borderRadius:4, color:"#2a5a8a", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize:11, padding:"4px 4px", outline:"none", textAlign:"center", colorScheme:"light", minWidth:0, width:"100%", boxSizing:"border-box" }}
+                  style={{ background: esEstimadoOriginal?"#eef3f8":"#f0ede8", border:`1px solid ${esEstimadoOriginal?"#b8cce0":"#4a6a9a"}`, borderRadius:4, color:"#2a5a8a", fontFamily:"'Courier Prime', 'Courier New', monospace", fontSize:11, padding:"4px 4px", outline:"none", textAlign:"center", colorScheme:"light", minWidth:0, width:"100%", boxSizing:"border-box" }}
                   onFocus={e=>e.target.style.borderColor="#4a6a9a"} onBlur={e=>e.target.style.borderColor=esEstimadoOriginal?"#b8cce0":"#4a6a9a"} />
               </div>
             );
           })()}
+          {hasJE && <div style={{ paddingTop:11 }}>
+            <input type="number" min="0" step="1" value={(jornadasEspecialesPorMes||[])[i]||""} placeholder="0"
+              onChange={e=>setJE(i,parseFloat(e.target.value)||0)}
+              title="Jornadas especiales (cada una = 1 HX + 20€)"
+              style={{ background:"#fff0f6", border:"1px solid #f0b0d0", borderRadius:4, color:"#8a1e4a", fontFamily:"'Courier Prime', 'Courier New', monospace", fontSize:11, padding:"4px 4px", outline:"none", textAlign:"center", colorScheme:"light", minWidth:0, width:"100%", boxSizing:"border-box" }}
+              onFocus={e=>e.target.style.borderColor="#d63a7a"} onBlur={e=>e.target.style.borderColor="#f0b0d0"} />
+          </div>}
           <div style={{ paddingTop:11 }}>
             <input type="number" min="0" step="1" value={vacDiasPorMes[i]||""} placeholder="0"
               onChange={e=>setV(i,parseFloat(e.target.value)||0)}
-              style={{ background:"#f0ede8", border:"1px solid #e0c8b0", borderRadius:4, color:"#8a2a20", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize:11, padding:"4px 4px", outline:"none", textAlign:"center", colorScheme:"light", minWidth:0, width:"100%", boxSizing:"border-box" }}
+              style={{ background:"#f0ede8", border:"1px solid #e0c8b0", borderRadius:4, color:"#8a2a20", fontFamily:"'Courier Prime', 'Courier New', monospace", fontSize:11, padding:"4px 4px", outline:"none", textAlign:"center", colorScheme:"light", minWidth:0, width:"100%", boxSizing:"border-box" }}
               onFocus={e=>e.target.style.borderColor="#8a5030"} onBlur={e=>e.target.style.borderColor="#e0c8b0"} />
           </div>
           {hasFest && <div style={{ paddingTop:11 }}>
             <input type="number" min="0" step="1" value={(festivosPorMes||[])[i]||""} placeholder="0"
               onChange={e=>setF(i,parseFloat(e.target.value)||0)}
-              style={{ background:"#f0ede8", border:"1px solid #c8b0d8", borderRadius:4, color:"#6a3a9a", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize:11, padding:"4px 4px", outline:"none", textAlign:"center", colorScheme:"light", minWidth:0, width:"100%", boxSizing:"border-box" }}
+              style={{ background:"#f0ede8", border:"1px solid #c8b0d8", borderRadius:4, color:"#6a3a9a", fontFamily:"'Courier Prime', 'Courier New', monospace", fontSize:11, padding:"4px 4px", outline:"none", textAlign:"center", colorScheme:"light", minWidth:0, width:"100%", boxSizing:"border-box" }}
               onFocus={e=>e.target.style.borderColor="#8a5aaa"} onBlur={e=>e.target.style.borderColor="#c8b0d8"} />
           </div>}
         </div>
@@ -1961,16 +1974,17 @@ function InputsPorMes({ desglose, horasPorMes, setHorasPorMes, vacDiasPorMes, se
       })}
 
       <div style={{ display:"grid", gridTemplateColumns:cols, gap:6, marginTop:8, paddingTop:8, borderTop:"1px solid #e0ddd8" }}>
-        <div style={{ fontSize:9, color:"#777", textTransform:"uppercase", letterSpacing:"0.1em", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", display:"flex", alignItems:"center" }}>Total</div>
-        <div style={{ textAlign:"center", fontSize:12, fontWeight:700, color:"#2a5a8a", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>
+        <div style={{ fontSize:9, color:"#777", textTransform:"uppercase", letterSpacing:"0.1em", fontFamily:"'Courier Prime', 'Courier New', monospace", display:"flex", alignItems:"center" }}>Total</div>
+        <div style={{ textAlign:"center", fontSize:12, fontWeight:700, color:"#2a5a8a", fontFamily:"'Courier Prime', 'Courier New', monospace" }}>
           {desglose.reduce((s,d,i)=>{
             const v = horasPorMes[i];
             if (v === undefined || v === null || v === "") return s + Math.round(d.semanasLaborables * 5);
             return s + (v || 0);
           },0)}h
         </div>
-        <div style={{ textAlign:"center", fontSize:12, fontWeight:700, color:"#8a2a20", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>{totalV}d</div>
-        {hasFest && <div style={{ textAlign:"center", fontSize:12, fontWeight:700, color:"#6a3a9a", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>{totalF}d</div>}
+        {hasJE && <div style={{ textAlign:"center", fontSize:12, fontWeight:700, color:"#8a1e4a", fontFamily:"'Courier Prime', 'Courier New', monospace" }}>{totalJE}d</div>}
+        <div style={{ textAlign:"center", fontSize:12, fontWeight:700, color:"#8a2a20", fontFamily:"'Courier Prime', 'Courier New', monospace" }}>{totalV}d</div>
+        {hasFest && <div style={{ textAlign:"center", fontSize:12, fontWeight:700, color:"#6a3a9a", fontFamily:"'Courier Prime', 'Courier New', monospace" }}>{totalF}d</div>}
       </div>
     </div>
   );
@@ -2425,6 +2439,7 @@ function DocumentoImprimible({
   totFinal,
   totalVac45, totalIndem45,
   totalFestDias45, totalFestImport45,
+  totJEDias = 0, totJEImporte = 0, // v73: jornadas especiales
   plusHerramienta, plusCoche, plusVivienda, plusSeguroVida, plusComida,
   es40h = false,
   codigoContable = "",
@@ -2676,6 +2691,7 @@ function DocumentoImprimible({
               ...(es40h ? [] : [{ l: "PLUS ACT.", a: "right" }]),
               { l: "−VAC.D", a: "right" },
               { l: "FEST. €", a: "right" },
+              { l: "J.ESP €", a: "right" },
               { l: "PLUSES", a: "right" },
               { l: "COMIDA", a: "right" },
               { l: "TOTAL", a: "right", gold: true },
@@ -2716,6 +2732,7 @@ function DocumentoImprimible({
                 {!es40h && <td style={tdCell({ textAlign: "right", color: d.plusAct > 0 ? "#b07030" : "#bbb", fontWeight: d.plusAct > 0 ? 600 : 400 })}>{d.plusAct > 0 ? fmt(d.plusAct) : "—"}</td>}
                 <td style={tdCell({ textAlign: "right", color: vd > 0 ? "#8a2a20" : "#bbb" })}>{vd > 0 ? `−${fmt(vd)}` : "—"}</td>
                 <td style={tdCell({ textAlign: "right", color: fest > 0 ? "#6a3a9a" : "#bbb" })}>{fest > 0 ? fmt(fest) : "—"}</td>
+                <td style={tdCell({ textAlign: "right", color: (d.importeJE || 0) > 0 ? "#8a1e4a" : "#bbb" })}>{(d.importeJE || 0) > 0 ? fmt(d.importeJE) : "—"}</td>
                 <td style={tdCell({ textAlign: "right", color: plusesSinComida > 0 ? "#5a8a5a" : "#bbb" })}>{plusesSinComida > 0 ? fmt(plusesSinComida) : "—"}</td>
                 <td style={tdCell({ textAlign: "right", color: comida > 0 ? "#5a8a5a" : "#bbb" })}>{comida > 0 ? fmt(comida) : "—"}</td>
                 <td style={tdCell({ textAlign: "right", color: "#b8864a", fontWeight: 700 })}>{fmt(totalRow)}</td>
@@ -2739,6 +2756,7 @@ function DocumentoImprimible({
             {!es40h && <td style={tdCell({ background: "#fdf8f0", textAlign: "right", color: totPlus > 0 ? "#b07030" : "#bbb" })}>{totPlus > 0 ? fmt(totPlus) : "—"}</td>}
             <td style={tdCell({ background: "#fdf8f0", textAlign: "right", color: totVd > 0 ? "#8a2a20" : "#bbb" })}>{totVd > 0 ? `−${fmt(totVd)}` : "—"}</td>
             <td style={tdCell({ background: "#fdf8f0", textAlign: "right", color: totalFestImport45 > 0 ? "#6a3a9a" : "#bbb" })}>{totalFestImport45 > 0 ? fmt(totalFestImport45) : "—"}</td>
+            <td style={tdCell({ background: "#fdf8f0", textAlign: "right", color: totJEImporte > 0 ? "#8a1e4a" : "#bbb" })} title={totJEDias > 0 ? `${totJEDias} JE` : ""}>{totJEImporte > 0 ? fmt(totJEImporte) : "—"}</td>
             <td style={tdCell({ background: "#fdf8f0", textAlign: "right", color: "#5a8a5a" })}>
               {fmt(complementos45.reduce((s,c)=>s+(c.herramienta||0)+(c.coche||0)+(c.vivienda||0)+(c.seguroVida||0), 0))}
             </td>
@@ -2804,6 +2822,12 @@ function DocumentoImprimible({
             <tr>
               <td style={tdLabel}>+ Festivos trabajados ({totalFestDias45}d)</td>
               <td style={{ ...tdValue, textAlign: "right", color: "#6a3a9a", fontWeight: 700 }}>+ {fmtE(totalFestImport45)}</td>
+            </tr>
+          )}
+          {totJEDias > 0 && (
+            <tr>
+              <td style={tdLabel}>+ Jornadas especiales ({totJEDias}d)</td>
+              <td style={{ ...tdValue, textAlign: "right", color: "#8a1e4a", fontWeight: 700 }}>+ {fmtE(totJEImporte)}</td>
             </tr>
           )}
           <tr style={{ background: "#fdf8f0" }}>
@@ -2911,6 +2935,7 @@ function App45({ modoTab = "iruna45" }) {
   const [horasPorMes,      setHorasPorMes]     = useState([]);
   const [vacDiasPorMes,    setVacDiasPorMes]   = useState([]);
   const [festivosPorMes,   setFestivosPorMes]  = useState([]);
+  const [jornadasEspecialesPorMes, setJornadasEspecialesPorMes] = useState([]); // v73: JE por mes (editable)
   const [festivosActivos,  setFestivosActivos] = useState({});
   const [vacAcumulada,     setVacAcumulada]    = useState(false);
   const [indemAcumulada,   setIndemAcumulada]  = useState(false);
@@ -2932,7 +2957,7 @@ function App45({ modoTab = "iruna45" }) {
     })();
   }, [proyectoActivoCtx?.__calendario?.id, proyectoActivoCtx?.__calendario?.comunidad]);
 
-  // v71: recalcular horas/festivos/vacaciones desde el calendario y aplicar (sobrescribiendo)
+  // v71/v73: recalcular horas/JE/festivos/vacaciones desde el calendario y aplicar (sobrescribiendo)
   const aplicarCalendarioAhora = () => {
     const p = calcularPeriodo(fechaInicio, fechaFin);
     if (!p) return;
@@ -2940,26 +2965,24 @@ function App45({ modoTab = "iruna45" }) {
     if (!cal || !cal.dias) return;
     const n = p.desglose.length;
 
-    // Horas por mes (mismo cálculo que el auto-relleno)
+    // Horas por mes (SIN JE — las JE van aparte)
     let contadoresHoras;
     if (es40h) {
       if (hxPorRodaje40) {
         contadoresHoras = contarDiasCalendarioPorMes(cal, "rodaje", fechaInicio, fechaFin, festivosComunidadCal);
-        const especialesPorMes = contarDiasCalendarioPorMes(cal, "especial", fechaInicio, fechaFin, festivosComunidadCal);
-        for (const ym of Object.keys(especialesPorMes)) {
-          contadoresHoras[ym] = (contadoresHoras[ym] || 0) + especialesPorMes[ym];
-        }
       } else {
         contadoresHoras = {};
       }
     } else {
       contadoresHoras = contarDiasCalendarioPorMes(cal, "laboral", fechaInicio, fechaFin, festivosComunidadCal);
-      const especialesPorMes = contarDiasCalendarioPorMes(cal, "especial", fechaInicio, fechaFin, festivosComunidadCal);
-      for (const ym of Object.keys(especialesPorMes)) {
-        contadoresHoras[ym] = (contadoresHoras[ym] || 0) + especialesPorMes[ym];
-      }
     }
     const nuevasHoras = mapearContadoresADesglose(p.desglose, contadoresHoras);
+
+    // Jornadas especiales (aparte)
+    let contadoresJE;
+    if (es40h && !hxPorRodaje40) contadoresJE = {};
+    else contadoresJE = contarDiasCalendarioPorMes(cal, "especial", fechaInicio, fechaFin, festivosComunidadCal);
+    const nuevasJE = mapearContadoresADesglose(p.desglose, contadoresJE);
 
     // Festivos trabajados
     const festTrabajadosPorMes = {};
@@ -2982,9 +3005,10 @@ function App45({ modoTab = "iruna45" }) {
     const nuevasVac = mapearContadoresADesglose(p.desglose, vacacionesPorMes);
 
     if (es40h && !hxPorRodaje40) {
-      // no cambiar horas
+      // no cambiar horas ni JE
     } else {
       setHorasPorMes(nuevasHoras);
+      setJornadasEspecialesPorMes(nuevasJE);
     }
     setFestivosPorMes(nuevosFestivos);
     setVacDiasPorMes(nuevasVac);
@@ -2999,30 +3023,33 @@ function App45({ modoTab = "iruna45" }) {
     const p = calcularPeriodo(fechaInicio, fechaFin);
     if (!p) return false;
 
-    // Calcular lo esperado
+    // Calcular lo esperado (HX SIN JE)
     let contadoresHorasEsperados;
     if (es40h) {
       if (hxPorRodaje40) {
         contadoresHorasEsperados = contarDiasCalendarioPorMes(cal, "rodaje", fechaInicio, fechaFin, festivosComunidadCal);
-        const especialesPorMes = contarDiasCalendarioPorMes(cal, "especial", fechaInicio, fechaFin, festivosComunidadCal);
-        for (const ym of Object.keys(especialesPorMes)) {
-          contadoresHorasEsperados[ym] = (contadoresHorasEsperados[ym] || 0) + especialesPorMes[ym];
-        }
       } else {
-        contadoresHorasEsperados = null; // no comparamos horas
+        contadoresHorasEsperados = null;
       }
     } else {
       contadoresHorasEsperados = contarDiasCalendarioPorMes(cal, "laboral", fechaInicio, fechaFin, festivosComunidadCal);
-      const especialesPorMes = contarDiasCalendarioPorMes(cal, "especial", fechaInicio, fechaFin, festivosComunidadCal);
-      for (const ym of Object.keys(especialesPorMes)) {
-        contadoresHorasEsperados[ym] = (contadoresHorasEsperados[ym] || 0) + especialesPorMes[ym];
-      }
     }
 
     if (contadoresHorasEsperados !== null) {
       const horasEsperadas = mapearContadoresADesglose(p.desglose, contadoresHorasEsperados);
       for (let i = 0; i < horasEsperadas.length; i++) {
         if ((horasPorMes[i] || 0) !== (horasEsperadas[i] || 0)) return true;
+      }
+    }
+
+    // JE (aparte)
+    let contadoresJEEsperados;
+    if (es40h && !hxPorRodaje40) contadoresJEEsperados = null;
+    else contadoresJEEsperados = contarDiasCalendarioPorMes(cal, "especial", fechaInicio, fechaFin, festivosComunidadCal);
+    if (contadoresJEEsperados !== null) {
+      const jeEsperadas = mapearContadoresADesglose(p.desglose, contadoresJEEsperados);
+      for (let i = 0; i < jeEsperadas.length; i++) {
+        if ((jornadasEspecialesPorMes[i] || 0) !== (jeEsperadas[i] || 0)) return true;
       }
     }
 
@@ -3081,33 +3108,33 @@ function App45({ modoTab = "iruna45" }) {
       const cal = proyectoActivoCtx?.__calendario;
       const hayCalendario = cal && cal.dias && Object.keys(cal.dias).length > 0;
 
-      // v59: si hay calendario, autorrellenar horas y festivos desde el calendario del proyecto
+      // v59/v73: si hay calendario, autorrellenar horas, JE y festivos desde el calendario del proyecto
       if (hayCalendario) {
-        // v63/v70: en 45H usamos días laborales + jornadas especiales (cada JE = 1 HX adicional).
-        // En 40H usamos días de rodaje + jornadas especiales SOLO si el checkbox está activo.
+        // v73: las JE se cuentan APARTE (ya no se suman a horasPorMes). Van a jornadasEspecialesPorMes.
         let contadoresHoras;
         if (es40h) {
           if (hxPorRodaje40) {
-            // v70: rodaje + jornada especial suman HX
+            // 40H con checkbox: HX = días de rodaje (SIN JE, van aparte)
             contadoresHoras = contarDiasCalendarioPorMes(cal, "rodaje", fechaInicio, fechaFin, festivosComunidadCal);
-            const especialesPorMes = contarDiasCalendarioPorMes(cal, "especial", fechaInicio, fechaFin, festivosComunidadCal);
-            for (const ym of Object.keys(especialesPorMes)) {
-              contadoresHoras[ym] = (contadoresHoras[ym] || 0) + especialesPorMes[ym];
-            }
           } else {
             contadoresHoras = {}; // no auto-rellenar
           }
         } else {
-          // 45H: días laborales + jornadas especiales (cada JE es 1 HX adicional al laboral)
+          // 45H: HX = días laborales (SIN JE, van aparte)
           contadoresHoras = contarDiasCalendarioPorMes(cal, "laboral", fechaInicio, fechaFin, festivosComunidadCal);
-          const especialesPorMes = contarDiasCalendarioPorMes(cal, "especial", fechaInicio, fechaFin, festivosComunidadCal);
-          for (const ym of Object.keys(especialesPorMes)) {
-            contadoresHoras[ym] = (contadoresHoras[ym] || 0) + especialesPorMes[ym];
-          }
         }
         const nuevasHoras = mapearContadoresADesglose(p.desglose, contadoresHoras);
 
-        // Festivos trabajados por mes (aplica siempre, sea 45H o 40H)
+        // v73: Jornadas especiales aparte (aplican a 45H siempre y a 40H si el checkbox está activo)
+        let contadoresJE;
+        if (es40h && !hxPorRodaje40) {
+          contadoresJE = {}; // en 40H sin checkbox, no auto-rellenar JE
+        } else {
+          contadoresJE = contarDiasCalendarioPorMes(cal, "especial", fechaInicio, fechaFin, festivosComunidadCal);
+        }
+        const nuevasJE = mapearContadoresADesglose(p.desglose, contadoresJE);
+
+        // Festivos trabajados por mes (aplica siempre)
         const festTrabajadosPorMes = {};
         for (const [fecha, info] of Object.entries(cal.dias || {})) {
           if (fecha < fechaInicio || fecha > fechaFin) continue;
@@ -3130,8 +3157,10 @@ function App45({ modoTab = "iruna45" }) {
         // En 40H sin checkbox: no tocamos horas (deja lo que había o vacío)
         if (es40h && !hxPorRodaje40) {
           setHorasPorMes(prev => Array.from({ length: n }, (_, i) => prev[i] ?? 0));
+          setJornadasEspecialesPorMes(prev => Array.from({ length: n }, (_, i) => prev[i] ?? 0));
         } else {
           setHorasPorMes(nuevasHoras);
+          setJornadasEspecialesPorMes(nuevasJE);
         }
         setFestivosPorMes(nuevosFestivos);
         setVacDiasPorMes(nuevasVac);
@@ -3144,6 +3173,7 @@ function App45({ modoTab = "iruna45" }) {
         }));
         setVacDiasPorMes(prev    => Array.from({ length: n }, (_, i) => prev[i] ?? 0));
         setComidaDiasPorMes(prev => Array.from({ length: n }, (_, i) => prev[i] ?? null));
+        setJornadasEspecialesPorMes(prev => Array.from({ length: n }, (_, i) => prev[i] ?? 0));
       }
     }
   }, [fechaInicio, fechaFin, proyectoActivoCtx?.__calendario?.id, es40h, hxPorRodaje40, festivosComunidadCal]);
@@ -3288,6 +3318,45 @@ function App45({ modoTab = "iruna45" }) {
     }
     return v || 0;
   };
+  // v73: Jornadas especiales — importe por mes
+  // Cada JE = 1 HX (festiva si el día es festivo trabajado, normal si no) + 20€ fijos
+  // Para saber cuántas caen en festivo, contamos por mes desde el calendario
+  const jeInfoPorMes = (() => {
+    const cal = proyectoActivoCtx?.__calendario;
+    if (!cal || !cal.dias) {
+      // Sin calendario: asumimos JE normal (no festiva). Solo el contador manual.
+      return (p?.desglose || []).map((d, i) => {
+        const totalJE = jornadasEspecialesPorMes[i] || 0;
+        return { totalJE, jeFestivas: 0, jeNormales: totalJE };
+      });
+    }
+    // Con calendario: contar por mes cuántas JE hay marcadas y cuántas de ellas caen en festivo trabajado
+    const setFest = new Set(festivosComunidadCal || []);
+    const jeFestivasPorMes = {};
+    for (const [fecha, info] of Object.entries(cal.dias || {})) {
+      if (fecha < fechaInicio || fecha > fechaFin) continue;
+      if (!info?.especial) continue;
+      if (setFest.has(fecha) && info.festivo_trabajado) {
+        const ym = fecha.slice(0, 7);
+        jeFestivasPorMes[ym] = (jeFestivasPorMes[ym] || 0) + 1;
+      }
+    }
+    return (p?.desglose || []).map((d, i) => {
+      const totalJE = jornadasEspecialesPorMes[i] || 0;
+      const ym = `${d.anio}-${String(d.mesNum + 1).padStart(2, "0")}`;
+      const jeFestivasCal = jeFestivasPorMes[ym] || 0;
+      const jeFestivas = Math.min(jeFestivasCal, totalJE); // no puede haber más festivas que totales
+      const jeNormales = totalJE - jeFestivas;
+      return { totalJE, jeFestivas, jeNormales };
+    });
+  })();
+
+  const importeJEPorMes = jeInfoPorMes.map(je => {
+    const importeHX = je.jeNormales * vHoraEx + je.jeFestivas * salarioDia * 1.75;
+    const importe20 = je.totalJE * IMPORTE_JORNADA_ESPECIAL;
+    return importeHX + importe20;
+  });
+
   const desglose45 = p ? p.desglose.map((d, i) => {
     const hMes      = horasParaMes(i, d);
     const esUltimo  = i === n - 1;
@@ -3301,9 +3370,11 @@ function App45({ modoTab = "iruna45" }) {
     const objetivo     = salario45efectivo * d.fraccion;
     const plusAct      = Math.max(0, objetivo - cobroNatural);
     const vdShow   = vacAcumulada ? (esUltimo ? totalVdImporte : 0) : (importeVdMes[i]||0);
-    const totalMes = base40 + vac40 + indem40 + cobroHx + plusAct - vdShow;
-    // v50: Vacación mostrada en pantalla = prorrateada − días disfrutados (para tabla Nómina por mes)
-    // El PDF sigue mostrando vac40 tal cual. Puede ser negativa si disfrutó más de lo prorrateado ese mes.
+    // v73: importe JE por mes (aparte del pool objetivo)
+    const importeJE = importeJEPorMes[i] || 0;
+    const totalJEDias = jeInfoPorMes[i]?.totalJE || 0;
+    const totalMes = base40 + vac40 + indem40 + cobroHx + plusAct - vdShow + importeJE;
+    // v50: Vacación mostrada en pantalla = prorrateada − días disfrutados
     const vacMostrar = vac40 - vdShow;
     return {
       mes: d.mes, desde: d.desde, hasta: d.hasta,
@@ -3311,6 +3382,7 @@ function App45({ modoTab = "iruna45" }) {
       semanasLab: d.semanasLaborables,
       hMes, base40, vac40, vacMostrar, indem40, cobroHx, plusAct,
       vdDias: vacDiasPorMes[i]||0, vdShow,
+      importeJE, totalJEDias, // v73
       objetivo, totalMes,
     };
   }) : [];
@@ -3323,6 +3395,8 @@ function App45({ modoTab = "iruna45" }) {
   const totPlus   = desglose45.reduce((s,d)=>s+d.plusAct,  0);
   const totVd     = desglose45.reduce((s,d)=>s+d.vdShow,   0);
   const totFinal  = desglose45.reduce((s,d)=>s+d.totalMes, 0);
+  const totJEDias = desglose45.reduce((s,d)=>s+(d.totalJEDias||0), 0); // v73
+  const totJEImporte = desglose45.reduce((s,d)=>s+(d.importeJE||0), 0); // v73
 
   const complementos45 = p ? p.desglose.map((d, i) => {
     const calcPlus = (plus) => !plus.importe ? 0 :
@@ -3398,6 +3472,7 @@ function App45({ modoTab = "iruna45" }) {
       ...(es40h ? [] : ["Plus Actividad €"]),
       "Vac. disfr. (días)","Vac. disfr. €",
       "Festivos (días)","Festivos €",
+      "Jorn. Especiales (días)","Jorn. Especiales €",
       "Plus Herramienta €","Plus Coche €","Plus Vivienda €",
       "Plus Seguro Vida €","Días comida","Plus Comida €",
       "Total mes (€)","Complementos mes (€)","Total mes + complementos (€)"
@@ -3419,13 +3494,15 @@ function App45({ modoTab = "iruna45" }) {
         decimal(d.vdShow),
         festivosPorMes[i] || 0,
         decimal(importeFestMes45[i] || 0),
+        d.totalJEDias || 0,
+        decimal(d.importeJE || 0),
         decimal(c.herramienta || 0),
         decimal(c.coche || 0),
         decimal(c.vivienda || 0),
         decimal(c.seguroVida || 0),
         c.diasComida || 0,
         decimal(c.comida || 0),
-        decimal(totalMesAjustado),
+        decimal(totalMesAjustado - (d.importeJE || 0)),
         decimal(c.total || 0),
         decimal(totalMesAjustado + (c.total || 0)),
       ].join(sep));
@@ -3440,6 +3517,7 @@ function App45({ modoTab = "iruna45" }) {
     if (totPlus > 0 && !es40h) lines.push(["Plus Actividad (€)", decimal(totPlus)].join(sep));
     if (totVd > 0)   lines.push([`− Vac. disfrutadas (${totalVdDias}d) €`, decimal(totVd)].join(sep));
     if (totalFestDias45 > 0) lines.push([`+ Festivos trabajados (${totalFestDias45}d) €`, decimal(totalFestImport45)].join(sep));
+    if (totJEDias > 0)       lines.push([`+ Jornadas especiales (${totJEDias}d) €`, decimal(totJEImporte)].join(sep));
     if (totalCompl > 0)      lines.push(["+ Complementos (€)", decimal(totalCompl)].join(sep));
     const totFinalAjustado = es40h ? (totFinal - (totPlus || 0)) : totFinal;
     lines.push(["TOTAL A PERCIBIR (€)", decimal(totFinalAjustado + totalFestImport45 + totalCompl)].join(sep));
@@ -3710,7 +3788,7 @@ ${docHTML}
             datosActuales={{
               proyecto, productora, nombre, puesto, codigoContable, esFijoDiscontinuo, hxPorRodaje40, salario45, horasRef, modoInverso45, objetivoSemanal45,
               fechaInicio, fechaFin, vacAcumulada, indemAcumulada,
-              horasPorMes, vacDiasPorMes, festivosPorMes, festivosActivos, comidaDiasPorMes,
+              horasPorMes, vacDiasPorMes, festivosPorMes, jornadasEspecialesPorMes, festivosActivos, comidaDiasPorMes,
               plusHerramienta, plusCoche, plusVivienda, plusSeguroVida, plusComida,
               // Snapshot de resultados calculados (para Coste Empresa)
               _calculado: {
@@ -3750,6 +3828,7 @@ ${docHTML}
               if (d.horasPorMes !== undefined) setHorasPorMes(d.horasPorMes);
               if (d.vacDiasPorMes !== undefined) setVacDiasPorMes(d.vacDiasPorMes);
               if (d.festivosPorMes !== undefined) setFestivosPorMes(d.festivosPorMes);
+              if (d.jornadasEspecialesPorMes !== undefined) setJornadasEspecialesPorMes(d.jornadasEspecialesPorMes);
               if (d.festivosActivos !== undefined) setFestivosActivos(d.festivosActivos);
               if (d.comidaDiasPorMes !== undefined) setComidaDiasPorMes(d.comidaDiasPorMes);
               if (d.plusHerramienta !== undefined) setPlusHerramienta(d.plusHerramienta);
@@ -3961,6 +4040,7 @@ ${docHTML}
                 horasPorMes={horasPorMes}       setHorasPorMes={setHorasPorMes}
                 vacDiasPorMes={vacDiasPorMes}   setVacDiasPorMes={setVacDiasPorMes}
                 festivosPorMes={festivosPorMes} setFestivosPorMes={setFestivosPorMes}
+                jornadasEspecialesPorMes={jornadasEspecialesPorMes} setJornadasEspecialesPorMes={setJornadasEspecialesPorMes}
               />
             </div>
           )}
@@ -4278,6 +4358,7 @@ ${docHTML}
                         <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",borderBottom:"1px solid #e0ddd8",color:"#3a6898"}}>H.Ex €</th>
                         {!es40h && <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",borderBottom:"1px solid #e0ddd8",color:"#b07030"}}>Plus Act. €</th>}
                         <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",borderBottom:"1px solid #e0ddd8",color:"#1a1a1a"}}>TOTAL MES €</th>
+                        <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",borderBottom:"1px solid #e0ddd8",color:"#8a1e4a"}} title="Jornadas especiales (por encima del salario pactado)">Jorn.Esp €</th>
                         <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",borderBottom:"1px solid #e0ddd8",color:"#5a8a5a"}}>Compl. €</th>
                         <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",borderBottom:"1px solid #e0ddd8",color:"#b8864a"}}>TOTAL MES + Compl. €</th>
                       </tr>
@@ -4306,7 +4387,8 @@ ${docHTML}
                           <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",color:"#3a6898",borderBottom:"1px solid #eae7e2"}}>{d.hMes}h</td>
                           <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",color:"#3a6898",borderBottom:"1px solid #eae7e2"}}>{fmt(d.cobroHx)}</td>
                           {!es40h && <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",color:d.plusAct>0?"#b07030":"#ccc",fontWeight:d.plusAct>0?600:400,borderBottom:"1px solid #eae7e2"}}>{d.plusAct>0?fmt(d.plusAct):"—"}</td>}
-                          <td style={{padding:"6px 6px",fontSize:13,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",color:"#1a1a1a",fontWeight:700,borderBottom:"1px solid #eae7e2"}}>{fmt(es40h ? (d.totalMes - (d.plusAct || 0)) : d.totalMes)}</td>
+                          <td style={{padding:"6px 6px",fontSize:13,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",color:"#1a1a1a",fontWeight:700,borderBottom:"1px solid #eae7e2"}}>{fmt(es40h ? (d.totalMes - (d.plusAct || 0) - (d.importeJE || 0)) : (d.totalMes - (d.importeJE || 0)))}</td>
+                          <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",color:(d.importeJE || 0) > 0 ? "#8a1e4a" : "#ccc",fontWeight:(d.importeJE || 0) > 0 ? 600 : 400,borderBottom:"1px solid #eae7e2"}} title={(d.totalJEDias || 0) > 0 ? `${d.totalJEDias} JE × (1 HX + ${IMPORTE_JORNADA_ESPECIAL}€)` : ""}>{(d.importeJE || 0) > 0 ? fmt(d.importeJE) : "—"}</td>
                           <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",color:(complementos45[i]?.total || 0) > 0 ? "#5a8a5a" : "#ccc",fontWeight:(complementos45[i]?.total || 0) > 0 ? 600 : 400,borderBottom:"1px solid #eae7e2"}}>{(complementos45[i]?.total || 0) > 0 ? fmt(complementos45[i].total) : "—"}</td>
                           <td style={{padding:"6px 6px",fontSize:13,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",color:"#b8864a",fontWeight:700,borderBottom:"1px solid #eae7e2"}}>{fmt((es40h ? (d.totalMes - (d.plusAct || 0)) : d.totalMes) + (complementos45[i]?.total || 0))}</td>
                         </tr>
@@ -4321,7 +4403,8 @@ ${docHTML}
                         <td style={{padding:"8px",fontSize:11,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",color:"#3a6898",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{horasPorMes.reduce((s,v,i)=>{if (v === undefined || v === null || v === "") return s + Math.round((p.desglose[i]?.semanasLaborables||0)*5);return s + (v || 0);},0)}h</td>
                         <td style={{padding:"8px",fontSize:11,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",color:"#3a6898",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{fmt(totHx)}</td>
                         {!es40h && <td style={{padding:"8px",fontSize:11,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",color:totPlus>0?"#b07030":"#ccc",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{totPlus>0?fmt(totPlus):"—"}</td>}
-                        <td style={{padding:"8px",fontSize:13,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",color:"#1a1a1a",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{fmt(es40h ? (totFinal - (totPlus || 0)) : totFinal)}</td>
+                        <td style={{padding:"8px",fontSize:13,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",color:"#1a1a1a",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{fmt(es40h ? (totFinal - (totPlus || 0) - totJEImporte) : (totFinal - totJEImporte))}</td>
+                        <td style={{padding:"8px",fontSize:11,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",color:totJEImporte > 0 ? "#8a1e4a" : "#ccc",fontWeight:700,borderTop:"1px solid #d8d4ce"}} title={totJEDias > 0 ? `${totJEDias} JE totales` : ""}>{totJEImporte > 0 ? fmt(totJEImporte) : "—"}</td>
                         <td style={{padding:"8px",fontSize:11,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",color:totalCompl > 0 ? "#5a8a5a" : "#ccc",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{totalCompl > 0 ? fmt(totalCompl) : "—"}</td>
                         <td style={{padding:"8px",fontSize:13,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",color:"#b8864a",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{fmt((es40h ? (totFinal - (totPlus || 0)) : totFinal) + totalCompl)}</td>
                       </tr>
@@ -4418,7 +4501,7 @@ ${docHTML}
                 <Row label={`TOTAL A PERCIBIR (${es40h ? "40h" : "45h"})`} value={fmtE((es40h ? (totFinal - (totPlus || 0)) : totFinal) + (totalFestImport45 || 0))} highlight />
                 <Row label="Promedio mensual" value={fmtE((es40h ? (totFinal - (totPlus || 0)) : totFinal)/p.mesesTotales)} sub={`sobre ${fmtM(p.mesesTotales)} meses`} green />
                 <Row label="Promedio semanal" value={fmtE((es40h ? (totFinal - (totPlus || 0)) : totFinal)/p.semanasTotales)} sub={`sobre ${p.semanasTotales} sem. L-V`} />
-                {(totalCompl > 0 || totalFestDias45 > 0) && (
+                {(totalCompl > 0 || totalFestDias45 > 0 || totJEDias > 0) && (
                   <>
                     <Div />
                     <div style={{ padding:"10px 12px", background:"#f8f5ff", borderRadius:6, border:"1px solid #d8c8e8" }}>
@@ -4427,6 +4510,12 @@ ${docHTML}
                         <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
                           <span style={{ fontSize:11, color:"#6a3a9a", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>{totalFestDias45} festivo{totalFestDias45>1?"s":""} (incluido en total)</span>
                           <span style={{ fontSize:12, fontWeight:700, color:"#6a3a9a", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>+ {fmtE(totalFestImport45)}</span>
+                        </div>
+                      )}
+                      {totJEDias > 0 && (
+                        <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
+                          <span style={{ fontSize:11, color:"#8a1e4a", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>{totJEDias} jornada{totJEDias>1?"s":""} especial{totJEDias>1?"es":""} (incluido en total)</span>
+                          <span style={{ fontSize:12, fontWeight:700, color:"#8a1e4a", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>+ {fmtE(totJEImporte)}</span>
                         </div>
                       )}
                       {totalCompl > 0 && (
@@ -4591,7 +4680,7 @@ ${docHTML}
               totalVdDias={totalVdDias} totalCompl={totalCompl}
               totFinal={totFinal}
               totalVac45={totalVac45} totalIndem45={totalIndem45}
-              totalFestDias45={totalFestDias45} totalFestImport45={totalFestImport45}
+              totalFestDias45={totalFestDias45} totalFestImport45={totalFestImport45} totJEDias={totJEDias} totJEImporte={totJEImporte}
               plusHerramienta={plusHerramienta} plusCoche={plusCoche}
               plusVivienda={plusVivienda} plusSeguroVida={plusSeguroVida}
               plusComida={plusComida}
@@ -4623,7 +4712,7 @@ ${docHTML}
             totalVdDias={totalVdDias} totalCompl={totalCompl}
             totFinal={totFinal}
             totalVac45={totalVac45} totalIndem45={totalIndem45}
-            totalFestDias45={totalFestDias45} totalFestImport45={totalFestImport45}
+            totalFestDias45={totalFestDias45} totalFestImport45={totalFestImport45} totJEDias={totJEDias} totJEImporte={totJEImporte}
             plusHerramienta={plusHerramienta} plusCoche={plusCoche}
             plusVivienda={plusVivienda} plusSeguroVida={plusSeguroVida}
             plusComida={plusComida}
