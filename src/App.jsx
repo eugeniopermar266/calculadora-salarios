@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v69";
+const APP_VERSION = "v70";
 
 // v54: Festivos por defecto (fallback si Supabase falla). El array activo se
 // rellena desde Supabase en el arranque; ver cargarFestivosSupabase()
@@ -68,7 +68,7 @@ function contarDiasCalendarioPorMes(calendario, propiedad, fechaInicio, fechaFin
   for (const [fecha, info] of Object.entries(dias)) {
     if (fecha < fechaInicio || fecha > fechaFin) continue;
     if (!info || !info[propiedad]) continue;
-    if (propiedad === "laboral" || propiedad === "rodaje") {
+    if (propiedad === "laboral" || propiedad === "rodaje" || propiedad === "especial") {
       // v65: solo excluir festivos NO trabajados (los trabajados sí cuentan como día laboral)
       if (setFest.has(fecha) && !info.festivo_trabajado) continue;
       if (info.vacaciones) continue;
@@ -2953,17 +2953,27 @@ function App45({ modoTab = "iruna45" }) {
 
       // v59: si hay calendario, autorrellenar horas y festivos desde el calendario del proyecto
       if (hayCalendario) {
-        // v63: en 45H usamos días laborales (excluyendo festivos y vacaciones).
-        // En 40H usamos días de rodaje SOLO si el checkbox está activo (también excluye festivos y vacaciones).
+        // v63/v70: en 45H usamos días laborales + jornadas especiales (cada JE = 1 HX adicional).
+        // En 40H usamos días de rodaje + jornadas especiales SOLO si el checkbox está activo.
         let contadoresHoras;
         if (es40h) {
           if (hxPorRodaje40) {
+            // v70: rodaje + jornada especial suman HX
             contadoresHoras = contarDiasCalendarioPorMes(cal, "rodaje", fechaInicio, fechaFin, festivosComunidadCal);
+            const especialesPorMes = contarDiasCalendarioPorMes(cal, "especial", fechaInicio, fechaFin, festivosComunidadCal);
+            for (const ym of Object.keys(especialesPorMes)) {
+              contadoresHoras[ym] = (contadoresHoras[ym] || 0) + especialesPorMes[ym];
+            }
           } else {
             contadoresHoras = {}; // no auto-rellenar
           }
         } else {
+          // 45H: días laborales + jornadas especiales (cada JE es 1 HX adicional al laboral)
           contadoresHoras = contarDiasCalendarioPorMes(cal, "laboral", fechaInicio, fechaFin, festivosComunidadCal);
+          const especialesPorMes = contarDiasCalendarioPorMes(cal, "especial", fechaInicio, fechaFin, festivosComunidadCal);
+          for (const ym of Object.keys(especialesPorMes)) {
+            contadoresHoras[ym] = (contadoresHoras[ym] || 0) + especialesPorMes[ym];
+          }
         }
         const nuevasHoras = mapearContadoresADesglose(p.desglose, contadoresHoras);
 
@@ -4288,10 +4298,12 @@ ${docHTML}
                 {proyectoActivoCtx?.__calendario?.dias && fechaInicio && fechaFin && (() => {
                   const cal = proyectoActivoCtx.__calendario;
                   const setFest = new Set(festivosComunidadCal || []);
-                  let cRodaje = 0, cLaboralNoRodaje = 0, cVacaciones = 0, cFestivosTrab = 0, cFestivosNoTrab = 0, cDescanso = 0;
+                  let cRodaje = 0, cLaboralNoRodaje = 0, cVacaciones = 0, cFestivosTrab = 0, cFestivosNoTrab = 0, cDescanso = 0, cEspecial = 0;
                   for (const [fecha, info] of Object.entries(cal.dias || {})) {
                     if (fecha < fechaInicio || fecha > fechaFin) continue;
                     if (!info) continue;
+                    // v70: contar especial aparte (puede coexistir con laboral/rodaje)
+                    if (info.especial) cEspecial++;
                     const esFest = setFest.has(fecha);
                     if (esFest) {
                       if (info.festivo_trabajado) cFestivosTrab++;
@@ -4303,11 +4315,12 @@ ${docHTML}
                     if (info.rodaje) { cRodaje++; continue; }
                     if (info.laboral) { cLaboralNoRodaje++; continue; }
                   }
-                  const hayAlgo = cRodaje + cLaboralNoRodaje + cVacaciones + cFestivosTrab + cFestivosNoTrab + cDescanso > 0;
+                  const hayAlgo = cRodaje + cLaboralNoRodaje + cVacaciones + cFestivosTrab + cFestivosNoTrab + cDescanso + cEspecial > 0;
                   if (!hayAlgo) return null;
                   const cats = [
                     { label: "Rodaje",              n: cRodaje,           bg: "#faf1e0", border: "#c8963a", color: "#7a5a2a" },
                     { label: "Laboral no-rodaje",   n: cLaboralNoRodaje,  bg: "#e8f0e0", border: "#8ab070", color: "#3a5a2a" },
+                    { label: "Jornada especial",    n: cEspecial,         bg: "#ffd6e8", border: "#d63a7a", color: "#8a1e4a" },
                     { label: "Vacaciones",          n: cVacaciones,       bg: "#e0edf5", border: "#5090c0", color: "#204878" },
                     { label: "Festivos trabajados", n: cFestivosTrab,     bg: "#ffe8c8", border: "#e89838", color: "#8a5820" },
                     { label: "Festivos no trab.",   n: cFestivosNoTrab,   bg: "#fde0e0", border: "#c05050", color: "#8a2020" },
@@ -7821,6 +7834,7 @@ function PanelCalendarioProyecto({ proyecto, usuarioActual, onCerrar }) {
     rodaje:     { bg: "#faf1e0", border: "#c8963a", txt: "#7a5a2a" }, // dorado
     vacaciones: { bg: "#e0edf5", border: "#5090c0", txt: "#204878" }, // azul
     descanso:   { bg: "#ece0f0", border: "#8a5aa0", txt: "#502870" }, // v58: morado
+    especial:   { bg: "#ffd6e8", border: "#d63a7a", txt: "#8a1e4a" }, // v70: jornada especial (rosa fuerte)
     finde:      { bg: "#f0ede8", border: "#d0ccc6", txt: "#999" },
     fuera:      { bg: "#fafafa", border: "#eee", txt: "#ccc" },
   };
@@ -8047,13 +8061,14 @@ function PanelCalendarioProyecto({ proyecto, usuarioActual, onCerrar }) {
     const dow = new Date(fecha + "T12:00:00").getDay();
     const esFinde = dow === 0 || dow === 6;
 
-    // v58: los festivos SIEMPRE priorizan sobre el resto (rojo o naranja según trabajado)
-    // Prioridad festivos: festivo trabajado (naranja) > festivo (rojo) > vacaciones > descanso > rodaje > laboral > finde
+    // v58/v70: los festivos SIEMPRE priorizan sobre el resto (rojo o naranja según trabajado)
+    // Prioridad: festivo trabajado > festivo > vacaciones > descanso > jornada especial > rodaje > laboral > finde
     let color = COLORES.fuera;
     if (esFestivo && info.festivo_trabajado) color = COLORES.festivoTrab;
     else if (esFestivo) color = COLORES.festivo;
     else if (info.vacaciones) color = COLORES.vacaciones;
     else if (info.descanso) color = COLORES.descanso;
+    else if (info.especial) color = COLORES.especial;
     else if (info.rodaje) color = COLORES.rodaje;
     else if (info.laboral) color = COLORES.laboral;
     else if (esFinde) color = COLORES.finde;
@@ -8178,6 +8193,7 @@ function PanelCalendarioProyecto({ proyecto, usuarioActual, onCerrar }) {
                     { l: "Rodaje", c: COLORES.rodaje },
                     { l: "Vacaciones", c: COLORES.vacaciones },
                     { l: "Descanso", c: COLORES.descanso },
+                    { l: "Jornada especial", c: COLORES.especial },
                   ].map(item => (
                     <div key={item.l} style={{ display: "flex", alignItems: "center", gap: 4 }}>
                       <span style={{ width: 12, height: 12, borderRadius: 2, background: item.c.bg, border: `1px solid ${item.c.border}` }} />
@@ -8226,6 +8242,7 @@ function PanelCalendarioProyecto({ proyecto, usuarioActual, onCerrar }) {
                           {info.rodaje && <span>🎬 rod</span>}
                           {info.vacaciones && <span>🏖 vac</span>}
                           {info.descanso && <span>🌙 desc</span>}
+                          {info.especial && <span>⭐ esp</span>}
                           {esFestivo && info.festivo_trabajado && <span>✓ trab</span>}
                         </div>
                         {esFestivo && !info.festivo_trabajado && (
@@ -8263,6 +8280,10 @@ function PanelCalendarioProyecto({ proyecto, usuarioActual, onCerrar }) {
                   <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 11, padding: "4px 6px", background: "#f0ede8", borderRadius: 3 }}>
                     <input type="checkbox" checked={!!(dias[popup.fecha]?.descanso)} onChange={() => toggleProp(popup.fecha, "descanso")} />
                     <span>🌙 Descanso</span>
+                  </label>
+                  <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 11, padding: "4px 6px", background: "#f0ede8", borderRadius: 3 }}>
+                    <input type="checkbox" checked={!!(dias[popup.fecha]?.especial)} onChange={() => toggleProp(popup.fecha, "especial")} />
+                    <span>⭐ Jornada especial</span>
                   </label>
                   {popup.esFestivo && (
                     <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 11, padding: "4px 6px", background: "#f0ede8", borderRadius: 3 }}>
