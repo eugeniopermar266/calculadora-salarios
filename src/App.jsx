@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v63";
+const APP_VERSION = "v64";
 
 // v54: Festivos por defecto (fallback si Supabase falla). El array activo se
 // rellena desde Supabase en el arranque; ver cargarFestivosSupabase()
@@ -4282,6 +4282,17 @@ ${docHTML}
                           <span style={{ fontSize:12, fontWeight:700, color:"#5a8a5a", fontFamily:"'Courier New',monospace" }}>+ {fmtE(totalCompl)}</span>
                         </div>
                       )}
+                      {/* v64: TOTAL CON FESTIVOS/EXTRAS incluidos */}
+                      {totalFestDias45 > 0 && (() => {
+                        const baseFinal = es40h ? (totFinal - (totPlus || 0)) : totFinal;
+                        const totalConFestivos = baseFinal + (totalFestImport45 || 0);
+                        return (
+                          <div style={{ marginTop:8, paddingTop:8, borderTop:"1px solid #d8c8e8", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                            <span style={{ fontSize:10, color:"#4a2a7a", fontFamily:"'Courier New',monospace", fontWeight:700, letterSpacing:"0.1em", textTransform:"uppercase" }}>Total con festivos</span>
+                            <span style={{ fontSize:14, fontWeight:700, color:"#4a2a7a", fontFamily:"'Courier New',monospace" }}>{fmtE(totalConFestivos)}</span>
+                          </div>
+                        );
+                      })()}
                     </div>
                   </>
                 )}
