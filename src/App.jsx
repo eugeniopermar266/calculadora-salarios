@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v59";
+const APP_VERSION = "v60";
 
 // v54: Festivos por defecto (fallback si Supabase falla). El array activo se
 // rellena desde Supabase en el arranque; ver cargarFestivosSupabase()
@@ -89,10 +89,9 @@ function contarFestivosTrabajadosPorMes(calendario, festivosComunidadFechas, fec
 function mapearContadoresADesglose(desglose, contadoresPorMes) {
   if (!desglose) return [];
   return desglose.map(d => {
-    if (!d.mes) return 0;
-    // d.mes es tipo "Septiembre De 2026" → convertimos a YYYY-MM usando d.desde
-    const ym = d.desde ? d.desde.slice(0, 7) : null;
-    if (!ym) return 0;
+    // d.anio y d.mesNum (0-based) los añadimos al construir el desglose
+    if (d.anio == null || d.mesNum == null) return 0;
+    const ym = `${d.anio}-${String(d.mesNum + 1).padStart(2, "0")}`;
     return contadoresPorMes[ym] || 0;
   });
 }
@@ -769,7 +768,7 @@ function calcularPeriodo(fechaInicio, fechaFin) {
     const fraccion    = diasNormes / 30;
 
     const nombreMes = new Date(anioActual, mesActual, 1).toLocaleString("es-ES", { month: "long", year: "numeric" });
-    desglose.push({ mes: nombreMes, desde: diaDesde, hasta: diaHasta, diasReales, diasNorm: diasNormes, fraccion, esCompleto });
+    desglose.push({ mes: nombreMes, desde: diaDesde, hasta: diaHasta, diasReales, diasNorm: diasNormes, fraccion, esCompleto, anio: anioActual, mesNum: mesActual });
     mesActual++;
     if (mesActual > 11) { mesActual = 0; anioActual++; }
   }
