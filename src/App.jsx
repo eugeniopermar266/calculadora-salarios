@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v78";
+const APP_VERSION = "v79";
 
 // v73: importe fijo por jornada especial (se paga POR ENCIMA del salario pactado)
 const IMPORTE_JORNADA_ESPECIAL = 20;
@@ -7445,7 +7445,7 @@ function CosteEmpresa() {
                 </span>
               </label>
               <div style={{ fontSize: 9, color: "#666", marginTop: 4, width: "100%", lineHeight: 1.4 }}>
-                Firma contrato 6 € · Nómina 22 €/mes
+                Firma contrato 6 € · Nómina 26 €/mes
               </div>
             </div>
 
@@ -7613,7 +7613,9 @@ function CosteEmpresa() {
           const filas = desgloseGuardado.map((mes, i) => {
             const c = complementosGuardado[i] || {};
             const plusAct = esTab40 ? 0 : (mes.plusAct || 0);
-            const total = (mes.base40 || 0) + (mes.vac40 || 0) + (mes.indem40 || 0) + (mes.cobroHx || 0) + plusAct + (c.herramienta || 0) + (c.coche || 0) + (c.vivienda || 0) + (c.seguroVida || 0) + (c.comida || 0);
+            const festImp = importeFestGuardado[i] || 0; // v78
+            const jeImp = mes.importeJE || 0; // v78
+            const total = (mes.base40 || 0) + (mes.vac40 || 0) + (mes.indem40 || 0) + (mes.cobroHx || 0) + plusAct + festImp + jeImp + (c.herramienta || 0) + (c.coche || 0) + (c.vivienda || 0) + (c.seguroVida || 0) + (c.comida || 0);
 
             // Exención mes a mes
             const parsed = parseMesEspañol(mes.mes);
@@ -7633,7 +7635,6 @@ function CosteEmpresa() {
               importeExento: exentoMes,
               firmaContrato,
               incluirGestoria,
-        incluirGestoria,
             });
             return { mes: mes.mes, claveMes, ...ce, total };
           });
