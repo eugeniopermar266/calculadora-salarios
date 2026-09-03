@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v70";
+const APP_VERSION = "v71";
 
 // v54: Festivos por defecto (fallback si Supabase falla). El array activo se
 // rellena desde Supabase en el arranque; ver cargarFestivosSupabase()
@@ -2916,6 +2916,130 @@ function App45({ modoTab = "iruna45" }) {
   const [indemAcumulada,   setIndemAcumulada]  = useState(false);
   const [hxPorRodaje40,    setHxPorRodaje40]   = useState(false); // v59: solo 40H, 1 HX por día de rodaje del calendario
   const [mostrarFestivosLegacy, setMostrarFestivosLegacy] = useState(false); // v62: panel viejo festivos oculto por defecto si hay calendario
+  const saltarAutoRellenoRef = useRef(false); // v71: cuando acabamos de cargar un perfil, saltamos el próximo auto-relleno
+
+  // v71: recalcular horas/festivos/vacaciones desde el calendario y aplicar (sobrescribiendo)
+  const aplicarCalendarioAhora = () => {
+    const p = calcularPeriodo(fechaInicio, fechaFin);
+    if (!p) return;
+    const cal = proyectoActivoCtx?.__calendario;
+    if (!cal || !cal.dias) return;
+    const n = p.desglose.length;
+
+    // Horas por mes (mismo cálculo que el auto-relleno)
+    let contadoresHoras;
+    if (es40h) {
+      if (hxPorRodaje40) {
+        contadoresHoras = contarDiasCalendarioPorMes(cal, "rodaje", fechaInicio, fechaFin, festivosComunidadCal);
+        const especialesPorMes = contarDiasCalendarioPorMes(cal, "especial", fechaInicio, fechaFin, festivosComunidadCal);
+        for (const ym of Object.keys(especialesPorMes)) {
+          contadoresHoras[ym] = (contadoresHoras[ym] || 0) + especialesPorMes[ym];
+        }
+      } else {
+        contadoresHoras = {};
+      }
+    } else {
+      contadoresHoras = contarDiasCalendarioPorMes(cal, "laboral", fechaInicio, fechaFin, festivosComunidadCal);
+      const especialesPorMes = contarDiasCalendarioPorMes(cal, "especial", fechaInicio, fechaFin, festivosComunidadCal);
+      for (const ym of Object.keys(especialesPorMes)) {
+        contadoresHoras[ym] = (contadoresHoras[ym] || 0) + especialesPorMes[ym];
+      }
+    }
+    const nuevasHoras = mapearContadoresADesglose(p.desglose, contadoresHoras);
+
+    // Festivos trabajados
+    const festTrabajadosPorMes = {};
+    for (const [fecha, info] of Object.entries(cal.dias || {})) {
+      if (fecha < fechaInicio || fecha > fechaFin) continue;
+      if (!info?.festivo_trabajado) continue;
+      const ym = fecha.slice(0, 7);
+      festTrabajadosPorMes[ym] = (festTrabajadosPorMes[ym] || 0) + 1;
+    }
+    const nuevosFestivos = mapearContadoresADesglose(p.desglose, festTrabajadosPorMes);
+
+    // Vacaciones
+    const vacacionesPorMes = {};
+    for (const [fecha, info] of Object.entries(cal.dias || {})) {
+      if (fecha < fechaInicio || fecha > fechaFin) continue;
+      if (!info?.vacaciones) continue;
+      const ym = fecha.slice(0, 7);
+      vacacionesPorMes[ym] = (vacacionesPorMes[ym] || 0) + 1;
+    }
+    const nuevasVac = mapearContadoresADesglose(p.desglose, vacacionesPorMes);
+
+    if (es40h && !hxPorRodaje40) {
+      // no cambiar horas
+    } else {
+      setHorasPorMes(nuevasHoras);
+    }
+    setFestivosPorMes(nuevosFestivos);
+    setVacDiasPorMes(nuevasVac);
+    return true;
+  };
+
+  // v71: detectar si el perfil cargado difiere de lo que dictaría el calendario
+  const hayDiferenciasConCalendario = (() => {
+    const cal = proyectoActivoCtx?.__calendario;
+    if (!cal || !cal.dias || Object.keys(cal.dias).length === 0) return false;
+    if (!fechaInicio || !fechaFin) return false;
+    const p = calcularPeriodo(fechaInicio, fechaFin);
+    if (!p) return false;
+
+    // Calcular lo esperado
+    let contadoresHorasEsperados;
+    if (es40h) {
+      if (hxPorRodaje40) {
+        contadoresHorasEsperados = contarDiasCalendarioPorMes(cal, "rodaje", fechaInicio, fechaFin, festivosComunidadCal);
+        const especialesPorMes = contarDiasCalendarioPorMes(cal, "especial", fechaInicio, fechaFin, festivosComunidadCal);
+        for (const ym of Object.keys(especialesPorMes)) {
+          contadoresHorasEsperados[ym] = (contadoresHorasEsperados[ym] || 0) + especialesPorMes[ym];
+        }
+      } else {
+        contadoresHorasEsperados = null; // no comparamos horas
+      }
+    } else {
+      contadoresHorasEsperados = contarDiasCalendarioPorMes(cal, "laboral", fechaInicio, fechaFin, festivosComunidadCal);
+      const especialesPorMes = contarDiasCalendarioPorMes(cal, "especial", fechaInicio, fechaFin, festivosComunidadCal);
+      for (const ym of Object.keys(especialesPorMes)) {
+        contadoresHorasEsperados[ym] = (contadoresHorasEsperados[ym] || 0) + especialesPorMes[ym];
+      }
+    }
+
+    if (contadoresHorasEsperados !== null) {
+      const horasEsperadas = mapearContadoresADesglose(p.desglose, contadoresHorasEsperados);
+      for (let i = 0; i < horasEsperadas.length; i++) {
+        if ((horasPorMes[i] || 0) !== (horasEsperadas[i] || 0)) return true;
+      }
+    }
+
+    // Festivos
+    const festTrabajadosPorMes = {};
+    for (const [fecha, info] of Object.entries(cal.dias || {})) {
+      if (fecha < fechaInicio || fecha > fechaFin) continue;
+      if (!info?.festivo_trabajado) continue;
+      const ym = fecha.slice(0, 7);
+      festTrabajadosPorMes[ym] = (festTrabajadosPorMes[ym] || 0) + 1;
+    }
+    const festEsperados = mapearContadoresADesglose(p.desglose, festTrabajadosPorMes);
+    for (let i = 0; i < festEsperados.length; i++) {
+      if ((festivosPorMes[i] || 0) !== (festEsperados[i] || 0)) return true;
+    }
+
+    // Vacaciones
+    const vacacionesPorMes = {};
+    for (const [fecha, info] of Object.entries(cal.dias || {})) {
+      if (fecha < fechaInicio || fecha > fechaFin) continue;
+      if (!info?.vacaciones) continue;
+      const ym = fecha.slice(0, 7);
+      vacacionesPorMes[ym] = (vacacionesPorMes[ym] || 0) + 1;
+    }
+    const vacEsperadas = mapearContadoresADesglose(p.desglose, vacacionesPorMes);
+    for (let i = 0; i < vacEsperadas.length; i++) {
+      if ((vacDiasPorMes[i] || 0) !== (vacEsperadas[i] || 0)) return true;
+    }
+
+    return false;
+  })();
   const [festivosComunidadCal, setFestivosComunidadCal] = useState([]); // v63: fechas de festivos de la comunidad del calendario del proyecto
 
   // v63: cargar festivos de la comunidad del calendario del proyecto activo
@@ -2946,6 +3070,11 @@ function App45({ modoTab = "iruna45" }) {
   useEffect(() => {
     const p = calcularPeriodo(fechaInicio, fechaFin);
     setPeriodo(p);
+    // v71: si acabamos de cargar un perfil, no autorrellenamos (respeta los valores guardados)
+    if (saltarAutoRellenoRef.current) {
+      saltarAutoRellenoRef.current = false;
+      return;
+    }
     if (p) {
       const n = p.desglose.length;
       const cal = proyectoActivoCtx?.__calendario;
@@ -3594,6 +3723,8 @@ ${docHTML}
               },
             }}
             onCargarPerfil={(d) => {
+              // v71: al cargar un perfil, saltamos el próximo auto-relleno para no machacar los valores guardados
+              saltarAutoRellenoRef.current = true;
               // v45: si hay proyecto activo, los campos Proyecto/Productora se mantienen del activo (no del perfil cargado)
               if (proyectoActivoCtx) {
                 setProyecto(proyectoActivoCtx.nombre);
@@ -3767,6 +3898,18 @@ ${docHTML}
                     )}
                   </div>
                 </div>
+                {/* v71: botón para aplicar calendario si hay diferencias con el perfil cargado */}
+                {hayDiferenciasConCalendario && (
+                  <button
+                    onClick={() => {
+                      if (confirm("Esto sobrescribirá las horas extra, festivos y vacaciones con los datos del calendario del proyecto. ¿Continuar?")) {
+                        aplicarCalendarioAhora();
+                      }
+                    }}
+                    title="El perfil cargado difiere del calendario. Pulsa para recalcular desde el calendario."
+                    style={{ background: "#b8864a", color: "#fff", border: "none", padding: "6px 10px", borderRadius: 3, cursor: "pointer", fontFamily: "'Courier Prime', 'Courier New', monospace", fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", flexShrink: 0 }}
+                  >📅 Aplicar calendario</button>
+                )}
               </div>
             )}
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, overflow:"hidden" }}>
