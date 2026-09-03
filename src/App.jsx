@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v67";
+const APP_VERSION = "v68";
 
 // v54: Festivos por defecto (fallback si Supabase falla). El array activo se
 // rellena desde Supabase en el arranque; ver cargarFestivosSupabase()
@@ -2862,21 +2862,18 @@ function DocumentoImprimible({
         </tbody>
       </table>
 
-      {/* Aviso orientativo — v67 reducido */}
-      <div style={{ marginTop: 10, padding: "6px 10px", background: "#fafaf7", border: "1px solid #e0ddd8", borderRadius: 3, textAlign: "center", fontSize: 8, fontWeight: 700, color: "#1a1a1a", letterSpacing: "0.02em", lineHeight: 1.3 }}>
+      {/* Aviso orientativo — v68 compacto pero legible */}
+      <div style={{ marginTop: 12, padding: "8px 12px", background: "#fafaf7", border: "1px solid #e0ddd8", borderRadius: 3, textAlign: "center", fontSize: 9, fontWeight: 700, color: "#1a1a1a", letterSpacing: "0.02em", lineHeight: 1.4 }}>
         Cálculo orientativo del salario mensual bruto, que puede diferir ligeramente de la nómina real generada en cada periodo.
       </div>
 
-      {/* ═══ PIE ═══ v67 compacto */}
-      <div style={{ marginTop: 10, paddingTop: 6, borderTop: "1px solid #e0ddd8", textAlign: "center" }}>
-        <div style={{ fontSize: 7, color: "#888", letterSpacing: "0.15em", textTransform: "uppercase", fontWeight: 700, marginBottom: 2 }}>
-          BD PROD TOOLS · DESIGNED BY EUGENIO PEREZ · ALL RIGHTS RESERVED
+      {/* ═══ PIE ═══ v68 compacto pero legible (una sola línea combinada) */}
+      <div style={{ marginTop: 12, paddingTop: 8, borderTop: "1px solid #e0ddd8", textAlign: "center" }}>
+        <div style={{ fontSize: 8, color: "#888", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 700, marginBottom: 3 }}>
+          BD PROD TOOLS · Designed by Eugenio Perez · All Rights Reserved
         </div>
-        <div style={{ fontSize: 6, color: "#aaa", letterSpacing: "0.03em", marginBottom: 2 }}>
-          {DISCLAIMER_PDF}
-        </div>
-        <div style={{ fontSize: 6, color: "#aaa", letterSpacing: "0.05em", textTransform: "uppercase" }}>
-          BD PROD TOOLS · Generado el {new Date().toLocaleString("es-ES")}
+        <div style={{ fontSize: 7, color: "#aaa", letterSpacing: "0.05em" }}>
+          Uso no autorizado prohibido · Generado el {new Date().toLocaleString("es-ES")}
         </div>
       </div>
 
@@ -8753,7 +8750,7 @@ export default function App() {
   const [calendarioActivo, setCalendarioActivo] = useState(null); // v59: calendario del proyecto activo
   const [tab, setTab] = useState("iruna45"); // "iruna45" | "tab40"
 
-  // v67: inyectar Courier Prime desde Google Fonts para que Chrome la incruste bien en PDFs
+  // v67/v68: inyectar Courier Prime desde Google Fonts para que Chrome la incruste bien en PDFs
   // (evita el aviso "No se puede extraer la fuente T3Font_0" al abrir en Adobe Reader)
   useEffect(() => {
     const id = "bd-google-fonts-courier";
@@ -8770,8 +8767,14 @@ export default function App() {
     const link3 = document.createElement("link");
     link3.id = id;
     link3.rel = "stylesheet";
-    link3.href = "https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400;1,700&display=swap";
+    // v68: display=block asegura que Chrome espera a la fuente antes de renderizar (mejor para PDF)
+    link3.href = "https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400;1,700&display=block";
     document.head.appendChild(link3);
+    // v68: forzar carga inmediata para que esté disponible al generar PDF
+    if (document.fonts && document.fonts.load) {
+      document.fonts.load("400 12px 'Courier Prime'").catch(() => {});
+      document.fonts.load("700 12px 'Courier Prime'").catch(() => {});
+    }
   }, []);
 
   // v59: cargar calendario cuando cambia el proyecto activo
