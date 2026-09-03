@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v75";
+const APP_VERSION = "v76";
 
 // v73: importe fijo por jornada especial (se paga POR ENCIMA del salario pactado)
 const IMPORTE_JORNADA_ESPECIAL = 20;
@@ -1933,8 +1933,8 @@ function InputsPorMes({ desglose, horasPorMes, setHorasPorMes, vacDiasPorMes, se
             const esEstimadoOriginal = hasVal && valorActual === autoH;
             return (
               <div>
-                <div style={{ fontSize:8, color: esEstimadoOriginal ? "#4a6a9a" : "#8aa0b8", fontFamily:"'Courier Prime', 'Courier New', monospace", letterSpacing:"0.05em", textAlign:"center", lineHeight:1, fontWeight: esEstimadoOriginal ? 700 : 400, marginBottom:2 }}>
-                  L-V · {autoH}d
+                <div style={{ fontSize:8, color: esEstimadoOriginal ? "#4a6a9a" : "#8aa0b8", fontFamily:"'Courier Prime', 'Courier New', monospace", letterSpacing:"0.05em", textAlign:"center", lineHeight:1, fontWeight: esEstimadoOriginal ? 700 : 400, marginBottom:2, whiteSpace:"nowrap" }}>
+                  {autoH}d
                 </div>
                 <input type="number" min="0" step="0.5"
                   value={valorMostrar}
