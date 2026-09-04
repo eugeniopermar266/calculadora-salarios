@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v81";
+const APP_VERSION = "v82";
 
 // v73: importe fijo por jornada especial (se paga POR ENCIMA del salario pactado)
 const IMPORTE_JORNADA_ESPECIAL = 20;
@@ -676,6 +676,7 @@ const CE_GESTORIA_MES    = 26;
 function calcularCosteEmpresaMes({
   total,         // TOTAL del mes (lo que percibe el trabajador)
   vacaciones,    // importe vacaciones del mes
+  vacDisfrutadas = 0, // v82: importe de vacaciones disfrutadas (vdShow). Solo afecta en modo "al final".
   indem,         // importe indemnización del mes
   horasExtraEur, // importe h.extra en euros del mes
   plusVivienda,  // importe plus vivienda del mes
@@ -692,11 +693,14 @@ function calcularCosteEmpresaMes({
 
   // v81: si las vacaciones son MES A MES (vacAcumulada=false), van dentro del pool topado (SS Vac = 0)
   //      si son AL FINAL (vacAcumulada=true), van aparte (comportamiento anterior)
+  // v82: en modo AL FINAL, si el trabajador ya disfrutó días, se restan de la base SS Vac
+  //      (la empresa cotiza solo por lo realmente pagado al final)
   let baseSSPrincipal, ssVacaciones;
   if (vacAcumulada) {
-    // Modo B: al final → vacaciones aparte
+    // Modo B: al final → vacaciones aparte, descontando disfrutadas
     baseSSPrincipal = Math.max(0, (total || 0) - vacMes - (indem || 0) - exento);
-    ssVacaciones    = vacMes * CE_PCT_SS; // sin topar
+    const vacNeta = Math.max(0, vacMes - (vacDisfrutadas || 0)); // v82: descontar disfrutadas
+    ssVacaciones    = vacNeta * CE_PCT_SS;
   } else {
     // Modo A: mes a mes → vacaciones dentro del pool topado
     baseSSPrincipal = Math.max(0, (total || 0) - (indem || 0) - exento);
@@ -6695,6 +6699,7 @@ function CosteEmpresa() {
       const ce = calcularCosteEmpresaMes({
         total,
         vacaciones: mes.vac40 || 0,
+        vacDisfrutadas: mes.vdShow || 0,
         indem: mes.indem40 || 0,
         horasExtraEur: mes.cobroHx || 0,
         plusVivienda: c.vivienda || 0,
@@ -7076,12 +7081,13 @@ function CosteEmpresa() {
 
   <div class="reglas">
     <b>Reglas aplicadas:</b><br/>
-    · <b>SS Principal</b> (33,35%): sobre TOTAL del mes − vacaciones − indemnización. Topada a 1.701,25 € si base &gt; 5.101,20 €.<br/>
-    · <b>SS Vacaciones</b> (33,35%) y <b>SS H.Extra</b> (27%): siempre se suman aparte, independientes del tope.<br/>
+    · <b>SS Principal</b> (33,35%): sobre TOTAL del mes − vacaciones* − indemnización. Topada a 1.701,25 € si base &gt; 5.101,20 €.<br/>
+    · <b>SS Vacaciones</b> (33,35%): solo si vacaciones "al final"* — se suman aparte, sin topar. <b>SS H.Extra</b> (27%): siempre aparte, independiente del tope.<br/>
     · <b>IMEI</b> (0,75%): sobre TOTAL del mes − indemnización. Topado a 38,26 € si base &gt; 5.101,20 €.<br/>
-    · <b>Solidaridad</b> (tramos 0,97% / 1,15% / 1,33%): sobre exceso de (TOTAL − indemnización − vacaciones − horas extra) sobre 5.101,20 €.<br/>
+    · <b>Solidaridad</b> (tramos 0,97% / 1,15% / 1,33%): sobre exceso de (TOTAL − indemnización − vacaciones* − horas extra) sobre 5.101,20 €.<br/>
     · <b>Indemnización</b>: NO genera SS ni IMEI.<br/>
-    · <b>Gestoría</b>: primer mes 32 € (alta + nómina), resto 26 €.
+    · <b>Gestoría</b>: primer mes 32 € (alta + nómina), resto 26 €.<br/>
+    <span style="color:#888;font-size:8px">* Vacaciones prorrateadas (mes a mes) → van dentro del pool topado de SS Principal y no se restan. Vacaciones "al final" → se restan del pool y generan su propia SS Vacaciones (sin topar) el último mes.</span>
   </div>
 
   <div class="resumen">
@@ -7648,6 +7654,7 @@ function CosteEmpresa() {
             const ce = calcularCosteEmpresaMes({
               total,
               vacaciones: mes.vac40 || 0,
+              vacDisfrutadas: mes.vdShow || 0,
               indem: mes.indem40 || 0,
               horasExtraEur: mes.cobroHx || 0,
               plusVivienda: c.vivienda || 0,
@@ -7737,12 +7744,13 @@ function CosteEmpresa() {
               {/* Notas explicativas */}
               <div style={{ marginTop: 12, padding: "10px 14px", background: "#fafaf7", borderRadius: 4, border: "1px solid #e0ddd8", fontSize: 9.5, color: "#666", lineHeight: 1.6 }}>
                 <strong style={{ color: "#444" }}>Reglas aplicadas:</strong><br/>
-                · <strong>SS Principal</strong> (33,35%): sobre TOTAL del mes − vacaciones − indemnización. Topada a 1.701,25 € si base &gt; 5.101,20 €.<br/>
-                · <strong>SS Vacaciones</strong> (33,35%) y <strong>SS H.Extra</strong> (27%): siempre se suman aparte, independientes del tope.<br/>
+                · <strong>SS Principal</strong> (33,35%): sobre TOTAL del mes − vacaciones* − indemnización. Topada a 1.701,25 € si base &gt; 5.101,20 €.<br/>
+                · <strong>SS Vacaciones</strong> (33,35%): solo si vacaciones "al final"* — se suman aparte, sin topar. <strong>SS H.Extra</strong> (27%): siempre aparte, independiente del tope.<br/>
                 · <strong>IMEI</strong> (0,75%): sobre TOTAL del mes − indemnización. Topado a 38,26 € si base &gt; 5.101,20 €.<br/>
-                · <strong>Solidaridad</strong> (tramos 0,97% / 1,15% / 1,33%): sobre exceso de (TOTAL − indemnización − vacaciones − horas extra) sobre 5.101,20 €.<br/>
+                · <strong>Solidaridad</strong> (tramos 0,97% / 1,15% / 1,33%): sobre exceso de (TOTAL − indemnización − vacaciones* − horas extra) sobre 5.101,20 €.<br/>
                 · <strong>Indemnización</strong>: NO genera SS ni IMEI.<br/>
-                · <strong>Gestoría</strong>: primer mes 32 € (alta + nómina), resto 26 €.
+                · <strong>Gestoría</strong>: primer mes 32 € (alta + nómina), resto 26 €.<br/>
+                <span style={{ color: "#999", fontSize: 8.5, fontStyle: "italic" }}>* Vacaciones prorrateadas (mes a mes) → van dentro del pool topado de SS Principal y no se restan. Vacaciones "al final" → se restan del pool y generan su propia SS Vacaciones (sin topar) el último mes.</span>
               </div>
 
               {/* Comparativa rápida */}
