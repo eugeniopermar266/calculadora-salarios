@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v82";
+const APP_VERSION = "v83";
 
 // v73: importe fijo por jornada especial (se paga POR ENCIMA del salario pactado)
 const IMPORTE_JORNADA_ESPECIAL = 20;
@@ -6685,10 +6685,13 @@ function CosteEmpresa() {
       const plusAct = esT40 ? 0 : (mes.plusAct || 0);
       const festImp = importeFestMes[i] || 0;  // v77
       const jeImp   = mes.importeJE || 0;      // v77 (viene en desglose desde v73)
-      // v77: sumar festivos y JE al total percibido
+      const vdShow  = mes.vdShow || 0;         // v83: importe días de vacaciones ya disfrutados
+      // v77: total BRUTO (base para SS): incluye vac prorrateada completa (sin restar días disfrutados)
       const total = (mes.base40 || 0) + (mes.vac40 || 0) + (mes.indem40 || 0) + (mes.cobroHx || 0) + plusAct
                   + festImp + jeImp
                   + (c.herramienta || 0) + (c.coche || 0) + (c.vivienda || 0) + (c.seguroVida || 0) + (c.comida || 0);
+      // v83: total PERCIBIDO (líquido para mostrar al usuario): resta las vacaciones ya disfrutadas
+      const totalPercibido = total - vdShow;
 
       // Determinar si este mes tiene exención aplicada
       const parsed = parseMesEspañol(mes.mes);
@@ -6719,7 +6722,9 @@ function CosteEmpresa() {
         hasta: mes.hasta,
         // Importes percibe trabajador
         base: mes.base40 || 0,
-        vac: mes.vac40 || 0,
+        vac: (mes.vac40 || 0) - vdShow, // v83: vac líquida (menos días disfrutados)
+        vacBruta: mes.vac40 || 0,       // v83: vac bruta prorrateada (para referencia)
+        vdShow,                          // v83: importe días disfrutados
         indem: mes.indem40 || 0,
         hx: mes.cobroHx || 0,
         plusAct,
@@ -6730,7 +6735,8 @@ function CosteEmpresa() {
         vivienda: c.vivienda || 0,
         seguroVida: c.seguroVida || 0,
         comida: c.comida || 0,
-        total,
+        total: totalPercibido,      // v83: total líquido (para mostrar)
+        totalBruto: total,          // v83: total bruto (base SS, por si se necesita)
         // Coste empresa
         ...ce,
       };
@@ -7597,7 +7603,9 @@ function CosteEmpresa() {
                     const plusAct = esTab40 ? 0 : (mes.plusAct || 0);
                     const festImp = importeFestGuardado[i] || 0; // v77
                     const jeImp = mes.importeJE || 0; // v77
-                    const totalMes = (mes.base40 || 0) + (mes.vac40 || 0) + (mes.indem40 || 0) + (mes.cobroHx || 0) + plusAct + festImp + jeImp + (c.herramienta || 0) + (c.coche || 0) + (c.vivienda || 0) + (c.seguroVida || 0) + (c.comida || 0);
+                    // v83: vacMostrar = vac40 − vdShow (líquido tras descontar días disfrutados)
+                    const vacMostrar = (mes.vacMostrar !== undefined) ? mes.vacMostrar : ((mes.vac40 || 0) - (mes.vdShow || 0));
+                    const totalMes = (mes.base40 || 0) + vacMostrar + (mes.indem40 || 0) + (mes.cobroHx || 0) + plusAct + festImp + jeImp + (c.herramienta || 0) + (c.coche || 0) + (c.vivienda || 0) + (c.seguroVida || 0) + (c.comida || 0);
 
                     // Exención del mes
                     const parsed = parseMesEspañol(mes.mes);
@@ -7612,7 +7620,7 @@ function CosteEmpresa() {
                           {mes.mes}{!mes.esCompleto && <span style={{ fontSize: 8, color: "#888", marginLeft: 4 }}>({mes.desde}-{mes.hasta})</span>}
                         </td>
                         <td style={{ padding: "7px 6px", textAlign: "right" }}>{fmt(mes.base40 || 0)}</td>
-                        <td style={{ padding: "7px 6px", textAlign: "right", color: (mes.vac40 || 0) === 0 ? "#bbb" : "#1a1a1a" }}>{(mes.vac40 || 0) === 0 ? "—" : fmt(mes.vac40)}</td>
+                        <td style={{ padding: "7px 6px", textAlign: "right", color: vacMostrar === 0 ? "#bbb" : (vacMostrar < 0 ? "#c04040" : "#1a1a1a") }} title={(mes.vdShow || 0) > 0 ? `Prorrateada ${fmt(mes.vac40 || 0)} − disfrutadas ${fmt(mes.vdShow || 0)}` : ""}>{vacMostrar === 0 ? "—" : fmt(vacMostrar)}</td>
                         <td style={{ padding: "7px 6px", textAlign: "right", color: (mes.indem40 || 0) === 0 ? "#bbb" : "#1a1a1a" }}>{(mes.indem40 || 0) === 0 ? "—" : fmt(mes.indem40)}</td>
                         <td style={{ padding: "7px 6px", textAlign: "right", color: (mes.cobroHx || 0) === 0 ? "#bbb" : "#3a6898" }}>{(mes.cobroHx || 0) === 0 ? "—" : fmt(mes.cobroHx)}</td>
                         <td style={{ padding: "7px 6px", textAlign: "right", color: plusAct === 0 ? "#bbb" : "#b07030" }}>{plusAct === 0 ? "—" : fmt(plusAct)}</td>
