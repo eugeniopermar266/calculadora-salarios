@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v79";
+const APP_VERSION = "v81";
 
 // v73: importe fijo por jornada especial (se paga POR ENCIMA del salario pactado)
 const IMPORTE_JORNADA_ESPECIAL = 20;
@@ -684,17 +684,25 @@ function calcularCosteEmpresaMes({
   esPrimerMes,   // boolean: ¿es el primer mes del contrato?
   importeExento = 0, // importe a restar de las bases SS/IMEI/Solidaridad (por baja médica)
   firmaContrato = true, // boolean: ¿hay firma de contrato este primer mes? (afecta solo si esPrimerMes)
-  incluirGestoria = false, // v78: si false, la gestoría no suma al total (aparece con importe 0 en el total)
+  incluirGestoria = false, // v78: si false, la gestoría no suma al total
+  vacAcumulada = false, // v81: si false (mes a mes), las vacaciones van al pool topado. Si true, van aparte.
 }) {
   const exento = Math.max(0, importeExento || 0);
+  const vacMes = vacaciones || 0;
 
-  // Base SS principal: TOTAL - vacaciones - indemnización - importe exento
-  // (las vacaciones tienen su propia SS aparte)
-  const baseSSPrincipal = Math.max(0, (total || 0) - (vacaciones || 0) - (indem || 0) - exento);
-  const ssPrincipal     = baseSSPrincipal > CE_TOPE_BASE ? CE_SS_TOPADA : baseSSPrincipal * CE_PCT_SS;
-
-  // SS Vacaciones: siempre 33,35% × vacaciones (suma aparte, NO afectada por exención)
-  const ssVacaciones    = (vacaciones || 0) * CE_PCT_SS;
+  // v81: si las vacaciones son MES A MES (vacAcumulada=false), van dentro del pool topado (SS Vac = 0)
+  //      si son AL FINAL (vacAcumulada=true), van aparte (comportamiento anterior)
+  let baseSSPrincipal, ssVacaciones;
+  if (vacAcumulada) {
+    // Modo B: al final → vacaciones aparte
+    baseSSPrincipal = Math.max(0, (total || 0) - vacMes - (indem || 0) - exento);
+    ssVacaciones    = vacMes * CE_PCT_SS; // sin topar
+  } else {
+    // Modo A: mes a mes → vacaciones dentro del pool topado
+    baseSSPrincipal = Math.max(0, (total || 0) - (indem || 0) - exento);
+    ssVacaciones    = 0;
+  }
+  const ssPrincipal = baseSSPrincipal > CE_TOPE_BASE ? CE_SS_TOPADA : baseSSPrincipal * CE_PCT_SS;
 
   // SS H.Extra: siempre 27% × h.extra (suma aparte, NO afectada por exención)
   const ssHorasExtra    = (horasExtraEur || 0) * CE_PCT_SS_HEXTRA;
@@ -703,9 +711,10 @@ function calcularCosteEmpresaMes({
   const baseIMEI        = Math.max(0, (total || 0) - (indem || 0) - exento);
   const imeiCalc        = baseIMEI > CE_TOPE_BASE ? CE_IMEI_TOPADO : baseIMEI * CE_PCT_IMEI;
 
-  // Base Solidaridad: TOTAL - indemnización - vacaciones - horas extra - importe exento
-  // (igual concepto que la Base SS Principal — solo el salario "regular")
-  const baseSolidaridad = Math.max(0, (total || 0) - (indem || 0) - (vacaciones || 0) - (horasExtraEur || 0) - exento);
+  // Base Solidaridad: TOTAL - indemnización - horas extra - importe exento
+  // v81: si vacAcumulada=true (al final) las vacaciones NO cuentan para solidaridad (van aparte).
+  //      si vacAcumulada=false (mes a mes) las vacaciones SÍ cuentan (van dentro del pool).
+  const baseSolidaridad = Math.max(0, (total || 0) - (indem || 0) - (vacAcumulada ? vacMes : 0) - (horasExtraEur || 0) - exento);
   let solidaridad = 0;
   if (baseSolidaridad > CE_TOPE_BASE) {
     const exc = baseSolidaridad - CE_TOPE_BASE;
@@ -6695,6 +6704,7 @@ function CosteEmpresa() {
         importeExento: exentoMes,
         firmaContrato,
         incluirGestoria,
+        vacAcumulada: d.vacAcumulada || false,
       });
       return {
         mes: mes.mes,
@@ -6777,17 +6787,20 @@ function CosteEmpresa() {
     lines.push([""].join(sep));
 
     lines.push(["LO QUE PERCIBE EL TRABAJADOR (mensual)"].join(sep));
-    lines.push(["Mes","Salario Base","Vacaciones","Indemnizacion","H.Extra EUR","Plus Actividad","Coche","Vivienda","Seguro Vida","Comida","Exento","TOTAL"].join(sep));
+    lines.push(["Mes","Salario Base","Vacaciones","Indemnizacion","H.Extra EUR","Plus Actividad","Festivos EUR","Jorn.Esp EUR","Coche","Vivienda","Seguro Vida","Comida","Exento","TOTAL"].join(sep));
     filas.forEach(f => {
       lines.push([
         f.mes + (f.esCompleto ? "" : ` (${f.desde}-${f.hasta})`),
         dec(f.base), dec(f.vac), dec(f.indem), dec(f.hx), dec(f.plusAct),
+        dec(f.festivos || 0), dec(f.jeImporte || 0),
         dec(f.coche), dec(f.vivienda), dec(f.seguroVida), dec(f.comida), dec(f.exento || 0), dec(f.total),
       ].join(sep));
     });
     lines.push([
       "TOTAL", dec(totales.base), dec(totales.vac), dec(totales.indem), dec(totales.hx),
-      dec(totales.plusAct), dec(totales.coche), dec(totales.vivienda),
+      dec(totales.plusAct),
+      dec(totales.festivos || 0), dec(totales.jeImporte || 0),
+      dec(totales.coche), dec(totales.vivienda),
       dec(totales.seguroVida), dec(totales.comida), dec(totales.exento || 0), dec(totales.total)
     ].join(sep));
     lines.push([""].join(sep));
@@ -6859,6 +6872,8 @@ function CosteEmpresa() {
         <td class="n ${f.indem === 0 ? 'z' : ''}">${f.indem === 0 ? "—" : fmt(f.indem)}</td>
         <td class="n ${f.hx === 0 ? 'z' : 'b'}">${f.hx === 0 ? "—" : fmt(f.hx)}</td>
         <td class="n ${f.plusAct === 0 ? 'z' : 'o'}">${f.plusAct === 0 ? "—" : fmt(f.plusAct)}</td>
+        <td class="n ${(f.festivos || 0) === 0 ? 'z' : 'p'}">${(f.festivos || 0) === 0 ? "—" : fmt(f.festivos)}</td>
+        <td class="n ${(f.jeImporte || 0) === 0 ? 'z' : 'jp'}">${(f.jeImporte || 0) === 0 ? "—" : fmt(f.jeImporte)}</td>
         <td class="n ${f.coche === 0 ? 'z' : 'g'}">${f.coche === 0 ? "—" : fmt(f.coche)}</td>
         <td class="n ${f.vivienda === 0 ? 'z' : 'g'}">${f.vivienda === 0 ? "—" : fmt(f.vivienda)}</td>
         <td class="n ${f.seguroVida === 0 ? 'z' : 'g'}">${f.seguroVida === 0 ? "—" : fmt(f.seguroVida)}</td>
@@ -6877,7 +6892,7 @@ function CosteEmpresa() {
         <td class="n ${f.imei === 0 ? 'z' : ''}">${f.imei === 0 ? "—" : fmt(f.imei)}</td>
         <td class="n ${f.solidaridad === 0 ? 'z' : 'p'}">${f.solidaridad === 0 ? "—" : fmt(f.solidaridad)}</td>
         <td class="n ${f.irpfVivienda === 0 ? 'z' : 'o'}">${f.irpfVivienda === 0 ? "—" : fmt(f.irpfVivienda)}</td>
-        <td class="n g">${fmt(f.gestoria)}</td>
+        <td class="n ${incluirGestoria ? 'g' : 'z'}" style="${incluirGestoria ? '' : 'text-decoration:line-through'}">${fmt(f.gestoria)}</td>
         <td class="n ${(f.exento || 0) === 0 ? 'z' : 'red'}">${(f.exento || 0) === 0 ? "—" : "-" + fmt(f.exento)}</td>
         <td class="n red"><b>${fmt(f.totalCosteEmpresa)}</b></td>
         <td class="n gold" style="background:#fdf8f0;border-left:2px solid #b8864a"><b>${fmt(f.total + f.totalCosteEmpresa)}</b></td>
@@ -6914,6 +6929,8 @@ function CosteEmpresa() {
   th.first { text-align: left; }
   th.gold { color: #b8864a; }
   th.red { color: #a04545; }
+  th.p { color: #6a3a9a; }
+  th.jp { color: #8a1e4a; }
   th .pct { display: block; font-weight: 400; font-size: 6px; color: #999; margin-top: 1px; }
   td { padding: 3px 2px; border-bottom: 1px solid #eae7e2; word-wrap: break-word; }
   td.m { font-weight: 600; text-transform: capitalize; font-size: 7px; }
@@ -6922,6 +6939,7 @@ function CosteEmpresa() {
   td.o { color: #b07030; }
   td.g { color: #5a8a5a; }
   td.p { color: #6a3a9a; }
+  td.jp { color: #8a1e4a; }
   td.gold { color: #b8864a; }
   td.red { color: #a04545; }
   td.z { color: #ccc; }
@@ -6988,6 +7006,8 @@ function CosteEmpresa() {
         <th>Indem.</th>
         <th>H.Extra €</th>
         <th>Plus Act.</th>
+        <th class="p">Festivos €</th>
+        <th class="jp">Jorn.Esp €</th>
         <th>Coche</th>
         <th>Vivienda</th>
         <th>Seguro V.</th>
@@ -7005,6 +7025,8 @@ function CosteEmpresa() {
         <td class="n">${fmt(totales.indem)}</td>
         <td class="n b">${fmt(totales.hx)}</td>
         <td class="n o">${totales.plusAct === 0 ? "—" : fmt(totales.plusAct)}</td>
+        <td class="n p">${(totales.festivos || 0) === 0 ? "—" : fmt(totales.festivos)}</td>
+        <td class="n jp">${(totales.jeImporte || 0) === 0 ? "—" : fmt(totales.jeImporte)}</td>
         <td class="n g">${fmt(totales.coche)}</td>
         <td class="n g">${fmt(totales.vivienda)}</td>
         <td class="n g">${fmt(totales.seguroVida)}</td>
@@ -7044,7 +7066,7 @@ function CosteEmpresa() {
         <td class="n">${fmt(totales.imei)}</td>
         <td class="n p">${totales.solidaridad === 0 ? "—" : fmt(totales.solidaridad)}</td>
         <td class="n o">${totales.irpfVivienda === 0 ? "—" : fmt(totales.irpfVivienda)}</td>
-        <td class="n g">${fmt(totales.gestoria)}</td>
+        <td class="n ${incluirGestoria ? 'g' : 'z'}" style="${incluirGestoria ? '' : 'text-decoration:line-through'}">${fmt(totales.gestoria)}</td>
         <td class="n red">${(totales.exento || 0) === 0 ? "—" : "-" + fmt(totales.exento)}</td>
         <td class="n red">${fmt(totales.totalCosteEmpresa)}</td>
         <td class="n gold" style="background:#b8864a;color:#fff;border-left:2px solid #b8864a"><b>${fmt(totales.total + totales.totalCosteEmpresa)}</b></td>
@@ -7635,6 +7657,7 @@ function CosteEmpresa() {
               importeExento: exentoMes,
               firmaContrato,
               incluirGestoria,
+              vacAcumulada: d.vacAcumulada || false,
             });
             return { mes: mes.mes, claveMes, ...ce, total };
           });
