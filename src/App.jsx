@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v83";
+const APP_VERSION = "v84";
 
 // v73: importe fijo por jornada especial (se paga POR ENCIMA del salario pactado)
 const IMPORTE_JORNADA_ESPECIAL = 20;
@@ -2927,6 +2927,7 @@ function DocumentoImprimible({
 function App45({ modoTab = "iruna45" }) {
   // Usuario actual de la sesión (para mostrar autor en exports)
   const usuarioSesion = useContext(UsuarioContext);
+  const esAdmin = !!usuarioSesion?.es_admin; // v84: para mostrar box Coste Empresa a admins
   const proyectoActivoCtx = useContext(ProyectoContext); // v45
 
   // === FLAG PESTAÑA 40H ===
@@ -4549,6 +4550,73 @@ ${docHTML}
                     </div>
                   </>
                 )}
+                {/* v84: Box Coste Empresa (solo admin) — vista rápida SS sobre datos en vivo */}
+                {esAdmin && desglose45.length > 0 && (() => {
+                  const totalPercibido45 = (es40h ? (totFinal - (totPlus || 0)) : totFinal) + (totalFestImport45 || 0);
+                  // Calcular SS por mes usando calcularCosteEmpresaMes con datos en vivo
+                  let ssPrincipalTot = 0, ssVacTot = 0, ssHxTot = 0, imeiTot = 0, solidTot = 0;
+                  desglose45.forEach((d, i) => {
+                    const c = complementos45[i] || {};
+                    const festImpM = importeFestMes45[i] || 0;
+                    const jeImpM   = d.importeJE || 0;
+                    const plusA    = es40h ? 0 : (d.plusAct || 0);
+                    const vdShow   = d.vdShow || 0;
+                    // Base bruta (con vac completa, sin restar disfrutadas)
+                    const totalBruto = (d.base40 || 0) + (d.vac40 || 0) + (d.indem40 || 0) + (d.cobroHx || 0) + plusA
+                                     + festImpM + jeImpM
+                                     + (c.herramienta || 0) + (c.coche || 0) + (c.vivienda || 0) + (c.seguroVida || 0) + (c.comida || 0);
+                    const ce = calcularCosteEmpresaMes({
+                      total: totalBruto,
+                      vacaciones: d.vac40 || 0,
+                      vacDisfrutadas: vdShow,
+                      indem: d.indem40 || 0,
+                      horasExtraEur: d.cobroHx || 0,
+                      plusVivienda: c.vivienda || 0,
+                      irpfActivo: false,      // no IRPF en vista rápida
+                      pctIRPF: 0,
+                      esPrimerMes: i === 0,
+                      importeExento: 0,       // no baja médica
+                      firmaContrato: true,
+                      incluirGestoria: false, // solo SS, sin gestoría
+                      vacAcumulada,
+                    });
+                    ssPrincipalTot += ce.ssPrincipal || 0;
+                    ssVacTot       += ce.ssVacaciones || 0;
+                    ssHxTot        += ce.ssHorasExtra || 0;
+                    imeiTot        += ce.imei || 0;
+                    solidTot       += ce.solidaridad || 0;
+                  });
+                  const costeSSTotal = ssPrincipalTot + ssVacTot + ssHxTot + imeiTot + solidTot;
+                  const costeTotal   = totalPercibido45 + costeSSTotal;
+                  const pctSobre     = totalPercibido45 > 0 ? (costeSSTotal / totalPercibido45 * 100) : 0;
+                  return (
+                    <>
+                      <Div />
+                      <details open style={{ padding:"12px 14px", background:"#faf3ea", borderRadius:6, border:"1px solid #d4b988" }}>
+                        <summary style={{ cursor:"pointer", fontSize:10, color:"#8a5030", letterSpacing:"0.14em", textTransform:"uppercase", fontWeight:700, marginBottom:2, outline:"none" }}>
+                          ▸ Coste Empresa (vista rápida) <span style={{ fontSize:8, color:"#b8864a", marginLeft:6, letterSpacing:"0.08em" }}>solo admin · solo SS</span>
+                        </summary>
+                        <div style={{ marginTop:10, display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:10 }}>
+                          <div style={{ padding:"10px 12px", background:"#fff", borderRadius:5, border:"1px solid #e0d4b8" }}>
+                            <div style={{ fontSize:9, color:"#8a5030", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:4 }}>Coste SS Empresa</div>
+                            <div style={{ fontSize:16, fontWeight:700, color:"#8a5030", fontFamily:"'Courier Prime', 'Courier New', monospace" }}>{fmtE(costeSSTotal)}</div>
+                          </div>
+                          <div style={{ padding:"10px 12px", background:"#fff", borderRadius:5, border:"1px solid #e0d4b8" }}>
+                            <div style={{ fontSize:9, color:"#8a5030", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:4 }}>Coste Total</div>
+                            <div style={{ fontSize:16, fontWeight:700, color:"#8a5030", fontFamily:"'Courier Prime', 'Courier New', monospace" }}>{fmtE(costeTotal)}</div>
+                          </div>
+                          <div style={{ padding:"10px 12px", background:"#fff", borderRadius:5, border:"1px solid #e0d4b8" }}>
+                            <div style={{ fontSize:9, color:"#8a5030", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:4 }}>% s/Salario</div>
+                            <div style={{ fontSize:16, fontWeight:700, color:"#8a5030", fontFamily:"'Courier Prime', 'Courier New', monospace" }}>{pctSobre.toFixed(2)} %</div>
+                          </div>
+                        </div>
+                        <div style={{ marginTop:8, fontSize:8.5, color:"#a08050", fontStyle:"italic", letterSpacing:"0.02em" }}>
+                          Incluye SS Principal, SS Vac, SS H.Extra, IMEI y Solidaridad. No incluye gestoría ni IRPF vivienda. Para desglose completo, ir a la pestaña Coste Empresa.
+                        </div>
+                      </details>
+                    </>
+                  );
+                })()}
                 {/* v69: Resumen del calendario del proyecto (días del trabajador por categoría) */}
                 {proyectoActivoCtx?.__calendario?.dias && fechaInicio && fechaFin && (() => {
                   const cal = proyectoActivoCtx.__calendario;
