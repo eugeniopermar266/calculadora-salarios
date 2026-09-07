@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v88";
+const APP_VERSION = "v89";
 
 // v73: importe fijo por jornada especial (se paga POR ENCIMA del salario pactado)
 const IMPORTE_JORNADA_ESPECIAL = 20;
@@ -3708,6 +3708,20 @@ function App45({ modoTab = "iruna45" }) {
 ${usuarioSesion ? `<div class="autor-box">Generado por <b>${usuarioSesion.nombre}</b> · ${new Date().toLocaleString("es-ES")}</div>` : ""}
 ${docHTML}
 <script>
+  // v89: forzar document.title al cargar y antes de imprimir
+  // (el navegador usa document.title como sugerencia de nombre al guardar como PDF)
+  document.title = ${JSON.stringify(tituloPDF)};
+  window.addEventListener("beforeprint", function() {
+    document.title = ${JSON.stringify(tituloPDF)};
+  });
+  window.addEventListener("afterprint", function() {
+    document.title = ${JSON.stringify(tituloPDF)};
+  });
+  // Reforzar cada vez que la ventana recobra foco (por si el navegador cambió el título)
+  window.addEventListener("focus", function() {
+    document.title = ${JSON.stringify(tituloPDF)};
+  });
+
   // Guardar la página actual como archivo HTML
   function guardarHTML() {
     try {
@@ -7277,6 +7291,11 @@ function CosteEmpresa() {
 
 </div>
 <script>
+  // v89: forzar document.title al cargar y antes de imprimir
+  document.title = ${JSON.stringify(generarFilename())};
+  window.addEventListener("beforeprint", function() { document.title = ${JSON.stringify(generarFilename())}; });
+  window.addEventListener("afterprint", function() { document.title = ${JSON.stringify(generarFilename())}; });
+  window.addEventListener("focus", function() { document.title = ${JSON.stringify(generarFilename())}; });
   // Auto-lanzar el diálogo de impresión al cargar
   window.addEventListener("load", function() {
     setTimeout(function() { window.print(); }, 400);
