@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v87";
+const APP_VERSION = "v88";
 
 // v73: importe fijo por jornada especial (se paga POR ENCIMA del salario pactado)
 const IMPORTE_JORNADA_ESPECIAL = 20;
@@ -1231,6 +1231,7 @@ function GestorPerfiles({ tabId, datosActuales, onCargarPerfil }) {
   const usuarioCtx = useContext(UsuarioContext);
   const proyectoActivoCtx = useContext(ProyectoContext); // v46
   const esAdmin = !!usuarioCtx?.es_admin;
+  const esCoordinador = usuarioCtx?.rol === "coordinador"; // v88
   const [perfiles, setPerfiles] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [mostrarLista, setMostrarLista] = useState(false);
@@ -4896,7 +4897,7 @@ async function loginUsuario(nombre, pin) {
     nombre: `eq.${nombre}`,
     pin: `eq.${pin}`,
     activo: `eq.true`,
-    select: "id,nombre,es_admin",
+    select: "id,nombre,es_admin,rol",
   });
   const data = await supabaseFetch(`usuarios?${params}`);
   return Array.isArray(data) && data.length === 1 ? data[0] : null;
@@ -5092,10 +5093,18 @@ async function obtenerCalendarioProyecto(proyectoId) {
   }
 }
 
-async function crearCalendarioProyecto(adminPin, { proyectoId, fechaInicio, fechaFin, comunidad, dias = {}, notas = "", modoVacaciones = "mes_a_mes", modoIndemnizacion = "mes_a_mes" }) {
+async function crearCalendarioProyecto(auth, { proyectoId, fechaInicio, fechaFin, comunidad, dias = {}, notas = "", modoVacaciones = "mes_a_mes", modoIndemnizacion = "mes_a_mes" }) {
+  // v88: auth puede ser string (admin pin, retrocompat) u objeto {adminPin, userPin}
+  const headers = { "Prefer": "return=representation" };
+  if (typeof auth === "string") {
+    headers["x-admin-pin"] = auth;
+  } else if (auth && typeof auth === "object") {
+    if (auth.adminPin) headers["x-admin-pin"] = auth.adminPin;
+    if (auth.userPin) headers["x-user-pin"] = auth.userPin;
+  }
   return supabaseFetch(`calendarios_proyecto`, {
     method: "POST",
-    headers: { "x-admin-pin": adminPin, "Prefer": "return=representation" },
+    headers,
     body: JSON.stringify({
       proyecto_id: proyectoId,
       fecha_inicio: fechaInicio,
@@ -5109,14 +5118,22 @@ async function crearCalendarioProyecto(adminPin, { proyectoId, fechaInicio, fech
   });
 }
 
-async function actualizarCalendarioProyecto(adminPin, id, cambios) {
+async function actualizarCalendarioProyecto(auth, id, cambios) {
+  // v88: auth puede ser string (admin pin, retrocompat) u objeto {adminPin, userPin}
   const c = { ...cambios };
   if (c.fechaInicio !== undefined) { c.fecha_inicio = c.fechaInicio; delete c.fechaInicio; }
   if (c.fechaFin !== undefined) { c.fecha_fin = c.fechaFin; delete c.fechaFin; }
   c.updated_at = new Date().toISOString();
+  const headers = { "Prefer": "return=representation" };
+  if (typeof auth === "string") {
+    headers["x-admin-pin"] = auth;
+  } else if (auth && typeof auth === "object") {
+    if (auth.adminPin) headers["x-admin-pin"] = auth.adminPin;
+    if (auth.userPin) headers["x-user-pin"] = auth.userPin;
+  }
   return supabaseFetch(`calendarios_proyecto?id=eq.${id}`, {
     method: "PATCH",
-    headers: { "x-admin-pin": adminPin, "Prefer": "return=representation" },
+    headers,
     body: JSON.stringify(c),
   });
 }
@@ -5564,7 +5581,7 @@ async function borrarLogsAntiguos(adminPin, dias = 30) {
 // ═══════════════════════════════════════════════════════════════════════
 // PANTALLA SELECTOR DE PROYECTO (v45)
 // ═══════════════════════════════════════════════════════════════════════
-function PantallaSelectorProyecto({ usuario, onSeleccionar, onLogout, onGestionar }) {
+function PantallaSelectorProyecto({ usuario, onSeleccionar, onLogout, onGestionar, onEditarCalendario }) {
   const [proyectos, setProyectos] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
@@ -5611,7 +5628,7 @@ function PantallaSelectorProyecto({ usuario, onSeleccionar, onLogout, onGestiona
             Selecciona Proyecto
           </div>
           <div style={{ fontSize: 10, color: "#888", marginTop: 4, letterSpacing: "0.12em", textTransform: "uppercase" }}>
-            {usuario.nombre}{usuario.es_admin ? " · Admin" : ""}
+            {usuario.nombre}{usuario.es_admin ? " · Admin" : (usuario.rol === "coordinador" ? " · Coordinador" : "")}
           </div>
           <div style={{ fontSize: 9, color: "#c8a96e", marginTop: 6, letterSpacing: "0.12em", fontWeight: 700, fontFamily: "'Courier Prime', 'Courier New', monospace" }} title="Versión de la app">
             {APP_VERSION}
@@ -5648,29 +5665,49 @@ function PantallaSelectorProyecto({ usuario, onSeleccionar, onLogout, onGestiona
         {!cargando && proyectos.length > 0 && (
           <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
             {proyectos.map(p => (
-              <button
-                key={p.id}
-                onClick={() => onSeleccionar(p)}
-                style={{
-                  background: "#fff", border: "1px solid #d0ccc6",
-                  borderRadius: 6, padding: "14px 16px", cursor: "pointer",
-                  textAlign: "left", fontFamily: "'Courier Prime', 'Courier New', monospace",
-                  transition: "all 0.15s", color: "#1a1a1a",
-                  display: "flex", justifyContent: "space-between", alignItems: "center",
-                }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = "#c8a96e"; e.currentTarget.style.background = "#faf6ee"; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = "#d0ccc6"; e.currentTarget.style.background = "#fff"; }}
-              >
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", letterSpacing: "0.05em" }}>
-                    {p.nombre}
+              <div key={p.id} style={{
+                background: "#fff", border: "1px solid #d0ccc6",
+                borderRadius: 6, display: "flex", alignItems: "stretch",
+                fontFamily: "'Courier Prime', 'Courier New', monospace",
+              }}>
+                <button
+                  onClick={() => onSeleccionar(p)}
+                  style={{
+                    flex: 1, background: "transparent", border: "none",
+                    padding: "14px 16px", cursor: "pointer",
+                    textAlign: "left", fontFamily: "'Courier Prime', 'Courier New', monospace",
+                    transition: "background 0.15s", color: "#1a1a1a",
+                    display: "flex", justifyContent: "space-between", alignItems: "center",
+                    borderRadius: (usuario.es_admin || usuario.rol === "coordinador") ? "6px 0 0 6px" : 6,
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = "#faf6ee"; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
+                >
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", letterSpacing: "0.05em" }}>
+                      {p.nombre}
+                    </div>
+                    <div style={{ fontSize: 10, color: "#888", marginTop: 2, letterSpacing: "0.1em", textTransform: "uppercase" }}>
+                      {p.productora}
+                    </div>
                   </div>
-                  <div style={{ fontSize: 10, color: "#888", marginTop: 2, letterSpacing: "0.1em", textTransform: "uppercase" }}>
-                    {p.productora}
-                  </div>
-                </div>
-                <div style={{ color: "#c8a96e", fontSize: 18 }}>→</div>
-              </button>
+                  <div style={{ color: "#c8a96e", fontSize: 18 }}>→</div>
+                </button>
+                {(usuario.es_admin || usuario.rol === "coordinador") && (
+                  <button
+                    onClick={() => onEditarCalendario && onEditarCalendario(p)}
+                    title="Editar calendario del proyecto"
+                    style={{
+                      background: "#faf3ea", border: "none", borderLeft: "1px solid #e0d4b8",
+                      padding: "0 14px", cursor: "pointer", color: "#8a5030",
+                      fontSize: 16, borderRadius: "0 6px 6px 0",
+                      transition: "background 0.15s",
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.background = "#f0e3c8"; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = "#faf3ea"; }}
+                  >📅</button>
+                )}
+              </div>
             ))}
           </div>
         )}
@@ -5734,13 +5771,13 @@ function PantallaLogin({ onAcierto }) {
       if (user) {
         try {
           localStorage.setItem(AUTH_KEY, JSON.stringify({
-            id: user.id, nombre: user.nombre, es_admin: user.es_admin, pin,
+            id: user.id, nombre: user.nombre, es_admin: user.es_admin, rol: user.rol || (user.es_admin ? "admin" : "user"), pin,
             ultima_actividad: Date.now(),
           }));
         } catch {}
         // Registrar log de acceso (no bloqueante)
         registrarLog(user.nombre, "login");
-        onAcierto({ id: user.id, nombre: user.nombre, es_admin: user.es_admin, pin });
+        onAcierto({ id: user.id, nombre: user.nombre, es_admin: user.es_admin, rol: user.rol || (user.es_admin ? "admin" : "user"), pin });
       } else {
         setError(true); setIntentos(n => n + 1); setPin("");
         setTimeout(() => setError(false), 600);
@@ -5931,7 +5968,9 @@ function PanelAdmin({ usuarioActual, onCerrar }) {
   const onSaveEdit = async () => {
     try {
       await actualizarUsuario(usuarioActual.pin, editando.id, {
-        nombre: editando.nombre.trim(), pin: editando.pin.trim(), es_admin: editando.es_admin
+        nombre: editando.nombre.trim(), pin: editando.pin.trim(),
+        es_admin: editando.rol === "admin",  // v88: mantener es_admin sincronizado con rol
+        rol: editando.rol || "user",         // v88
       });
       setEditando(null);
       recargar();
@@ -6006,7 +6045,7 @@ function PanelAdmin({ usuarioActual, onCerrar }) {
               <thead><tr>
                 <th style={TH}>Nombre</th>
                 <th style={TH}>PIN</th>
-                <th style={{ ...TH, textAlign: "center" }}>Admin</th>
+                <th style={{ ...TH, textAlign: "center" }}>Rol</th>
                 <th style={{ ...TH, textAlign: "center" }}>Estado</th>
                 <th style={{ ...TH, textAlign: "right" }}>Acciones</th>
               </tr></thead>
@@ -6018,7 +6057,13 @@ function PanelAdmin({ usuarioActual, onCerrar }) {
                       <tr key={u.id}>
                         <td style={C}><input style={{ ...inp, width: "100%" }} value={editando.nombre} onChange={e => setEditando({ ...editando, nombre: e.target.value })} /></td>
                         <td style={C}><input style={{ ...inp, width: "100%" }} value={editando.pin} onChange={e => setEditando({ ...editando, pin: e.target.value })} /></td>
-                        <td style={{ ...C, textAlign: "center" }}><input type="checkbox" checked={editando.es_admin} onChange={e => setEditando({ ...editando, es_admin: e.target.checked })} /></td>
+                        <td style={{ ...C, textAlign: "center" }}>
+                          <select value={editando.rol || (editando.es_admin ? "admin" : "user")} onChange={e => setEditando({ ...editando, rol: e.target.value, es_admin: e.target.value === "admin" })} style={{ ...inp, fontSize: 10, padding: "4px 6px" }}>
+                            <option value="user">User</option>
+                            <option value="coordinador">Coordinador</option>
+                            <option value="admin">Admin</option>
+                          </select>
+                        </td>
                         <td style={{ ...C, textAlign: "center", color: "#888", fontSize: 9 }}>—</td>
                         <td style={{ ...C, textAlign: "right" }}>
                           <button onClick={onSaveEdit} style={{ ...btn("#5a8a5a"), marginRight: 4 }}>✓</button>
@@ -6034,7 +6079,15 @@ function PanelAdmin({ usuarioActual, onCerrar }) {
                         {u.id === usuarioActual.id && <span style={{ fontSize: 9, color: "#888", marginLeft: 6 }}>(tú)</span>}
                       </td>
                       <td style={{ ...C, color: inactivo ? "#aaa" : "#888" }}>••••</td>
-                      <td style={{ ...C, textAlign: "center" }}>{u.es_admin ? "✓" : "—"}</td>
+                      <td style={{ ...C, textAlign: "center", fontSize: 10 }}>
+                        {u.rol === "admin" || u.es_admin ? (
+                          <span style={{ background: "rgba(200,150,58,0.15)", color: "#8a5030", padding: "2px 7px", borderRadius: 3, fontSize: 9, fontWeight: 700, letterSpacing: "0.05em" }}>ADMIN</span>
+                        ) : u.rol === "coordinador" ? (
+                          <span style={{ background: "rgba(90,138,90,0.15)", color: "#3a6a3a", padding: "2px 7px", borderRadius: 3, fontSize: 9, fontWeight: 700, letterSpacing: "0.05em" }}>COORDINADOR</span>
+                        ) : (
+                          <span style={{ color: "#999", fontSize: 9 }}>user</span>
+                        )}
+                      </td>
                       <td style={{ ...C, textAlign: "center" }}>
                         {inactivo ? (
                           <span style={{ background: "rgba(136,136,136,0.15)", color: "#666", padding: "2px 7px", borderRadius: 3, fontSize: 9, fontWeight: 700, letterSpacing: "0.05em" }}>⊘ INACTIVO</span>
@@ -8271,6 +8324,10 @@ function PanelProyectos({ usuarioActual, onCerrar }) {
 // ═══════════════════════════════════════════════════════════════════════
 
 function PanelCalendarioProyecto({ proyecto, usuarioActual, onCerrar }) {
+  // v88: rol del usuario para decidir cabeceras y ocultar acciones
+  const esAdmin = !!usuarioActual?.es_admin;
+  const esCoordinador = usuarioActual?.rol === "coordinador";
+  const auth = esAdmin ? { adminPin: usuarioActual.pin } : (esCoordinador ? { userPin: usuarioActual.pin } : {});
   const [calendario, setCalendario] = useState(null); // null=cargando, false=no existe, obj=datos
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
@@ -8403,7 +8460,7 @@ function PanelCalendarioProyecto({ proyecto, usuarioActual, onCerrar }) {
     setGuardando(true); setError(null);
     try {
       if (calendario && calendario.id) {
-        await actualizarCalendarioProyecto(usuarioActual.pin, calendario.id, {
+        await actualizarCalendarioProyecto(auth, calendario.id, {
           fechaInicio: form.fechaInicio, fechaFin: form.fechaFin,
           comunidad: form.comunidad, dias,
           modo_vacaciones: form.modoVacaciones,      // v86
@@ -8411,7 +8468,7 @@ function PanelCalendarioProyecto({ proyecto, usuarioActual, onCerrar }) {
         });
         setMensaje({ tipo: "ok", texto: "✓ Calendario actualizado" });
       } else {
-        await crearCalendarioProyecto(usuarioActual.pin, {
+        await crearCalendarioProyecto(auth, {
           proyectoId: proyecto.id, fechaInicio: form.fechaInicio, fechaFin: form.fechaFin,
           comunidad: form.comunidad, dias,
           modoVacaciones: form.modoVacaciones,        // v86
@@ -8822,7 +8879,7 @@ function PanelCalendarioProyecto({ proyecto, usuarioActual, onCerrar }) {
             {/* Barra inferior: guardar / borrar */}
             <div style={{ display: "flex", gap: 8, marginTop: 14, justifyContent: "space-between", position: "sticky", bottom: -20, background: "#faf7f2", padding: "12px 0 4px", borderTop: "1px solid #e0ddd8" }}>
               <div>
-                {calendario && calendario.id && (
+                {esAdmin && calendario && calendario.id && (
                   <button onClick={eliminar} style={{ ...btnGhost, borderColor: "#c00", color: "#c00" }}>🗑 Borrar calendario</button>
                 )}
               </div>
@@ -9331,6 +9388,7 @@ export default function App() {
   const [mostrarLogs, setMostrarLogs] = useState(false);
   const [mostrarPuestos, setMostrarPuestos] = useState(false);
   const [mostrarProyectos, setMostrarProyectos] = useState(false);
+  const [proyectoCalendarioSelector, setProyectoCalendarioSelector] = useState(null); // v88: proyecto para editar calendario desde selector
   const [mostrarFestivos, setMostrarFestivos] = useState(false); // v54
   const [proyectoActivo, setProyectoActivo] = useState(null); // v45: proyecto seleccionado
   const [calendarioActivo, setCalendarioActivo] = useState(null); // v59: calendario del proyecto activo
@@ -9415,6 +9473,7 @@ export default function App() {
         id: parsed.id,
         nombre: parsed.nombre,
         es_admin: parsed.es_admin,
+        rol: parsed.rol || (parsed.es_admin ? "admin" : "user"), // v88
         pin: parsed.pin,
       });
       // Restaurar proyecto activo si lo tenía seleccionado (v45)
@@ -9544,9 +9603,17 @@ export default function App() {
           onSeleccionar={seleccionarProyecto}
           onLogout={cerrarSesion}
           onGestionar={() => setMostrarProyectos(true)}
+          onEditarCalendario={(p) => setProyectoCalendarioSelector(p)}
         />
         {mostrarProyectos && usuario.es_admin && (
           <PanelProyectos usuarioActual={usuario} onCerrar={() => setMostrarProyectos(false)} />
+        )}
+        {proyectoCalendarioSelector && (usuario.es_admin || usuario.rol === "coordinador") && (
+          <PanelCalendarioProyecto
+            proyecto={proyectoCalendarioSelector}
+            usuarioActual={usuario}
+            onCerrar={() => setProyectoCalendarioSelector(null)}
+          />
         )}
       </>
     );
