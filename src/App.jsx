@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v85";
+const APP_VERSION = "v86";
 
 // v73: importe fijo por jornada especial (se paga POR ENCIMA del salario pactado)
 const IMPORTE_JORNADA_ESPECIAL = 20;
@@ -2955,8 +2955,8 @@ function App45({ modoTab = "iruna45" }) {
   const [festivosPorMes,   setFestivosPorMes]  = useState([]);
   const [jornadasEspecialesPorMes, setJornadasEspecialesPorMes] = useState([]); // v73: JE por mes (editable)
   const [festivosActivos,  setFestivosActivos] = useState({});
-  const [vacAcumulada,     setVacAcumulada]    = useState(false);
-  const [indemAcumulada,   setIndemAcumulada]  = useState(false);
+  const [vacAcumulada,     setVacAcumulada]    = useState(proyectoActivoCtx?.__calendario?.modo_vacaciones === "al_final"); // v86: hereda del proyecto
+  const [indemAcumulada,   setIndemAcumulada]  = useState(proyectoActivoCtx?.__calendario?.modo_indemnizacion === "al_final"); // v86: hereda del proyecto
   const [hxPorRodaje40,    setHxPorRodaje40]   = useState(false); // v59: solo 40H, 1 HX por día de rodaje del calendario
   const [mostrarFestivosLegacy, setMostrarFestivosLegacy] = useState(false); // v62: panel viejo festivos oculto por defecto si hay calendario
   const saltarAutoRellenoRef = useRef(false); // v71: cuando acabamos de cargar un perfil, saltamos el próximo auto-relleno
@@ -3848,6 +3848,27 @@ ${docHTML}
               if (d.fechaFin !== undefined) setFechaFin(d.fechaFin);
               if (d.vacAcumulada !== undefined) setVacAcumulada(d.vacAcumulada);
               if (d.indemAcumulada !== undefined) setIndemAcumulada(d.indemAcumulada);
+              // v86: si el proyecto tiene modos definidos y difieren, preguntar si actualizar
+              const calProy = proyectoActivoCtx?.__calendario;
+              if (calProy) {
+                const modoVacProy = calProy.modo_vacaciones === "al_final";
+                const modoIndProy = calProy.modo_indemnizacion === "al_final";
+                const vacGuardada = d.vacAcumulada;
+                const indGuardada = d.indemAcumulada;
+                const diffVac = vacGuardada !== undefined && vacGuardada !== modoVacProy;
+                const diffInd = indGuardada !== undefined && indGuardada !== modoIndProy;
+                if (diffVac || diffInd) {
+                  setTimeout(() => {
+                    const partes = [];
+                    if (diffVac) partes.push(`• Vacaciones: perfil "${vacGuardada?"al final":"mes a mes"}" → proyecto "${modoVacProy?"al final":"mes a mes"}"`);
+                    if (diffInd) partes.push(`• Indemnización: perfil "${indGuardada?"al final":"mes a mes"}" → proyecto "${modoIndProy?"al final":"mes a mes"}"`);
+                    if (confirm(`El proyecto ha cambiado el modo por defecto:\n\n${partes.join("\n")}\n\n¿Actualizar este perfil?`)) {
+                      if (diffVac) setVacAcumulada(modoVacProy);
+                      if (diffInd) setIndemAcumulada(modoIndProy);
+                    }
+                  }, 300);
+                }
+              }
               if (d.horasPorMes !== undefined) setHorasPorMes(d.horasPorMes);
               if (d.vacDiasPorMes !== undefined) setVacDiasPorMes(d.vacDiasPorMes);
               if (d.festivosPorMes !== undefined) setFestivosPorMes(d.festivosPorMes);
@@ -5056,7 +5077,7 @@ async function obtenerCalendarioProyecto(proyectoId) {
   }
 }
 
-async function crearCalendarioProyecto(adminPin, { proyectoId, fechaInicio, fechaFin, comunidad, dias = {}, notas = "" }) {
+async function crearCalendarioProyecto(adminPin, { proyectoId, fechaInicio, fechaFin, comunidad, dias = {}, notas = "", modoVacaciones = "mes_a_mes", modoIndemnizacion = "mes_a_mes" }) {
   return supabaseFetch(`calendarios_proyecto`, {
     method: "POST",
     headers: { "x-admin-pin": adminPin, "Prefer": "return=representation" },
@@ -5067,6 +5088,8 @@ async function crearCalendarioProyecto(adminPin, { proyectoId, fechaInicio, fech
       comunidad,
       dias,
       notas,
+      modo_vacaciones: modoVacaciones,      // v86
+      modo_indemnizacion: modoIndemnizacion, // v86
     }),
   });
 }
@@ -8236,7 +8259,7 @@ function PanelCalendarioProyecto({ proyecto, usuarioActual, onCerrar }) {
   const [calendario, setCalendario] = useState(null); // null=cargando, false=no existe, obj=datos
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
-  const [form, setForm] = useState({ fechaInicio: "", fechaFin: "", comunidad: "" });
+  const [form, setForm] = useState({ fechaInicio: "", fechaFin: "", comunidad: "", modoVacaciones: "mes_a_mes", modoIndemnizacion: "mes_a_mes" }); // v86
   const [festivosComunidad, setFestivosComunidad] = useState([]);
   const [guardando, setGuardando] = useState(false);
   const [mensaje, setMensaje] = useState(null);
@@ -8277,13 +8300,15 @@ function PanelCalendarioProyecto({ proyecto, usuarioActual, onCerrar }) {
           fechaInicio: cal.fecha_inicio || "",
           fechaFin: cal.fecha_fin || "",
           comunidad: cal.comunidad || "",
+          modoVacaciones: cal.modo_vacaciones || "mes_a_mes",
+          modoIndemnizacion: cal.modo_indemnizacion || "mes_a_mes",
         });
         setDias(cal.dias || {});
         // Situar el mes actual en el primer mes del rango
         if (cal.fecha_inicio) setMesActual(cal.fecha_inicio.slice(0, 7));
       } else {
         setCalendario(false);
-        setForm({ fechaInicio: "", fechaFin: "", comunidad: "" });
+        setForm({ fechaInicio: "", fechaFin: "", comunidad: "", modoVacaciones: "mes_a_mes", modoIndemnizacion: "mes_a_mes" });
         setDias({});
       }
       setTocado(false);
@@ -8366,12 +8391,16 @@ function PanelCalendarioProyecto({ proyecto, usuarioActual, onCerrar }) {
         await actualizarCalendarioProyecto(usuarioActual.pin, calendario.id, {
           fechaInicio: form.fechaInicio, fechaFin: form.fechaFin,
           comunidad: form.comunidad, dias,
+          modo_vacaciones: form.modoVacaciones,      // v86
+          modo_indemnizacion: form.modoIndemnizacion, // v86
         });
         setMensaje({ tipo: "ok", texto: "✓ Calendario actualizado" });
       } else {
         await crearCalendarioProyecto(usuarioActual.pin, {
           proyectoId: proyecto.id, fechaInicio: form.fechaInicio, fechaFin: form.fechaFin,
           comunidad: form.comunidad, dias,
+          modoVacaciones: form.modoVacaciones,        // v86
+          modoIndemnizacion: form.modoIndemnizacion,  // v86
         });
         setMensaje({ tipo: "ok", texto: "✓ Calendario creado" });
       }
@@ -8562,6 +8591,43 @@ function PanelCalendarioProyecto({ proyecto, usuarioActual, onCerrar }) {
               </div>
             </div>
 
+            {/* v86: Modos por defecto del proyecto (vacaciones + indemnización) */}
+            <div style={{ background: "#faf3ea", padding: 14, borderRadius: 4, marginBottom: 14, border: "1px solid #d4b988" }}>
+              <div style={{ fontSize: 9, color: "#8a5030", letterSpacing: "0.14em", textTransform: "uppercase", fontWeight: 700, marginBottom: 10 }}>
+                ⚙️ Modo por defecto para perfiles de este proyecto
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+
+                <div style={{ background: "#fff", border: "1px solid #e0d4b8", borderRadius: 4, padding: "10px 12px" }}>
+                  <div style={{ fontSize: 10, color: "#666", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 8, fontWeight: 700 }}>Vacaciones</div>
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 8px", background: form.modoVacaciones === "mes_a_mes" ? "#f8f5ff" : "transparent", borderRadius: 3, marginBottom: 4, cursor: "pointer" }}>
+                    <input type="radio" name="modo-vac" checked={form.modoVacaciones === "mes_a_mes"} onChange={() => { setForm({...form, modoVacaciones: "mes_a_mes"}); setTocado(true); }} />
+                    <span style={{ fontSize: 11, color: "#1a1a1a" }}>Prorrateadas (mes a mes)</span>
+                  </label>
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 8px", background: form.modoVacaciones === "al_final" ? "#f8f5ff" : "transparent", borderRadius: 3, cursor: "pointer" }}>
+                    <input type="radio" name="modo-vac" checked={form.modoVacaciones === "al_final"} onChange={() => { setForm({...form, modoVacaciones: "al_final"}); setTocado(true); }} />
+                    <span style={{ fontSize: 11, color: "#1a1a1a" }}>Al final del contrato</span>
+                  </label>
+                </div>
+
+                <div style={{ background: "#fff", border: "1px solid #e0d4b8", borderRadius: 4, padding: "10px 12px" }}>
+                  <div style={{ fontSize: 10, color: "#666", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 8, fontWeight: 700 }}>Indemnización</div>
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 8px", background: form.modoIndemnizacion === "mes_a_mes" ? "#f8f5ff" : "transparent", borderRadius: 3, marginBottom: 4, cursor: "pointer" }}>
+                    <input type="radio" name="modo-ind" checked={form.modoIndemnizacion === "mes_a_mes"} onChange={() => { setForm({...form, modoIndemnizacion: "mes_a_mes"}); setTocado(true); }} />
+                    <span style={{ fontSize: 11, color: "#1a1a1a" }}>Prorrateada (mes a mes)</span>
+                  </label>
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 8px", background: form.modoIndemnizacion === "al_final" ? "#f8f5ff" : "transparent", borderRadius: 3, cursor: "pointer" }}>
+                    <input type="radio" name="modo-ind" checked={form.modoIndemnizacion === "al_final"} onChange={() => { setForm({...form, modoIndemnizacion: "al_final"}); setTocado(true); }} />
+                    <span style={{ fontSize: 11, color: "#1a1a1a" }}>Al final del contrato</span>
+                  </label>
+                </div>
+
+              </div>
+              <div style={{ marginTop: 10, fontSize: 8.5, color: "#a08050", fontStyle: "italic" }}>
+                Al crear un nuevo perfil se aplicará esta configuración. Los perfiles existentes te preguntará si quieres actualizarlos al cargarlos.
+              </div>
+            </div>
+
             {/* Añadir tramo */}
             {form.fechaInicio && form.fechaFin && (
               <div style={{ background: "#fff", padding: 14, borderRadius: 4, marginBottom: 14, border: "1px solid #e0ddd8" }}>
@@ -8651,7 +8717,7 @@ function PanelCalendarioProyecto({ proyecto, usuarioActual, onCerrar }) {
                         onClick={(e) => {
                           e.stopPropagation();
                           const rect = e.currentTarget.getBoundingClientRect();
-                          setPopup({ fecha: iso, x: rect.left, y: rect.bottom + 4, esFestivo });
+                          setPopup({ fecha: iso, x: rect.left, y: rect.bottom + 4, yTop: rect.top - 4, esFestivo });
                         }}
                         style={{
                           background: color.bg,
@@ -8683,14 +8749,24 @@ function PanelCalendarioProyecto({ proyecto, usuarioActual, onCerrar }) {
             )}
 
             {/* Popup al clicar día */}
-            {popup && (
+            {popup && (() => {
+              const POPUP_H = 340; // altura aproximada del popup
+              const POPUP_W = 220;
+              const espacioAbajo = window.innerHeight - popup.y;
+              const cabajo = espacioAbajo >= POPUP_H + 10;
+              // Si no cabe abajo, colocarlo arriba (popup.yTop es la parte superior del día)
+              const topFinal = cabajo
+                ? Math.min(popup.y, window.innerHeight - POPUP_H - 10)
+                : Math.max(10, popup.yTop - POPUP_H);
+              const leftFinal = Math.min(popup.x, window.innerWidth - POPUP_W - 10);
+              return (
               <div style={{
                 position: "fixed",
-                left: Math.min(popup.x, window.innerWidth - 220),
-                top: Math.min(popup.y, window.innerHeight - 200),
+                left: leftFinal,
+                top: topFinal,
                 background: "#fff", border: "1px solid #b8864a", borderRadius: 6,
                 padding: 10, zIndex: 1200, boxShadow: "0 4px 20px rgba(0,0,0,0.3)",
-                width: 200,
+                width: POPUP_W,
               }} onClick={e => e.stopPropagation()}>
                 <div style={{ fontSize: 10, color: "#666", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700 }}>
                   {popup.fecha}
@@ -8725,7 +8801,8 @@ function PanelCalendarioProyecto({ proyecto, usuarioActual, onCerrar }) {
                 </div>
                 <button onClick={() => setPopup(null)} style={{ ...btnGhost, width: "100%", marginTop: 8 }}>Cerrar</button>
               </div>
-            )}
+              );
+            })()}
 
             {/* Barra inferior: guardar / borrar */}
             <div style={{ display: "flex", gap: 8, marginTop: 14, justifyContent: "space-between", position: "sticky", bottom: -20, background: "#faf7f2", padding: "12px 0 4px", borderTop: "1px solid #e0ddd8" }}>
