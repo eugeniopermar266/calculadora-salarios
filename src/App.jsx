@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v86";
+const APP_VERSION = "v87";
 
 // v73: importe fijo por jornada especial (se paga POR ENCIMA del salario pactado)
 const IMPORTE_JORNADA_ESPECIAL = 20;
@@ -2955,13 +2955,27 @@ function App45({ modoTab = "iruna45" }) {
   const [festivosPorMes,   setFestivosPorMes]  = useState([]);
   const [jornadasEspecialesPorMes, setJornadasEspecialesPorMes] = useState([]); // v73: JE por mes (editable)
   const [festivosActivos,  setFestivosActivos] = useState({});
-  const [vacAcumulada,     setVacAcumulada]    = useState(proyectoActivoCtx?.__calendario?.modo_vacaciones === "al_final"); // v86: hereda del proyecto
-  const [indemAcumulada,   setIndemAcumulada]  = useState(proyectoActivoCtx?.__calendario?.modo_indemnizacion === "al_final"); // v86: hereda del proyecto
+  const [vacAcumulada,     setVacAcumulada]    = useState(false);
+  const [indemAcumulada,   setIndemAcumulada]  = useState(false);
+  const perfilCargadoRef = useRef(false); // v87: marca si el usuario cargó un perfil (para no sobreescribir sus toggles)
+  const modosToggleadoManualRef = useRef({ vac: false, ind: false }); // v87: si el user tocó el toggle a mano, respetarlo
   const [hxPorRodaje40,    setHxPorRodaje40]   = useState(false); // v59: solo 40H, 1 HX por día de rodaje del calendario
   const [mostrarFestivosLegacy, setMostrarFestivosLegacy] = useState(false); // v62: panel viejo festivos oculto por defecto si hay calendario
   const saltarAutoRellenoRef = useRef(false); // v71: cuando acabamos de cargar un perfil, saltamos el próximo auto-relleno
 
   const [festivosComunidadCal, setFestivosComunidadCal] = useState([]); // v63: fechas de festivos de la comunidad del calendario del proyecto
+
+  // v87: cuando el calendario del proyecto se carga (o cambia), aplicar los modos por defecto
+  // SOLO si el usuario no ha cargado un perfil ni ha tocado los toggles a mano
+  useEffect(() => {
+    const cal = proyectoActivoCtx?.__calendario;
+    if (!cal) return;
+    if (perfilCargadoRef.current) return; // hay perfil cargado, no tocar
+    const modoVacProy = cal.modo_vacaciones === "al_final";
+    const modoIndProy = cal.modo_indemnizacion === "al_final";
+    if (!modosToggleadoManualRef.current.vac) setVacAcumulada(modoVacProy);
+    if (!modosToggleadoManualRef.current.ind) setIndemAcumulada(modoIndProy);
+  }, [proyectoActivoCtx?.__calendario?.id, proyectoActivoCtx?.__calendario?.modo_vacaciones, proyectoActivoCtx?.__calendario?.modo_indemnizacion]);
 
   // v63: cargar festivos de la comunidad del calendario del proyecto activo
   useEffect(() => {
@@ -3848,6 +3862,7 @@ ${docHTML}
               if (d.fechaFin !== undefined) setFechaFin(d.fechaFin);
               if (d.vacAcumulada !== undefined) setVacAcumulada(d.vacAcumulada);
               if (d.indemAcumulada !== undefined) setIndemAcumulada(d.indemAcumulada);
+              perfilCargadoRef.current = true; // v87: hay perfil cargado, no aplicar defaults del proyecto
               // v86: si el proyecto tiene modos definidos y difieren, preguntar si actualizar
               const calProy = proyectoActivoCtx?.__calendario;
               if (calProy) {
@@ -4245,8 +4260,8 @@ ${docHTML}
 
           <div style={P}>
             <div style={ST}>▸ Modo de Pago</div>
-            <Toggle label="Vacaciones al final"    value={vacAcumulada}   onChange={setVacAcumulada}   sublabel={vacAcumulada?"Total vacaciones en última nómina":"Prorrateadas cada mes"} />
-            <Toggle label="Indemnización al final" value={indemAcumulada} onChange={setIndemAcumulada} sublabel={indemAcumulada?"Total indemnización en última nómina":"Prorrateada cada mes"} />
+            <Toggle label="Vacaciones al final"    value={vacAcumulada}   onChange={(v)=>{ modosToggleadoManualRef.current.vac = true; setVacAcumulada(v); }}   sublabel={vacAcumulada?"Total vacaciones en última nómina":"Prorrateadas cada mes"} />
+            <Toggle label="Indemnización al final" value={indemAcumulada} onChange={(v)=>{ modosToggleadoManualRef.current.ind = true; setIndemAcumulada(v); }} sublabel={indemAcumulada?"Total indemnización en última nómina":"Prorrateada cada mes"} />
             <div style={{ fontSize:9, color:"#888", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", marginTop:4, padding:"6px 10px", background:"#f0ede8", borderRadius:4, border:"1px solid #e0ddd8" }}>
               ℹ Las horas extra siempre se cobran el mes que se generan
             </div>
