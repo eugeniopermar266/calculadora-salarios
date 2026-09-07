@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v90";
+const APP_VERSION = "v91";
 
 // v73: importe fijo por jornada especial (se paga POR ENCIMA del salario pactado)
 const IMPORTE_JORNADA_ESPECIAL = 20;
@@ -3325,7 +3325,10 @@ function App45({ modoTab = "iruna45" }) {
   // v47: en 40H con fijo discontinuo, cambia el factor de indemnización (1,6433333 en vez de 0,98632)
   // y también el divisor 40H para que Base + Vac + Indem siga dando el salario pactado
   const factorIndemActivo = (es40h && esFijoDiscontinuo) ? FACTOR_INDEM_FIJO_DISC : FACTOR_INDEM_DIA;
-  const DIVISOR_40H_ACTIVO = 1 + 1/DIVISOR_VAC + factorIndemActivo/30;
+  // v90: si finiquitoAparte, el divisor NO incluye el término de indem (base+vac = salario pactado; indem se paga aparte)
+  const DIVISOR_40H_ACTIVO = finiquitoAparte
+    ? (1 + 1/DIVISOR_VAC)                              // v90: sin indem
+    : (1 + 1/DIVISOR_VAC + factorIndemActivo/30);       // comportamiento actual
   const baseRef    = es40h
     ? (Number(salario45) || 0) / DIVISOR_40H_ACTIVO
     : p40ref * FACTOR_BASE;
