@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v89";
+const APP_VERSION = "v90";
 
 // v73: importe fijo por jornada especial (se paga POR ENCIMA del salario pactado)
 const IMPORTE_JORNADA_ESPECIAL = 20;
@@ -2958,6 +2958,12 @@ function App45({ modoTab = "iruna45" }) {
   const [festivosActivos,  setFestivosActivos] = useState({});
   const [vacAcumulada,     setVacAcumulada]    = useState(false);
   const [indemAcumulada,   setIndemAcumulada]  = useState(false);
+  const [finiquitoAparte,  setFiniquitoAparte] = useState(false); // v90: si ON, indemnización NO se descuenta del salario pactado (se paga aparte al final)
+
+  // v90: cuando "finiquito aparte" está ON, forzar indemAcumulada = true (siempre se paga al final)
+  useEffect(() => {
+    if (finiquitoAparte && !indemAcumulada) setIndemAcumulada(true);
+  }, [finiquitoAparte]);
   const perfilCargadoRef = useRef(false); // v87: marca si el usuario cargó un perfil (para no sobreescribir sus toggles)
   const modosToggleadoManualRef = useRef({ vac: false, ind: false }); // v87: si el user tocó el toggle a mano, respetarlo
   const [hxPorRodaje40,    setHxPorRodaje40]   = useState(false); // v59: solo 40H, 1 HX por día de rodaje del calendario
@@ -3397,9 +3403,11 @@ function App45({ modoTab = "iruna45" }) {
     const indemNat  = indemRef * d.fraccion;
     const base40  = baseRef * d.fraccion;
     const vac40   = vacAcumulada  ? (esUltimo ? totalVac45   : 0) : vacNat;
-    const indem40 = indemAcumulada? (esUltimo ? totalIndem45 : 0) : indemNat;
+    // v90: si finiquitoAparte, indem SIEMPRE va al final (no prorrateada) y no descuenta del pactado mensual
+    const indem40 = (indemAcumulada || finiquitoAparte) ? (esUltimo ? totalIndem45 : 0) : indemNat;
     const cobroHx = vHoraEx * hMes;
-    const cobroNatural = base40 + vacNat + indemNat + cobroHx;
+    // v90: si finiquitoAparte, cobroNatural NO incluye indemNat (para que plusAct no lo descuente del pactado)
+    const cobroNatural = base40 + vacNat + (finiquitoAparte ? 0 : indemNat) + cobroHx;
     const objetivo     = salario45efectivo * d.fraccion;
     const plusAct      = Math.max(0, objetivo - cobroNatural);
     const vdShow   = vacAcumulada ? (esUltimo ? totalVdImporte : 0) : (importeVdMes[i]||0);
@@ -3741,12 +3749,13 @@ ${docHTML}
 </body>
 </html>`;
 
-      // Abrir en nueva ventana (SIN auto-print, el usuario elige con los botones)
-      const blob = new Blob([html], { type: "text/html;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const nuevaVentana = window.open(url, "_blank");
+      // v90: abrir con document.write en vez de blob URL para que el navegador use document.title
+      // como nombre de archivo (blob URLs los ignoran y usan el UUID del blob).
+      const nuevaVentana = window.open("", "_blank");
       if (!nuevaVentana) {
-        // Bloqueado por popup: fallback a descarga
+        // Bloqueado por popup: fallback a descarga con blob
+        const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
         a.download = baseFilename + (es40h ? "_40h.html" : "_45h.html");
@@ -3754,9 +3763,13 @@ ${docHTML}
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 30000);
         setExportError({ tipo: "aviso", mensaje: "⚠ El navegador bloqueó la ventana emergente. Se ha descargado el HTML. Permite ventanas emergentes para esta web y el PDF se abrirá directamente." });
+      } else {
+        nuevaVentana.document.open();
+        nuevaVentana.document.write(html);
+        nuevaVentana.document.close();
       }
-      setTimeout(() => URL.revokeObjectURL(url), 30000);
 
       // Confirmación visual breve
       setExportError({ tipo: "ok", mensaje: `✓ Descargando: ${baseFilename}${es40h ? "_40h.html" : "_45h.html"}` });
@@ -3834,7 +3847,7 @@ ${docHTML}
             tabId={modoTab === "tab40" ? "40h" : "45h"}
             datosActuales={{
               proyecto, productora, nombre, puesto, codigoContable, esFijoDiscontinuo, hxPorRodaje40, salario45, horasRef, modoInverso45, objetivoSemanal45,
-              fechaInicio, fechaFin, vacAcumulada, indemAcumulada,
+              fechaInicio, fechaFin, vacAcumulada, indemAcumulada, finiquitoAparte,
               horasPorMes, vacDiasPorMes, festivosPorMes, jornadasEspecialesPorMes, festivosActivos, comidaDiasPorMes,
               plusHerramienta, plusCoche, plusVivienda, plusSeguroVida, plusComida,
               // Snapshot de resultados calculados (para Coste Empresa)
@@ -3877,6 +3890,7 @@ ${docHTML}
               if (d.fechaFin !== undefined) setFechaFin(d.fechaFin);
               if (d.vacAcumulada !== undefined) setVacAcumulada(d.vacAcumulada);
               if (d.indemAcumulada !== undefined) setIndemAcumulada(d.indemAcumulada);
+              if (d.finiquitoAparte !== undefined) setFiniquitoAparte(d.finiquitoAparte); // v90
               perfilCargadoRef.current = true; // v87: hay perfil cargado, no aplicar defaults del proyecto
               // v86: si el proyecto tiene modos definidos y difieren, preguntar si actualizar
               const calProy = proyectoActivoCtx?.__calendario;
@@ -4276,7 +4290,8 @@ ${docHTML}
           <div style={P}>
             <div style={ST}>▸ Modo de Pago</div>
             <Toggle label="Vacaciones al final"    value={vacAcumulada}   onChange={(v)=>{ modosToggleadoManualRef.current.vac = true; setVacAcumulada(v); }}   sublabel={vacAcumulada?"Total vacaciones en última nómina":"Prorrateadas cada mes"} />
-            <Toggle label="Indemnización al final" value={indemAcumulada} onChange={(v)=>{ modosToggleadoManualRef.current.ind = true; setIndemAcumulada(v); }} sublabel={indemAcumulada?"Total indemnización en última nómina":"Prorrateada cada mes"} />
+            <Toggle label="Indemnización al final" value={indemAcumulada || finiquitoAparte} onChange={(v)=>{ modosToggleadoManualRef.current.ind = true; setIndemAcumulada(v); }} sublabel={finiquitoAparte ? "Forzado por 'Finiquito aparte'" : (indemAcumulada?"Total indemnización en última nómina":"Prorrateada cada mes")} disabled={finiquitoAparte} />
+            <Toggle label="Finiquito aparte del salario pactado" value={finiquitoAparte} onChange={setFiniquitoAparte} sublabel={finiquitoAparte?"Salario pactado NO incluye indemnización (se paga aparte)":"Salario pactado incluye indemnización prorrateada"} />
             <div style={{ fontSize:9, color:"#888", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", marginTop:4, padding:"6px 10px", background:"#f0ede8", borderRadius:4, border:"1px solid #e0ddd8" }}>
               ℹ Las horas extra siempre se cobran el mes que se generan
             </div>
@@ -7304,12 +7319,12 @@ function CosteEmpresa() {
 </body>
 </html>`;
 
-    // Abrir en nueva ventana y auto-imprimir
-    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const nuevaVentana = window.open(url, "_blank");
+    // v90: abrir con document.write en vez de blob URL para que el nombre PDF sea correcto
+    const nuevaVentana = window.open("", "_blank");
     if (!nuevaVentana) {
-      // Bloqueado por popup: fallback a descarga
+      // Bloqueado por popup: fallback a descarga con blob
+      const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
       a.download = generarFilename() + ".html";
@@ -7317,9 +7332,13 @@ function CosteEmpresa() {
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 30000);
       alert("⚠ El navegador bloqueó la ventana emergente. Se ha descargado el HTML. Permite ventanas emergentes para esta web y el PDF se abrirá directamente.");
+    } else {
+      nuevaVentana.document.open();
+      nuevaVentana.document.write(html);
+      nuevaVentana.document.close();
     }
-    setTimeout(() => URL.revokeObjectURL(url), 30000);
 
     if (usuarioCtx) {
       try { registrarLog(usuarioCtx.nombre, "export_pdf", `[Coste Empresa] ${generarFilename()}.html · ${d.nombre || "—"}`); } catch {}
