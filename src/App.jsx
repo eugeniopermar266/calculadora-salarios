@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v84";
+const APP_VERSION = "v85";
 
 // v73: importe fijo por jornada especial (se paga POR ENCIMA del salario pactado)
 const IMPORTE_JORNADA_ESPECIAL = 20;
@@ -8047,6 +8047,39 @@ function PanelProyectos({ usuarioActual, onCerrar }) {
     } catch (err) { alert("Error al borrar: " + err.message); }
   };
 
+  // v84: duplicar proyecto (con calendario, SIN perfiles ni asignaciones)
+  const onDuplicar = async (p) => {
+    const sugerido = `${p.nombre} (copia)`;
+    const nuevoNombre = prompt(`Nombre del nuevo proyecto:\n\n(Se duplicará el proyecto y su calendario. Los perfiles y asignaciones NO se copian.)`, sugerido);
+    if (!nuevoNombre || !nuevoNombre.trim()) return;
+    const nombreLimpio = nuevoNombre.trim();
+    try {
+      setCargando(true);
+      // 1. Crear el nuevo proyecto
+      const nuevoRes = await crearProyecto(usuarioActual.pin, nombreLimpio, p.productora || "");
+      const nuevoProyecto = Array.isArray(nuevoRes) ? nuevoRes[0] : nuevoRes;
+      if (!nuevoProyecto?.id) throw new Error("No se pudo crear el proyecto duplicado");
+
+      // 2. Copiar el calendario si existe
+      const calendarioOriginal = await obtenerCalendarioProyecto(p.id);
+      if (calendarioOriginal) {
+        await crearCalendarioProyecto(usuarioActual.pin, {
+          proyectoId: nuevoProyecto.id,
+          fechaInicio: calendarioOriginal.fecha_inicio,
+          fechaFin: calendarioOriginal.fecha_fin,
+          comunidad: calendarioOriginal.comunidad,
+          dias: calendarioOriginal.dias || {},
+          notas: calendarioOriginal.notas || "",
+        });
+      }
+      recargar();
+      alert(`✓ Proyecto duplicado como "${nombreLimpio}"${calendarioOriginal ? " (con calendario)" : " (sin calendario)"}.\n\nRecuerda asignar los usuarios y perfiles al nuevo proyecto.`);
+    } catch (err) {
+      setCargando(false);
+      alert("Error al duplicar: " + err.message);
+    }
+  };
+
   // Asignar/desasignar usuario a proyecto
   const estaAsignado = (usuarioId, proyectoId) =>
     asignaciones.some(a => a.usuario_id === usuarioId && a.proyecto_id === proyectoId);
@@ -8138,7 +8171,7 @@ function PanelProyectos({ usuarioActual, onCerrar }) {
                 <button onClick={() => setEditando(null)} style={btnGhost}>Cancelar</button>
               </div>
             ) : (
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto auto auto auto auto", gap: 8, alignItems: "center" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto auto auto auto auto auto", gap: 8, alignItems: "center" }}>
                 <div style={{ fontWeight: 700, color: p.activo ? "#1a1a1a" : "#999" }}>
                   {p.nombre} {!p.activo && <span style={{ fontSize: 9, color: "#c00" }}>(inactivo)</span>}
                 </div>
@@ -8149,6 +8182,7 @@ function PanelProyectos({ usuarioActual, onCerrar }) {
                 <button onClick={() => setProyectoAsignar(proyectoAsignar?.id === p.id ? null : p)} style={btnGhost}>👥 Usuarios</button>
                 <button onClick={() => setProyectoConCalendario(p)} style={btnGhost}>📅 Calendario</button>
                 <button onClick={() => setEditando({ id: p.id, nombre: p.nombre, productora: p.productora, activo: p.activo })} style={btnGhost}>Editar</button>
+                <button onClick={() => onDuplicar(p)} style={btnGhost} title="Duplicar proyecto y calendario (sin perfiles)">📋 Duplicar</button>
                 <button onClick={() => onBorrar(p)} style={{ ...btnGhost, borderColor: "#c00", color: "#c00" }}>🗑</button>
               </div>
             )}
