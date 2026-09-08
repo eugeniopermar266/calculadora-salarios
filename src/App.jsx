@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v117";
+const APP_VERSION = "v118";
 
 // v97: Departamentos de un rodaje audiovisual (obligatorio en cada perfil)
 const DEPARTAMENTOS = [
@@ -7671,7 +7671,7 @@ function CosteEmpresa() {
         <td class="n ${incluirGestoria ? 'g' : 'z'}" style="${incluirGestoria ? '' : 'text-decoration:line-through'}">${fmt(f.gestoria)}</td>
         <td class="n ${(f.exento || 0) === 0 ? 'z' : 'red'}">${(f.exento || 0) === 0 ? "—" : "-" + fmt(f.exento)}</td>
         <td class="n red"><b>${fmt(f.totalCosteEmpresa)}</b></td>
-        <td class="n gold" style="background:#fdf8f0;border-left:2px solid #4ec9b8"><b>${fmt(f.total + f.totalCosteEmpresa)}</b></td>
+        <td class="n gold" style="background:#f2f5f7;border-left:2px solid #4ec9b8"><b>${fmt(f.total + f.totalCosteEmpresa)}</b></td>
       </tr>
     `).join("");
 
@@ -7697,7 +7697,7 @@ function CosteEmpresa() {
   h2 { font-size: 8px; letter-spacing: 0.18em; color: #4ec9b8; text-transform: uppercase; margin: 0 0 6px; padding-bottom: 5px; border-bottom: 1px solid #d5d9dc; }
   h2.red { color: #a04545; }
   .datos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
-  .datos > div { background: #fafaf7; border: 1px solid #d5d9dc; border-radius: 3px; padding: 5px 7px; }
+  .datos > div { background: #f2f5f7; border: 1px solid #d5d9dc; border-radius: 3px; padding: 5px 7px; }
   .datos .l { font-size: 6.5px; color: #888; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 2px; }
   .datos .v { font-size: 9px; font-weight: 700; }
   table { width: 100%; border-collapse: collapse; font-size: 7px; table-layout: fixed; }
@@ -7708,19 +7708,19 @@ function CosteEmpresa() {
   th.p { color: #6a3a9a; }
   th.jp { color: #8a1e4a; }
   th .pct { display: block; font-weight: 400; font-size: 6px; color: #999; margin-top: 1px; }
-  td { padding: 3px 2px; border-bottom: 1px solid #eae7e2; word-wrap: break-word; }
+  td { padding: 3px 2px; border-bottom: 1px solid #eef1f3; word-wrap: break-word; }
   td.m { font-weight: 600; text-transform: capitalize; font-size: 7px; }
   td.n { text-align: right; }
   td.b { color: #1a1a1a; }
   td.o { color: #b07030; }
-  td.g { color: #5a8a5a; }
+  td.g { color: #4ec9b8; }
   td.p { color: #6a3a9a; }
   td.jp { color: #8a1e4a; }
   td.gold { color: #4ec9b8; }
   td.red { color: #a04545; }
   td.z { color: #ccc; }
   .small { font-size: 6px; color: #888; }
-  tr.total td { background: #fdf8f0; font-weight: 700; border-top: 1.5px solid #d8a8a8; }
+  tr.total td { background: #f2f5f7; font-weight: 700; border-top: 1.5px solid #d8a8a8; }
   tr.total td.first { color: #6a2020; text-transform: uppercase; letter-spacing: 0.08em; font-size: 7px; }
   .ce table tr.total td { background: #fdf0f0; }
   .resumen { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-top: 8px; }
@@ -7728,9 +7728,9 @@ function CosteEmpresa() {
   .resumen .l { font-size: 6.5px; color: #666; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 3px; }
   .resumen .v { font-size: 10px; font-weight: 700; }
   .resumen .vL { font-size: 12px; font-weight: 700; }
-  .reglas { margin-top: 10px; padding: 8px 10px; background: #fafaf7; border: 1px solid #d5d9dc; border-radius: 3px; font-size: 7.5px; color: #666; line-height: 1.5; }
+  .reglas { margin-top: 10px; padding: 8px 10px; background: #f2f5f7; border: 1px solid #d5d9dc; border-radius: 3px; font-size: 7.5px; color: #666; line-height: 1.5; }
   .reglas b { color: #444; }
-  .legal { margin-top: 14px; padding: 10px 12px; background: #fafaf7; border: 1px solid #e8e4de; border-radius: 3px; }
+  .legal { margin-top: 14px; padding: 10px 12px; background: #f2f5f7; border: 1px solid #e8e4de; border-radius: 3px; }
   .legal h3 { font-size: 8px; color: #888; letter-spacing: 0.18em; text-transform: uppercase; margin: 0 0 6px; }
   .legal .brand { font-size: 9px; font-weight: 700; letter-spacing: 0.05em; margin-bottom: 4px; }
   .legal p { font-size: 7.5px; color: #666; line-height: 1.4; margin: 0 0 4px; }
@@ -8037,7 +8037,7 @@ function CosteEmpresa() {
   // === Si no hay perfil cargado: solo selector ===
   if (!perfilCargado) {
     return (
-      <div style={{ color: "#1a1a1a", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", padding: "32px 32px" }}>
+      <div style={{ color: "#1a1a1a", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", padding: "32px 32px" }}>
         <div style={{ maxWidth: 1400, margin: "0 auto 24px" }}>
           <div style={{ background: "#1a1a1a", padding: "18px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", color: "#f0f0f0", borderRadius: 8 }}>
             <div style={{ background: "#4ec9b8", color: "#1a1a1a", padding: "8px 14px", borderRadius: 4, fontSize: 12, fontWeight: 700, letterSpacing: "0.1em" }}>BD PROD TOOLS</div>
@@ -8058,12 +8058,12 @@ function CosteEmpresa() {
                 placeholder="🔍 Buscar perfil, trabajador o proyecto..."
                 value={busqueda}
                 onChange={e => setBusqueda(e.target.value)}
-                style={{ flex: 1, minWidth: 200, padding: "8px 12px", border: "1px solid #c0bcb5", borderRadius: 4, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize: 11, background: "#dfe4e8" }}
+                style={{ flex: 1, minWidth: 200, padding: "8px 12px", border: "1px solid #d5d9dc", borderRadius: 4, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontSize: 11, background: "#dfe4e8" }}
               />
               <select
                 value={filtroTipo}
                 onChange={e => setFiltroTipo(e.target.value)}
-                style={{ padding: "8px 12px", border: "1px solid #c0bcb5", borderRadius: 4, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize: 11, background: "#dfe4e8" }}
+                style={{ padding: "8px 12px", border: "1px solid #d5d9dc", borderRadius: 4, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontSize: 11, background: "#dfe4e8" }}
               >
                 <option value="todos">Todos los tipos</option>
                 <option value="45h">Solo 45H</option>
@@ -8085,7 +8085,7 @@ function CosteEmpresa() {
                   const puesto = p.datos?.puesto || "—";
                   const autor = p.autor || "—";
                   return (
-                    <div key={p.key} style={{ padding: "10px 14px", borderBottom: idx < perfilesFiltrados.length - 1 ? "1px solid #eae7e2" : "none", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}
+                    <div key={p.key} style={{ padding: "10px 14px", borderBottom: idx < perfilesFiltrados.length - 1 ? "1px solid #eef1f3" : "none", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}
                       onClick={() => cargarPerfil(p)}>
                       <div style={{ minWidth: 0, flex: 1 }}>
                         <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a" }}>
@@ -8097,7 +8097,7 @@ function CosteEmpresa() {
                       </div>
                       <button
                         onClick={(e) => { e.stopPropagation(); cargarPerfil(p); }}
-                        style={{ background: "transparent", color: "#4ec9b8", border: "1px solid #4ec9b8", padding: "5px 12px", borderRadius: 3, fontSize: 9, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}
+                        style={{ background: "transparent", color: "#4ec9b8", border: "1px solid #4ec9b8", padding: "5px 12px", borderRadius: 3, fontSize: 9, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}
                       >
                         Cargar
                       </button>
@@ -8134,7 +8134,7 @@ function CosteEmpresa() {
   const importeFestGuardado = d._calculado?.importeFestMes45 || []; // v77
 
   return (
-    <div style={{ color: "#1a1a1a", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", padding: "32px 32px" }}>
+    <div style={{ color: "#1a1a1a", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", padding: "32px 32px" }}>
       <div style={{ maxWidth: 1400, margin: "0 auto 24px" }}>
         <div style={{ background: "#1a1a1a", padding: "18px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", color: "#f0f0f0", borderRadius: 8 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
@@ -8152,35 +8152,35 @@ function CosteEmpresa() {
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
             <button
               onClick={exportarCSV}
-              style={{ background: "transparent", color: "#5a8a5a", border: "1px solid #5a8a5a", padding: "6px 12px", borderRadius: 4, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}
+              style={{ background: "transparent", color: "#4ec9b8", border: "1px solid #4ec9b8", padding: "6px 12px", borderRadius: 4, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}
               title="Descargar CSV"
             >
               📊 CSV
             </button>
             <button
               onClick={exportarPDF}
-              style={{ background: "transparent", color: "#d8a0a0", border: "1px solid #a04545", padding: "6px 12px", borderRadius: 4, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}
+              style={{ background: "transparent", color: "#d8a0a0", border: "1px solid #a04545", padding: "6px 12px", borderRadius: 4, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}
               title="Generar PDF (se abre en otra ventana para imprimir o guardar como PDF)"
             >
               📄 PDF
             </button>
             <button
               onClick={abrirModalExportMaster}
-              style={{ background: "transparent", color: "#4ec9b8", border: "1px solid #4ec9b8", padding: "6px 12px", borderRadius: 4, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}
+              style={{ background: "transparent", color: "#4ec9b8", border: "1px solid #4ec9b8", padding: "6px 12px", borderRadius: 4, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}
               title="Rellenar fila en el Excel Master (EQUIPO TÉCNICO)"
             >
               📋 Excel Master
             </button>
             <button
               onClick={guardarConfigCosteEmpresa}
-              style={{ background: "transparent", color: "#1a1a1a", border: "1px solid #1a1a1a", padding: "6px 12px", borderRadius: 4, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}
+              style={{ background: "transparent", color: "#1a1a1a", border: "1px solid #1a1a1a", padding: "6px 12px", borderRadius: 4, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}
               title="Guardar la configuración actual (IRPF, firma, baja) en el perfil"
             >
               💾 Guardar Config
             </button>
             <button
               onClick={() => setPerfilCargado(null)}
-              style={{ background: "transparent", color: "#aaa", border: "1px solid #555", padding: "6px 12px", borderRadius: 4, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}
+              style={{ background: "transparent", color: "#aaa", border: "1px solid #555", padding: "6px 12px", borderRadius: 4, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}
             >
               ← Cambiar perfil
             </button>
@@ -8231,7 +8231,7 @@ function CosteEmpresa() {
                     if (v === "" || /^\d*\.?\d*$/.test(v)) setPctIRPF(v);
                   }}
                   placeholder="ej: 18"
-                  style={{ width: 60, padding: "5px 8px", border: "1px solid #c0bcb5", borderRadius: 4, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize: 11, fontWeight: 700, textAlign: "right" }}
+                  style={{ width: 60, padding: "5px 8px", border: "1px solid #d5d9dc", borderRadius: 4, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontSize: 11, fontWeight: 700, textAlign: "right" }}
                 />
                 <span style={{ fontSize: 11, color: "#666", fontWeight: 700 }}>%</span>
               </div>
@@ -8298,7 +8298,7 @@ function CosteEmpresa() {
                       if (v === "" || /^\d*\.?\d*$/.test(v)) setImporteExento(v);
                     }}
                     placeholder="ej: 600"
-                    style={{ width: 80, padding: "5px 8px", border: "1px solid #c0bcb5", borderRadius: 4, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize: 11, fontWeight: 700, textAlign: "right" }}
+                    style={{ width: 80, padding: "5px 8px", border: "1px solid #d5d9dc", borderRadius: 4, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontSize: 11, fontWeight: 700, textAlign: "right" }}
                   />
                   <span style={{ fontSize: 11, color: "#666", fontWeight: 700 }}>€</span>
                 </div>
@@ -8389,7 +8389,7 @@ function CosteEmpresa() {
                     const exentoMes = aplicaExencion ? importeExentoNum : 0;
 
                     return (
-                      <tr key={i} style={{ borderBottom: "1px solid #eae7e2" }}>
+                      <tr key={i} style={{ borderBottom: "1px solid #eef1f3" }}>
                         <td style={{ padding: "7px 6px", fontWeight: 600, textTransform: "capitalize" }}>
                           {mes.mes}{!mes.esCompleto && <span style={{ fontSize: 8, color: "#888", marginLeft: 4 }}>({mes.desde}-{mes.hasta})</span>}
                         </td>
@@ -8400,10 +8400,10 @@ function CosteEmpresa() {
                         <td style={{ padding: "7px 6px", textAlign: "right", color: plusAct === 0 ? "#bbb" : "#b07030" }}>{plusAct === 0 ? "—" : fmt(plusAct)}</td>
                         <td style={{ padding: "7px 6px", textAlign: "right", color: festImp === 0 ? "#bbb" : "#6a3a9a" }}>{festImp === 0 ? "—" : fmt(festImp)}</td>
                         <td style={{ padding: "7px 6px", textAlign: "right", color: jeImp === 0 ? "#bbb" : "#8a1e4a" }} title={jeImp > 0 ? `${mes.totalJEDias || 0} JE` : ""}>{jeImp === 0 ? "—" : fmt(jeImp)}</td>
-                        <td style={{ padding: "7px 6px", textAlign: "right", color: (c.coche || 0) === 0 ? "#bbb" : "#5a8a5a" }}>{(c.coche || 0) === 0 ? "—" : fmt(c.coche)}</td>
-                        <td style={{ padding: "7px 6px", textAlign: "right", color: (c.vivienda || 0) === 0 ? "#bbb" : "#5a8a5a" }}>{(c.vivienda || 0) === 0 ? "—" : fmt(c.vivienda)}</td>
-                        <td style={{ padding: "7px 6px", textAlign: "right", color: (c.seguroVida || 0) === 0 ? "#bbb" : "#5a8a5a" }}>{(c.seguroVida || 0) === 0 ? "—" : fmt(c.seguroVida)}</td>
-                        <td style={{ padding: "7px 6px", textAlign: "right", color: (c.comida || 0) === 0 ? "#bbb" : "#5a8a5a" }}>{(c.comida || 0) === 0 ? "—" : fmt(c.comida)}</td>
+                        <td style={{ padding: "7px 6px", textAlign: "right", color: (c.coche || 0) === 0 ? "#bbb" : "#4ec9b8" }}>{(c.coche || 0) === 0 ? "—" : fmt(c.coche)}</td>
+                        <td style={{ padding: "7px 6px", textAlign: "right", color: (c.vivienda || 0) === 0 ? "#bbb" : "#4ec9b8" }}>{(c.vivienda || 0) === 0 ? "—" : fmt(c.vivienda)}</td>
+                        <td style={{ padding: "7px 6px", textAlign: "right", color: (c.seguroVida || 0) === 0 ? "#bbb" : "#4ec9b8" }}>{(c.seguroVida || 0) === 0 ? "—" : fmt(c.seguroVida)}</td>
+                        <td style={{ padding: "7px 6px", textAlign: "right", color: (c.comida || 0) === 0 ? "#bbb" : "#4ec9b8" }}>{(c.comida || 0) === 0 ? "—" : fmt(c.comida)}</td>
                         <td style={{ padding: "7px 6px", textAlign: "right", color: exentoMes === 0 ? "#bbb" : "#a04545", fontWeight: exentoMes > 0 ? 700 : 400 }}>{exentoMes === 0 ? "—" : `-${fmt(exentoMes)}`}</td>
                         <td style={{ padding: "7px 6px", textAlign: "right", fontWeight: 700, color: "#4ec9b8" }}>{fmt(totalMes)}</td>
                       </tr>
@@ -8465,7 +8465,7 @@ function CosteEmpresa() {
           }), { ssPrincipal: 0, ssVacaciones: 0, ssHorasExtra: 0, imei: 0, solidaridad: 0, irpfVivienda: 0, gestoria: 0, exento: 0, totalCosteEmpresa: 0 });
 
           const cellNum = (v, color) => (
-            <td style={{ padding: "7px 5px", textAlign: "right", color: v === 0 ? "#ccc" : (color || "#1a1a1a"), fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>
+            <td style={{ padding: "7px 5px", textAlign: "right", color: v === 0 ? "#ccc" : (color || "#1a1a1a"), fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>
               {v === 0 ? "—" : fmt(v)}
             </td>
           );
@@ -8494,7 +8494,7 @@ function CosteEmpresa() {
                   </thead>
                   <tbody>
                     {filas.map((f, i) => (
-                      <tr key={i} style={{ borderBottom: "1px solid #eae7e2" }}>
+                      <tr key={i} style={{ borderBottom: "1px solid #eef1f3" }}>
                         <td style={{ padding: "7px 5px", fontWeight: 600, textTransform: "capitalize" }}>{f.mes}</td>
                         {cellNum(f.ssPrincipal)}
                         {cellNum(f.ssVacaciones)}
@@ -8502,8 +8502,8 @@ function CosteEmpresa() {
                         {cellNum(f.imei)}
                         {cellNum(f.solidaridad, "#6a3a9a")}
                         {cellNum(f.irpfVivienda, "#b07030")}
-                        <td style={{ padding: "7px 5px", textAlign: "right", color: incluirGestoria ? "#5a8a5a" : "#bbb", textDecoration: incluirGestoria ? "none" : "line-through", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>{fmt(f.gestoria)}</td>
-                        <td style={{ padding: "7px 5px", textAlign: "right", fontWeight: 700, color: "#a04545", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>{fmt(f.totalCosteEmpresa)}</td>
+                        <td style={{ padding: "7px 5px", textAlign: "right", color: incluirGestoria ? "#4ec9b8" : "#bbb", textDecoration: incluirGestoria ? "none" : "line-through", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>{fmt(f.gestoria)}</td>
+                        <td style={{ padding: "7px 5px", textAlign: "right", fontWeight: 700, color: "#a04545", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>{fmt(f.totalCosteEmpresa)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -8516,15 +8516,15 @@ function CosteEmpresa() {
                       {cellNum(T.imei)}
                       {cellNum(T.solidaridad, "#6a3a9a")}
                       {cellNum(T.irpfVivienda, "#b07030")}
-                      <td style={{ padding: "9px 5px", textAlign: "right", fontWeight: 700, color: incluirGestoria ? "#5a8a5a" : "#bbb", textDecoration: incluirGestoria ? "none" : "line-through", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>{fmt(T.gestoria)}</td>
-                      <td style={{ padding: "9px 5px", textAlign: "right", fontWeight: 700, color: "#a04545", fontSize: 12, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>{fmt(T.totalCosteEmpresa)}</td>
+                      <td style={{ padding: "9px 5px", textAlign: "right", fontWeight: 700, color: incluirGestoria ? "#4ec9b8" : "#bbb", textDecoration: incluirGestoria ? "none" : "line-through", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>{fmt(T.gestoria)}</td>
+                      <td style={{ padding: "9px 5px", textAlign: "right", fontWeight: 700, color: "#a04545", fontSize: 12, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>{fmt(T.totalCosteEmpresa)}</td>
                     </tr>
                   </tfoot>
                 </table>
               </div>
 
               {/* Notas explicativas */}
-              <div style={{ marginTop: 12, padding: "10px 14px", background: "#fafaf7", borderRadius: 4, border: "1px solid #d5d9dc", fontSize: 9.5, color: "#666", lineHeight: 1.6 }}>
+              <div style={{ marginTop: 12, padding: "10px 14px", background: "#f2f5f7", borderRadius: 4, border: "1px solid #d5d9dc", fontSize: 9.5, color: "#666", lineHeight: 1.6 }}>
                 <strong style={{ color: "#444" }}>Reglas aplicadas:</strong><br/>
                 · <strong>SS Principal</strong> (33,35%): sobre TOTAL del mes − vacaciones* − indemnización. Topada a 1.701,25 € si base &gt; 5.101,20 €.<br/>
                 · <strong>SS Vacaciones</strong> (33,35%): solo si vacaciones "al final"* — se suman aparte, sin topar. <strong>SS H.Extra</strong> (27%): siempre aparte, independiente del tope.<br/>
@@ -8554,7 +8554,7 @@ function CosteEmpresa() {
                   ].map(it => (
                     <div key={it.l} style={{ background: "#dfe4e8", borderRadius: 6, padding: "10px 14px", border: "1px solid #d5d9dc", textAlign: "center" }}>
                       <div style={{ fontSize: 9, color: "#666", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 4 }}>{it.l}</div>
-                      <div style={{ fontSize: it.bold ? 16 : 14, fontWeight: 700, color: it.color, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>{it.v}</div>
+                      <div style={{ fontSize: it.bold ? 16 : 14, fontWeight: 700, color: it.color, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>{it.v}</div>
                     </div>
                   ));
                 })()}
@@ -8564,18 +8564,18 @@ function CosteEmpresa() {
         })()}
 
         {/* Aviso Legal (solo visible cuando hay perfil cargado) */}
-        <div style={{ ...P, background: "#fafaf7", border: "1px solid #e8e4de" }}>
+        <div style={{ ...P, background: "#f2f5f7", border: "1px solid #e8e4de" }}>
           <div style={{ ...ST, color: "#888", marginBottom: 10 }}>▸ Aviso Legal</div>
-          <div style={{ fontSize: 10, fontWeight: 700, color: "#1a1a1a", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", marginBottom: 8, letterSpacing: "0.05em" }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: "#1a1a1a", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", marginBottom: 8, letterSpacing: "0.05em" }}>
             BD PROD TOOLS
           </div>
-          <div style={{ fontSize: 9, color: "#666", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", lineHeight: 1.5, marginBottom: 8 }}>
+          <div style={{ fontSize: 9, color: "#666", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", lineHeight: 1.5, marginBottom: 8 }}>
             {DISCLAIMER_ES}
           </div>
-          <div style={{ fontSize: 8, color: "#888", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", lineHeight: 1.5, fontStyle: "italic", marginBottom: 8 }}>
+          <div style={{ fontSize: 8, color: "#888", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", lineHeight: 1.5, fontStyle: "italic", marginBottom: 8 }}>
             {DISCLAIMER_EN}
           </div>
-          <div style={{ fontSize: 8, color: "#888", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", lineHeight: 1.5, fontStyle: "italic" }}>
+          <div style={{ fontSize: 8, color: "#888", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", lineHeight: 1.5, fontStyle: "italic" }}>
             G &amp; G Enterprises LLC
           </div>
         </div>
@@ -8587,7 +8587,7 @@ function CosteEmpresa() {
           onClick={(e) => { if (e.target === e.currentTarget && !procesandoMaster) setMostrarExportMaster(false); }}
           style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 1000, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "40px 16px", overflowY: "auto" }}
         >
-          <div style={{ background: "#dfe4e8", borderRadius: 8, maxWidth: 600, width: "100%", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", color: "#1a1a1a", boxShadow: "0 10px 40px rgba(0,0,0,0.5)" }}>
+          <div style={{ background: "#dfe4e8", borderRadius: 8, maxWidth: 600, width: "100%", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", color: "#1a1a1a", boxShadow: "0 10px 40px rgba(0,0,0,0.5)" }}>
             <div style={{ background: "#1a1a1a", color: "#f0f0f0", padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", borderRadius: "8px 8px 0 0" }}>
               <div>
                 <div style={{ fontSize: 9, color: "#4ec9b8", letterSpacing: "0.2em", textTransform: "uppercase" }}>Coste empresa</div>
@@ -8596,7 +8596,7 @@ function CosteEmpresa() {
               <button
                 onClick={() => !procesandoMaster && setMostrarExportMaster(false)}
                 disabled={procesandoMaster}
-                style={{ background: "transparent", color: "#aaa", border: "1px solid #444", padding: "6px 14px", borderRadius: 4, cursor: procesandoMaster ? "not-allowed" : "pointer", fontSize: 10, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", opacity: procesandoMaster ? 0.5 : 1 }}
+                style={{ background: "transparent", color: "#aaa", border: "1px solid #444", padding: "6px 14px", borderRadius: 4, cursor: procesandoMaster ? "not-allowed" : "pointer", fontSize: 10, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", opacity: procesandoMaster ? 0.5 : 1 }}
               >
                 Cerrar
               </button>
@@ -8615,7 +8615,7 @@ function CosteEmpresa() {
 
               {/* Paso 1: Seleccionar archivo */}
               <div style={{ background: "#f2f5f7", border: "1px solid #d5d9dc", borderRadius: 6, padding: 14, marginBottom: 14 }}>
-                <div style={{ fontSize: 10, color: "#7a5a2a", letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 700, marginBottom: 8 }}>1. Excel Master original</div>
+                <div style={{ fontSize: 10, color: "#1a1a1a", letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 700, marginBottom: 8 }}>1. Excel Master original</div>
                 <input
                   ref={inputMasterRef}
                   type="file"
@@ -8627,7 +8627,7 @@ function CosteEmpresa() {
                   <button
                     onClick={() => inputMasterRef.current?.click()}
                     disabled={procesandoMaster}
-                    style={{ background: "transparent", color: "#4ec9b8", border: "1px solid #4ec9b8", padding: "6px 14px", borderRadius: 4, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}
+                    style={{ background: "transparent", color: "#4ec9b8", border: "1px solid #4ec9b8", padding: "6px 14px", borderRadius: 4, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}
                   >
                     📤 Seleccionar archivo
                   </button>
@@ -8639,7 +8639,7 @@ function CosteEmpresa() {
 
               {/* Paso 2: Fila destino */}
               <div style={{ background: "#f2f5f7", border: "1px solid #d5d9dc", borderRadius: 6, padding: 14, marginBottom: 14 }}>
-                <div style={{ fontSize: 10, color: "#7a5a2a", letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 700, marginBottom: 8 }}>2. Fila destino</div>
+                <div style={{ fontSize: 10, color: "#1a1a1a", letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 700, marginBottom: 8 }}>2. Fila destino</div>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <input
                     type="number"
@@ -8648,7 +8648,7 @@ function CosteEmpresa() {
                     value={filaDestinoExcel}
                     onChange={(e) => setFilaDestinoExcel(e.target.value)}
                     disabled={procesandoMaster}
-                    style={{ width: 80, padding: "6px 10px", border: "1px solid #c0bcb5", borderRadius: 4, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize: 12, fontWeight: 700, textAlign: "center" }}
+                    style={{ width: 80, padding: "6px 10px", border: "1px solid #d5d9dc", borderRadius: 4, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontSize: 12, fontWeight: 700, textAlign: "center" }}
                   />
                   <div style={{ fontSize: 10, color: "#666", lineHeight: 1.5 }}>
                     En qué fila del Excel se rellenan los datos.<br/>
@@ -8658,7 +8658,7 @@ function CosteEmpresa() {
               </div>
 
               {/* Aviso */}
-              <div style={{ background: "#fff8e6", border: "1px solid #d8c8a0", borderRadius: 4, padding: 10, marginBottom: 14, fontSize: 9.5, color: "#7a5a2a", lineHeight: 1.5 }}>
+              <div style={{ background: "#fff8e6", border: "1px solid #d8c8a0", borderRadius: 4, padding: 10, marginBottom: 14, fontSize: 9.5, color: "#1a1a1a", lineHeight: 1.5 }}>
                 <strong>⚠ Importante:</strong> esta operación pisa las fórmulas de las columnas D, F, G, K, L, N, U, V, W de la fila destino, y rellena SUELDOS + EXTRAS de cada mes del contrato. Las fórmulas de SS, MEI, Solidaridad NO se tocan. Antes de pegar al Excel en producción, abre el archivo descargado y revisa los valores.
               </div>
 
@@ -8667,14 +8667,14 @@ function CosteEmpresa() {
                 <button
                   onClick={() => setMostrarExportMaster(false)}
                   disabled={procesandoMaster}
-                  style={{ background: "transparent", color: "#666", border: "1px solid #888", padding: "8px 16px", borderRadius: 4, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", opacity: procesandoMaster ? 0.5 : 1 }}
+                  style={{ background: "transparent", color: "#666", border: "1px solid #888", padding: "8px 16px", borderRadius: 4, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", opacity: procesandoMaster ? 0.5 : 1 }}
                 >
                   Cancelar
                 </button>
                 <button
                   onClick={procesarExcelMaster}
                   disabled={procesandoMaster || !archivoMaster}
-                  style={{ background: archivoMaster && !procesandoMaster ? "#4ec9b8" : "#ddd", color: archivoMaster && !procesandoMaster ? "#1a1a1a" : "#888", border: "none", padding: "8px 20px", borderRadius: 4, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", cursor: archivoMaster && !procesandoMaster ? "pointer" : "not-allowed", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}
+                  style={{ background: archivoMaster && !procesandoMaster ? "#4ec9b8" : "#ddd", color: archivoMaster && !procesandoMaster ? "#1a1a1a" : "#888", border: "none", padding: "8px 20px", borderRadius: 4, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", cursor: archivoMaster && !procesandoMaster ? "pointer" : "not-allowed", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}
                 >
                   {procesandoMaster ? "Procesando..." : "✓ Generar y descargar"}
                 </button>
