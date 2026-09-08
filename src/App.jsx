@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v95";
+const APP_VERSION = "v96";
 
 // v73: importe fijo por jornada especial (se paga POR ENCIMA del salario pactado)
 const IMPORTE_JORNADA_ESPECIAL = 20;
@@ -8371,6 +8371,13 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
     if (seleccionados.size === 0) { alert("Selecciona al menos un perfil"); return; }
     const perfilesExp = perfiles.filter(p => seleccionados.has(p.id));
 
+    setMensaje({ tipo: "info", texto: "Generando Excel..." });
+
+    // Cargar SheetJS
+    let XLSX;
+    try { XLSX = await cargarXLSX(); }
+    catch (e) { setMensaje({ tipo: "error", texto: "Error cargando librería Excel: " + e.message }); return; }
+
     // Determinar rango de meses del proyecto (calendario)
     let mesesRango = [];
     try {
@@ -8378,7 +8385,6 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
       if (cal && cal.fecha_inicio && cal.fecha_fin) {
         mesesRango = generarMesesEntre(cal.fecha_inicio, cal.fecha_fin);
       } else {
-        // Fallback: usar rango unión de todos los perfiles
         const fechas = perfilesExp.map(p => ({ ini: p.datos?.fechaInicio, fin: p.datos?.fechaFin })).filter(f => f.ini && f.fin);
         if (fechas.length > 0) {
           const ini = fechas.map(f => f.ini).sort()[0];
@@ -8388,25 +8394,48 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
       }
     } catch (e) { console.warn("Sin calendario, calculando rango desde perfiles"); }
 
-    // Preparar cabeceras: columnas fijas + 3 por mes
+    // Cabeceras finales (v96): añadidas MMB, quitada % s/Salario, añadidas 3 columnas al final
     const headersFijos = [
-      "Nombre trabajador", "Puesto", "Código contable", "Proyecto", "Productora",
-      "Fecha inicio", "Fecha fin", "Días totales", "Salario pactado (€/mes)",
-      "Modalidad", "Fijo discontinuo", "Vacaciones", "Indemnización", "Finiquito aparte",
-      "Total Salario Base", "Total Vacaciones", "Total Indemnización", "Total H.Extra",
-      "Total Plus Actividad", "Total Festivos", "Total Jornadas Especiales", "Total Complementos",
-      "BRUTO TRABAJADOR", "Total SS Empresa", "COSTE TOTAL", "% s/Salario",
-      "Autor perfil", "Fecha creación", "Última modificación",
+      "Nombre trabajador", "Puesto", "Código contable", "Proyecto", "Productora",              // A-E
+      "Fecha inicio", "Fecha fin", "Días totales", "Salario pactado (€/mes)",                   // F-I
+      "Modalidad", "Fijo discontinuo", "Vacaciones", "Indemnización", "Finiquito aparte",       // J-N
+      "Total Salario Base", "Total Vacaciones", "Total Indemnización", "Total H.Extra",         // O-R
+      "Total Plus Actividad", "Total Festivos", "Total Jornadas Especiales", "Total Complementos", // S-V
+      "BRUTO TRABAJADOR", "Total SS Empresa", "COSTE TOTAL",                                    // W-X-Y
+      "BRUTO MMB", "FRINGES MMB", "TOTAL MMB", "DIFERENCIA (Y - AB)",                           // Z-AA-AB-AC (v96: nuevo)
+      "Autor perfil", "Fecha creación", "Última modificación",                                  // AD-AE-AF
     ];
     const headersMeses = [];
     mesesRango.forEach(ym => {
       const lbl = labelMesCorto(ym);
       headersMeses.push(`${lbl} Bruto`, `${lbl} SS`, `${lbl} Total`);
     });
-    const headers = [...headersFijos, ...headersMeses];
+    const headersFinales = ["Salario / Día", "Coste Hora Extra (€/h)", "Coste Festivo (€/día)"]; // v96
+    const headers = [...headersFijos, ...headersMeses, ...headersFinales];
 
-    // Filas de datos
-    const filas = perfilesExp.map(p => {
+    // Helper: convertir número de columna (0-indexed) a letra Excel (0=A, 25=Z, 26=AA, ...)
+    const colLetter = (idx) => {
+      let s = "";
+      let n = idx;
+      while (n >= 0) {
+        s = String.fromCharCode(65 + (n % 26)) + s;
+        n = Math.floor(n / 26) - 1;
+      }
+      return s;
+    };
+
+    // Índices de columnas (0-indexed)
+    const IDX_BRUTO_TRAB = 22;   // W
+    const IDX_SS = 23;           // X
+    const IDX_COSTE_TOTAL = 24;  // Y
+    const IDX_BRUTO_MMB = 25;    // Z
+    const IDX_FRINGES_MMB = 26;  // AA
+    const IDX_TOTAL_MMB = 27;    // AB (fórmula = Z + AA)
+    const IDX_DIFERENCIA = 28;   // AC (fórmula = Y - AB)
+
+    // Filas de datos (aoa = array of arrays)
+    const aoa = [headers];
+    perfilesExp.forEach((p, rowIdx) => {
       const d = p.datos || {};
       const c = d._calculado || {};
       const totBase = c.totBase || 0;
@@ -8420,7 +8449,11 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
       const bruto = c.totFinal ? (c.totFinal + totFest) : (totBase + totVac + totIndem + totHx + totPlus + totFest + totJE + totCompl);
       const { totalSS, porMes } = calcularCosteSSPerfil(d);
       const costeTotal = bruto + totalSS;
-      const pctSalario = bruto > 0 ? (totalSS / bruto * 100) : 0;
+
+      // v96: valores del contrato (base teórica)
+      const salarioDia = c.salarioDia || 0;
+      const vHoraEx = c.vHoraEx || 0;
+      const valorFestivo = salarioDia * 1.75;
 
       // Días totales del contrato
       let diasTot = 0;
@@ -8430,6 +8463,9 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
         diasTot = Math.round((fin - ini) / (1000 * 60 * 60 * 24)) + 1;
       }
 
+      // Excel row number (1-indexed, +2 porque headers = fila 1, primer perfil = fila 2)
+      const excelRow = rowIdx + 2;
+
       const fila = [
         d.nombre || p.nombre || "",
         d.puesto || "",
@@ -8438,58 +8474,101 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
         d.productora || proyectoSel.productora || "",
         d.fechaInicio || "",
         d.fechaFin || "",
-        diasTot || "",
-        d.salario45 || "",
+        diasTot || 0,
+        Number(d.salario45) || 0,
         p.tab_id === "40h" ? "40H" : "45H",
         d.esFijoDiscontinuo ? "Sí" : "No",
         d.vacAcumulada ? "Al final" : "Prorrateadas",
         d.indemAcumulada ? "Al final" : "Prorrateadas",
         d.finiquitoAparte ? "Sí" : "No",
-        totBase, totVac, totIndem, totHx, totPlus, totFest, totJE, totCompl,
-        bruto, totalSS, costeTotal, pctSalario,
+        totBase, totVac, totIndem, totHx, totPlus, totFest, totJE, totCompl,   // O-V
+        bruto, totalSS, costeTotal,                                             // W-X-Y
+        // Z, AA vacías; AB = Z+AA; AC = Y - AB (fórmulas con celdas)
+        null, null,                                                             // Z, AA vacías
+        { f: `${colLetter(IDX_BRUTO_MMB)}${excelRow}+${colLetter(IDX_FRINGES_MMB)}${excelRow}` },   // AB
+        { f: `${colLetter(IDX_COSTE_TOTAL)}${excelRow}-${colLetter(IDX_TOTAL_MMB)}${excelRow}` }, // AC
         p.autor || "",
         p.created_at ? new Date(p.created_at).toLocaleDateString("es-ES") : "",
         p.updated_at ? new Date(p.updated_at).toLocaleDateString("es-ES") : "",
       ];
-      // Añadir columnas de cash flow por mes
+      // Cash flow por mes
       mesesRango.forEach(ym => {
         const m = porMes[ym];
         fila.push(m ? m.bruto : 0, m ? m.ss : 0, m ? m.total : 0);
       });
-      return fila;
+      // Columnas finales v96: valores del contrato
+      fila.push(salarioDia, vHoraEx, valorFestivo);
+      aoa.push(fila);
     });
 
-    // Generar CSV (compatible con Excel, separador ;)
-    const escaparCSV = (v) => {
-      if (v === null || v === undefined) return "";
-      if (typeof v === "number") return String(v).replace(".", ",");
-      const s = String(v);
-      if (s.includes(";") || s.includes("\"") || s.includes("\n")) return `"${s.replace(/"/g, '""')}"`;
-      return s;
-    };
-    const bom = "\uFEFF"; // BOM para que Excel lo lea con UTF-8
-    const csv = bom + [headers, ...filas].map(r => r.map(escaparCSV).join(";")).join("\r\n");
-    const nombreArchivo = `Listado_${proyectoSel.nombre}_${new Date().toISOString().slice(0, 10)}.csv`;
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = nombreArchivo;
-    a.style.display = "none";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    // Crear worksheet
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+
+    // Formato contabilidad con € para las columnas de importe
+    // Formato Excel: [$€-C0A]  #,##0.00 (contabilidad con símbolo €)
+    const FMT_EUR = '_-* #,##0.00 [$€-C0A]_-;-* #,##0.00 [$€-C0A]_-;_-* "-"?? [$€-C0A]_-;_-@_-';
+    // Columnas con formato €: I (salario pactado) + O..Y + Z..AC (MMB) + cash flow + finales
+    const colsEUR = new Set();
+    colsEUR.add(8); // I - Salario pactado
+    for (let i = 14; i <= 28; i++) colsEUR.add(i); // O..AC (totales y MMB)
+    // Cash flow: desde índice (32) = después de AF (30 fijas + 3 cash flow por mes...)
+    const idxInicioMeses = headersFijos.length;                    // después de columnas fijas
+    const idxFinMeses = idxInicioMeses + mesesRango.length * 3;    // 3 cols por mes
+    for (let i = idxInicioMeses; i < idxFinMeses; i++) colsEUR.add(i);
+    // 3 finales
+    for (let i = idxFinMeses; i < idxFinMeses + 3; i++) colsEUR.add(i);
+
+    // Aplicar formato a cada celda de esas columnas (excepto headers)
+    const totalRows = aoa.length;
+    colsEUR.forEach(colIdx => {
+      for (let r = 1; r < totalRows; r++) {
+        const cellRef = colLetter(colIdx) + (r + 1);
+        if (ws[cellRef]) {
+          ws[cellRef].z = FMT_EUR;
+          // Si la celda tiene fórmula (f) o número, aseguramos tipo numérico
+          if (ws[cellRef].v === null || ws[cellRef].v === undefined) {
+            // celda vacía: dejar sin valor pero con formato
+            ws[cellRef].t = "n";
+          }
+        } else {
+          // Celda no creada por SheetJS (vacía) → crearla con formato
+          ws[cellRef] = { t: "n", z: FMT_EUR, v: null };
+        }
+      }
+    });
+
+    // Anchos de columna aproximados
+    const wscols = [];
+    headers.forEach((h, i) => {
+      let w = 12;
+      if (i === 0) w = 22;                            // Nombre
+      else if (i === 1) w = 18;                       // Puesto
+      else if (i === 3 || i === 4) w = 14;            // Proyecto, Productora
+      else if (i >= 5 && i <= 7) w = 11;              // Fechas, días
+      else if (i >= 14 && i <= 28) w = 15;            // Totales y MMB
+      else if (i >= idxInicioMeses && i < idxFinMeses) w = 11; // Cash flow
+      else if (i >= idxFinMeses) w = 14;              // Finales
+      wscols.push({ wch: w });
+    });
+    ws["!cols"] = wscols;
+
+    // Congelar primera fila y primeras 5 columnas (nombre..productora)
+    ws["!freeze"] = { xSplit: 5, ySplit: 1 };
+
+    // Crear workbook y descargar
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Listado");
+    const nombreArchivo = `Listado_${proyectoSel.nombre.replace(/[^a-zA-Z0-9]/g, "_")}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    XLSX.writeFile(wb, nombreArchivo);
 
     // Marcar perfiles como exportados
-    setMensaje({ tipo: "ok", texto: `Exportando ${perfilesExp.length} perfiles y marcando...` });
+    setMensaje({ tipo: "ok", texto: `Excel generado. Marcando ${perfilesExp.length} perfiles...` });
     for (const p of perfilesExp) {
       try {
         await marcarPerfilExportado(p.id, usuarioActual.nombre, auth);
       } catch (e) { console.warn("Error marcando", p.id, e); }
     }
     setMensaje({ tipo: "ok", texto: `✓ ${perfilesExp.length} perfiles exportados y marcados` });
-    // Recargar para ver los cambios
     await cargarPerfiles(proyectoSel);
   };
 
@@ -8604,7 +8683,7 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
                 {perfiles.length > 0 && (
                   <div style={{ marginTop: 16, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
                     <div style={{ fontSize: 10, color: "#666" }}>
-                      Se descargará un archivo <strong>.csv</strong> compatible con Excel con {seleccionados.size} perfil{seleccionados.size !== 1 ? "es" : ""}.
+                      Se descargará un archivo <strong>.xlsx</strong> (Excel) con {seleccionados.size} perfil{seleccionados.size !== 1 ? "es" : ""}, formato contabilidad y fórmulas.
                     </div>
                     <button onClick={exportar} disabled={seleccionados.size === 0}
                       style={{ background: seleccionados.size === 0 ? "#ccc" : "#5a8a5a", color: "#fff", border: "none", padding: "12px 24px", borderRadius: 5, cursor: seleccionados.size === 0 ? "not-allowed" : "pointer", fontFamily: "'Courier Prime', 'Courier New', monospace", fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>
