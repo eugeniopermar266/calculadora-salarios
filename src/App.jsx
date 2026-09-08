@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v106";
+const APP_VERSION = "v107";
 
 // v97: Departamentos de un rodaje audiovisual (obligatorio en cada perfil)
 const DEPARTAMENTOS = [
@@ -10222,21 +10222,29 @@ function PanelCalendarioProyecto({ proyecto, usuarioActual, onCerrar }) {
                             if (!enRango) return <div key={i} style={{ background: COLORES.fuera.bg, border: `1px solid ${COLORES.fuera.border}`, borderRadius: 6, minHeight: 70, padding: 8, fontSize: 13, color: COLORES.fuera.txt, fontFamily: "'Inter', sans-serif", fontWeight: 500 }}>{fecha.getDate()}</div>;
                             const { color, info, esFestivo } = getEstadoDia(iso);
                             const nombreFestivo = esFestivo ? festivosComunidad.find(f => f.fecha === iso)?.nombre : null;
-                            // Etiqueta textual del día
-                            let etiqueta = "";
-                            if (esFestivo && info.festivo_trabajado) etiqueta = "TRAB";
-                            else if (esFestivo) etiqueta = nombreFestivo || "FEST";
-                            else if (info.vacaciones) etiqueta = "VAC";
-                            else if (info.descanso) etiqueta = "DESC";
-                            else if (info.especial) etiqueta = "ESP";
-                            else if (info.rodaje) etiqueta = "ROD";
+                            // v107: etiqueta completa + color texto + soporte 2 líneas
+                            // { texto, color, lineas: 1|2 }
+                            let etiqueta = null;
+                            if (esFestivo && info.festivo_trabajado) {
+                              etiqueta = { texto: "RODAJE FESTIVO", color: "#fff", dosLineas: ["RODAJE", "FESTIVO"] };
+                            } else if (esFestivo) {
+                              etiqueta = { texto: (nombreFestivo || "FESTIVO").toUpperCase(), color: "#fff" };
+                            } else if (info.vacaciones) {
+                              etiqueta = { texto: "VACACIONES", color: "#000" };
+                            } else if (info.descanso) {
+                              etiqueta = { texto: "DESCANSO", color: "#000" };
+                            } else if (info.especial) {
+                              etiqueta = { texto: "JORNADA ESPECIAL", color: "#fff", dosLineas: ["JORNADA", "ESPECIAL"] };
+                            } else if (info.rodaje) {
+                              etiqueta = { texto: "RODAJE", color: "#000" };
+                            }
                             return (
                               <div
                                 key={i}
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   const rect = e.currentTarget.getBoundingClientRect();
-                                  setPopup({ fecha: iso, x: rect.left, y: rect.bottom + 4, yTop: rect.top - 4, esFestivo });
+                                  setPopup({ fecha: iso, x: rect.left, y: rect.bottom + 4, yTop: rect.top - 4, xCenter: rect.left + rect.width / 2, esFestivo });
                                 }}
                                 style={{
                                   background: color.bg,
@@ -10245,16 +10253,27 @@ function PanelCalendarioProyecto({ proyecto, usuarioActual, onCerrar }) {
                                   cursor: "pointer", position: "relative",
                                   transition: "transform 0.1s, box-shadow 0.1s",
                                   fontFamily: "'Inter', sans-serif",
+                                  overflow: "hidden",
                                 }}
                                 onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.04)"; e.currentTarget.style.boxShadow = `0 4px 12px ${color.bg}55`; e.currentTarget.style.zIndex = "5"; }}
                                 onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.zIndex = "auto"; }}
-                                title={nombreFestivo || ""}
+                                title={nombreFestivo || (etiqueta ? etiqueta.texto : "")}
                               >
                                 <div style={{ fontSize: 15, fontWeight: 700, color: color.txt }}>{fecha.getDate()}</div>
                                 {etiqueta && (
-                                  <div style={{ fontSize: 10, fontWeight: 700, color: "#fff", marginTop: 3, textShadow: "0 1px 2px rgba(0,0,0,0.5)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", letterSpacing: "0.03em" }}>
-                                    {etiqueta}
-                                  </div>
+                                  etiqueta.dosLineas ? (
+                                    <div style={{ marginTop: 3, lineHeight: 1.15 }}>
+                                      {etiqueta.dosLineas.map((linea, li) => (
+                                        <div key={li} style={{ fontSize: 10, fontWeight: 800, color: etiqueta.color, letterSpacing: "0.02em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                          {linea}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <div style={{ fontSize: 10, fontWeight: 800, color: etiqueta.color, marginTop: 3, letterSpacing: "0.02em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                      {etiqueta.texto}
+                                    </div>
+                                  )
                                 )}
                               </div>
                             );
@@ -10267,16 +10286,17 @@ function PanelCalendarioProyecto({ proyecto, usuarioActual, onCerrar }) {
               </div>
             )}
 
-            {/* Popup al clicar día */}
+            {/* Popup al clicar día (v107: siempre hacia arriba encima del día) */}
             {popup && (() => {
               const POPUP_H = 340;
               const POPUP_W = 240;
-              const espacioAbajo = window.innerHeight - popup.y;
-              const cabajo = espacioAbajo >= POPUP_H + 10;
-              const topFinal = cabajo
-                ? Math.min(popup.y, window.innerHeight - POPUP_H - 10)
-                : Math.max(10, popup.yTop - POPUP_H);
-              const leftFinal = Math.min(popup.x, window.innerWidth - POPUP_W - 10);
+              // Siempre hacia arriba: colocar la base del popup justo encima del día pulsado
+              // popup.yTop es la parte superior del día → base del popup = yTop
+              const topFinal = Math.max(10, popup.yTop - POPUP_H);
+              // Centrar horizontalmente sobre el día
+              const xCenter = popup.xCenter ?? popup.x;
+              const leftIdeal = xCenter - POPUP_W / 2;
+              const leftFinal = Math.max(10, Math.min(leftIdeal, window.innerWidth - POPUP_W - 10));
               return (
               <div style={{
                 position: "fixed",
