@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v104";
+const APP_VERSION = "v105";
 
 // v97: Departamentos de un rodaje audiovisual (obligatorio en cada perfil)
 const DEPARTAMENTOS = [
@@ -5999,46 +5999,102 @@ function PantallaSelectorProyecto({ usuario, onSeleccionar, onLogout, onGestiona
 
   useEffect(() => { recargar(); }, []);
 
+  // v105: cargar Inter
+  useEffect(() => {
+    const fontId = "inter-font-loader";
+    if (!document.getElementById(fontId)) {
+      const link = document.createElement("link");
+      link.id = fontId;
+      link.rel = "stylesheet";
+      link.href = "https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap";
+      document.head.appendChild(link);
+    }
+  }, []);
+
   return (
     <div style={{
       minHeight: "100vh",
-      background: "linear-gradient(135deg, #1a1a1a 0%, #2a2520 100%)",
+      width: "100%",
+      position: "relative",
       display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
       fontFamily: "'Courier Prime', 'Courier New', monospace",
+      overflow: "hidden",
+      boxSizing: "border-box",
     }}>
+      {/* v105: mismo bg.jpg que el login */}
       <div style={{
-        background: "#f0ede8", borderRadius: 12, padding: "40px 36px",
-        maxWidth: 480, width: "100%",
+        position: "fixed",
+        top: 0, left: 0,
+        width: "100vw", height: "100vh",
+        backgroundImage: "url('/bg.jpg')",
+        backgroundSize: "cover",
+        backgroundPosition: "center center",
+        backgroundRepeat: "no-repeat",
+        zIndex: 0,
+      }} />
+      <div style={{
+        position: "fixed",
+        top: 0, left: 0,
+        width: "100vw", height: "100vh",
+        background: "linear-gradient(180deg, rgba(10,15,20,0.35) 0%, rgba(10,15,20,0.55) 100%)",
+        zIndex: 1,
+      }} />
+
+      {/* Card opaca con blur */}
+      <div style={{
+        position: "relative", zIndex: 2,
+        width: "100%", maxWidth: 620,
+        background: "rgba(20,20,20,0.92)",
+        backdropFilter: "blur(20px)",
+        WebkitBackdropFilter: "blur(20px)",
+        border: "1px solid rgba(255,255,255,0.08)",
+        borderRadius: 16,
+        padding: "40px 36px",
         boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
-        border: "1px solid #c8a96e",
       }}>
         {/* Cabecera */}
-        <div style={{ textAlign: "center", marginBottom: 24 }}>
+        <div style={{ textAlign: "center", marginBottom: 32 }}>
+          {/* Icono triángulos en cuadro turquesa */}
           <div style={{
-            display: "inline-block", width: 56, height: 56,
-            background: "#c8a96e", borderRadius: 12,
-            color: "#1a1a1a", fontSize: 26, fontWeight: 700,
-            lineHeight: "56px", marginBottom: 14,
-          }}>📁</div>
-          <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", letterSpacing: "0.18em", textTransform: "uppercase" }}>
-            Selecciona Proyecto
+            width: 72, height: 72,
+            background: "rgba(78,201,184,0.08)",
+            border: "1px solid rgba(78,201,184,0.2)",
+            borderRadius: 16,
+            display: "inline-flex", alignItems: "center", justifyContent: "center",
+            marginBottom: 16,
+          }}>
+            <svg width="44" height="34" viewBox="0 0 44 34">
+              <polygon points="0,0 18,17 0,34" fill="#3a4a52"/>
+              <polygon points="11,0 29,17 11,34" fill="#8dcfc4" opacity="0.85"/>
+              <polygon points="22,0 40,17 22,34" fill="#4ec9b8"/>
+            </svg>
           </div>
-          <div style={{ fontSize: 10, color: "#888", marginTop: 4, letterSpacing: "0.12em", textTransform: "uppercase" }}>
+          <div style={{
+            fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+            fontSize: 24, fontWeight: 500, color: "#f0f0f0",
+            letterSpacing: "-0.01em", marginBottom: 6,
+          }}>
+            Selecciona proyecto
+          </div>
+          <div style={{
+            fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+            fontSize: 12, color: "#888", letterSpacing: "0.05em",
+          }}>
             {usuario.nombre}{usuario.es_admin ? " · Admin" : (usuario.rol === "coordinador" ? " · Coordinador" : "")}
           </div>
-          <div style={{ fontSize: 9, color: "#c8a96e", marginTop: 6, letterSpacing: "0.12em", fontWeight: 700, fontFamily: "'Courier Prime', 'Courier New', monospace" }} title="Versión de la app">
+          <div style={{ fontSize: 12, color: "#4ec9b8", letterSpacing: "0.2em", fontWeight: 700, marginTop: 10, fontFamily: "'Courier Prime', 'Courier New', monospace" }} title="Versión de la app">
             {APP_VERSION}
           </div>
         </div>
 
         {cargando && (
-          <div style={{ textAlign: "center", padding: 20, color: "#888", fontSize: 11 }}>
+          <div style={{ textAlign: "center", padding: 20, color: "#888", fontSize: 12, letterSpacing: "0.1em", fontFamily: "'Inter', sans-serif" }}>
             Cargando proyectos...
           </div>
         )}
 
         {error && (
-          <div style={{ padding: 12, background: "rgba(160,69,69,0.1)", border: "1px solid #a04545", borderRadius: 6, color: "#a04545", fontSize: 11, marginBottom: 12 }}>
+          <div style={{ padding: 14, background: "rgba(200,80,80,0.15)", border: "1px solid rgba(200,80,80,0.4)", borderRadius: 8, color: "#e88", fontSize: 11, marginBottom: 12, textAlign: "center" }}>
             ✕ {error}
           </div>
         )}
@@ -6046,8 +6102,9 @@ function PantallaSelectorProyecto({ usuario, onSeleccionar, onLogout, onGestiona
         {/* Sin proyectos */}
         {!cargando && !error && proyectos.length === 0 && (
           <div style={{
-            padding: 20, background: "rgba(184,134,74,0.08)", border: "1px solid #d4b678",
-            borderRadius: 6, color: "#5a4a2a", fontSize: 12, textAlign: "center", lineHeight: 1.5, marginBottom: 14,
+            padding: 24, background: "rgba(78,201,184,0.06)", border: "1px solid rgba(78,201,184,0.2)",
+            borderRadius: 10, color: "#4ec9b8", fontSize: 13, textAlign: "center", lineHeight: 1.6, marginBottom: 14,
+            fontFamily: "'Inter', sans-serif",
           }}>
             <div style={{ fontSize: 32, marginBottom: 8 }}>⚠</div>
             <b>No tienes proyectos asignados</b>
@@ -6059,49 +6116,69 @@ function PantallaSelectorProyecto({ usuario, onSeleccionar, onLogout, onGestiona
 
         {/* Lista de proyectos */}
         {!cargando && proyectos.length > 0 && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 24 }}>
             {proyectos.map(p => (
-              <div key={p.id} style={{
-                background: "#fff", border: "1px solid #d0ccc6",
-                borderRadius: 6, display: "flex", alignItems: "stretch",
-                fontFamily: "'Courier Prime', 'Courier New', monospace",
-              }}>
+              <div key={p.id} style={{ display: "flex", alignItems: "stretch", gap: 8 }}>
                 <button
                   onClick={() => onSeleccionar(p)}
                   style={{
-                    flex: 1, background: "transparent", border: "none",
-                    padding: "14px 16px", cursor: "pointer",
-                    textAlign: "left", fontFamily: "'Courier Prime', 'Courier New', monospace",
-                    transition: "background 0.15s", color: "#1a1a1a",
+                    flex: 1,
                     display: "flex", justifyContent: "space-between", alignItems: "center",
-                    borderRadius: (usuario.es_admin || usuario.rol === "coordinador") ? "6px 0 0 6px" : 6,
+                    padding: "16px 20px",
+                    background: "rgba(30,30,30,0.6)",
+                    border: "1px solid rgba(255,255,255,0.08)",
+                    borderRadius: 10, cursor: "pointer",
+                    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+                    color: "#f0f0f0",
+                    textAlign: "left",
+                    transition: "all 0.15s",
                   }}
-                  onMouseEnter={e => { e.currentTarget.style.background = "#faf6ee"; }}
-                  onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.background = "rgba(78,201,184,0.08)";
+                    e.currentTarget.style.borderColor = "rgba(78,201,184,0.3)";
+                    e.currentTarget.querySelector(".arrow").style.stroke = "#4ec9b8";
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.background = "rgba(30,30,30,0.6)";
+                    e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)";
+                    e.currentTarget.querySelector(".arrow").style.stroke = "#555";
+                  }}
                 >
                   <div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", letterSpacing: "0.05em" }}>
+                    <div style={{ fontSize: 16, fontWeight: 600, color: "#f0f0f0", letterSpacing: "-0.01em", marginBottom: 2 }}>
                       {p.nombre}
                     </div>
-                    <div style={{ fontSize: 10, color: "#888", marginTop: 2, letterSpacing: "0.1em", textTransform: "uppercase" }}>
+                    <div style={{ fontSize: 12, color: "#888", letterSpacing: "0.05em" }}>
                       {p.productora}
                     </div>
                   </div>
-                  <div style={{ color: "#c8a96e", fontSize: 18 }}>→</div>
+                  <svg className="arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#555" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transition: "stroke 0.15s" }}>
+                    <line x1="5" y1="12" x2="19" y2="12"/>
+                    <polyline points="12 5 19 12 12 19"/>
+                  </svg>
                 </button>
                 {(usuario.es_admin || usuario.rol === "coordinador") && (
                   <button
                     onClick={() => onEditarCalendario && onEditarCalendario(p)}
                     title="Editar calendario del proyecto"
                     style={{
-                      background: "#faf3ea", border: "none", borderLeft: "1px solid #e0d4b8",
-                      padding: "0 14px", cursor: "pointer", color: "#8a5030",
-                      fontSize: 16, borderRadius: "0 6px 6px 0",
-                      transition: "background 0.15s",
+                      width: 54, background: "rgba(30,30,30,0.8)",
+                      border: "1px solid rgba(255,255,255,0.1)",
+                      borderRadius: 10, cursor: "pointer",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      padding: 0,
+                      transition: "all 0.15s",
                     }}
-                    onMouseEnter={e => { e.currentTarget.style.background = "#f0e3c8"; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = "#faf3ea"; }}
-                  >📅</button>
+                    onMouseEnter={e => { e.currentTarget.style.background = "rgba(78,201,184,0.15)"; e.currentTarget.style.borderColor = "rgba(78,201,184,0.4)"; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = "rgba(30,30,30,0.8)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)"; }}
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                      <line x1="16" y1="2" x2="16" y2="6"/>
+                      <line x1="8" y1="2" x2="8" y2="6"/>
+                      <line x1="3" y1="10" x2="21" y2="10"/>
+                    </svg>
+                  </button>
                 )}
               </div>
             ))}
@@ -6109,38 +6186,45 @@ function PantallaSelectorProyecto({ usuario, onSeleccionar, onLogout, onGestiona
         )}
 
         {/* Botones inferiores */}
-        <div style={{ display: "flex", gap: 8, marginTop: 12, paddingTop: 14, borderTop: "1px solid #e0ddd8", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 8, paddingTop: 20, borderTop: "1px solid rgba(255,255,255,0.08)", flexWrap: "wrap" }}>
           {usuario.es_admin && (
             <button
               onClick={onGestionar}
               style={{
-                flex: 1, minWidth: 140, background: "#c8a96e", color: "#1a1a1a", border: "none",
-                padding: "10px 14px", borderRadius: 5, cursor: "pointer",
-                fontFamily: "'Courier Prime', 'Courier New', monospace", fontSize: 10, fontWeight: 700,
-                letterSpacing: "0.12em", textTransform: "uppercase",
+                flex: 1, minWidth: 140,
+                background: "#4ec9b8", color: "#0a0a0a", border: "none",
+                padding: "14px 20px", borderRadius: 10, cursor: "pointer",
+                fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+                fontSize: 13, fontWeight: 600, letterSpacing: "0.02em",
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                transition: "background 0.15s",
               }}
-            >⚙ Gestionar proyectos</button>
-          )}
-          {(usuario.es_admin || usuario.rol === "coordinador") && false && onExportarListado && (
-            <button
-              onClick={onExportarListado}
-              style={{
-                flex: 1, minWidth: 140, background: "#5a8a5a", color: "#fff", border: "none",
-                padding: "10px 14px", borderRadius: 5, cursor: "pointer",
-                fontFamily: "'Courier Prime', 'Courier New', monospace", fontSize: 10, fontWeight: 700,
-                letterSpacing: "0.12em", textTransform: "uppercase",
-              }}
-            >📊 Exportar listado</button>
+              onMouseEnter={e => e.currentTarget.style.background = "#5ed9c8"}
+              onMouseLeave={e => e.currentTarget.style.background = "#4ec9b8"}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+              </svg>
+              Gestionar proyectos
+            </button>
           )}
           <button
             onClick={onLogout}
             style={{
-              flex: 1, minWidth: 140, background: "transparent", color: "#888", border: "1px solid #ccc",
-              padding: "10px 14px", borderRadius: 5, cursor: "pointer",
-              fontFamily: "'Courier Prime', 'Courier New', monospace", fontSize: 10, fontWeight: 700,
-              letterSpacing: "0.12em", textTransform: "uppercase",
+              flex: 1, minWidth: 140,
+              background: "transparent", color: "#888",
+              border: "1px solid rgba(255,255,255,0.15)",
+              padding: "14px 20px", borderRadius: 10, cursor: "pointer",
+              fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+              fontSize: 13, fontWeight: 500, letterSpacing: "0.02em",
+              transition: "all 0.15s",
             }}
-          >Cerrar sesión</button>
+            onMouseEnter={e => { e.currentTarget.style.color = "#ddd"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.3)"; }}
+            onMouseLeave={e => { e.currentTarget.style.color = "#888"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.15)"; }}
+          >
+            Cerrar sesión
+          </button>
         </div>
       </div>
     </div>
