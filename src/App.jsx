@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v105";
+const APP_VERSION = "v106";
 
 // v97: Departamentos de un rodaje audiovisual (obligatorio en cada perfil)
 const DEPARTAMENTOS = [
@@ -9430,123 +9430,216 @@ function PanelProyectos({ usuarioActual, onCerrar }) {
     } catch (err) { alert("Error: " + err.message); }
   };
 
+  // v106: cargar Inter
+  useEffect(() => {
+    const fontId = "inter-font-loader";
+    if (!document.getElementById(fontId)) {
+      const link = document.createElement("link");
+      link.id = fontId;
+      link.rel = "stylesheet";
+      link.href = "https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap";
+      document.head.appendChild(link);
+    }
+  }, []);
+
   const overlay = {
-    position: "fixed", inset: 0, background: "rgba(20,20,20,0.75)",
+    position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)",
+    backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)",
     display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000,
+    padding: 20,
   };
   const modal = {
-    background: "#faf7f2", padding: 20, borderRadius: 6, maxWidth: 850, width: "90%",
-    maxHeight: "88vh", overflowY: "auto", color: "#1a1a1a",
-    fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", border: "1px solid #b8864a",
+    background: "rgba(20,20,20,0.96)",
+    backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)",
+    border: "1px solid rgba(255,255,255,0.08)",
+    borderRadius: 16, padding: "32px 32px", maxWidth: 1050, width: "100%",
+    maxHeight: "90vh", overflowY: "auto", color: "#f0f0f0",
+    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+    boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
   };
-  const btnGold = {
-    background: "#b8864a", color: "#fff", border: "none",
-    padding: "6px 12px", borderRadius: 4, cursor: "pointer",
-    fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize: 11, fontWeight: 700,
-    letterSpacing: "0.1em", textTransform: "uppercase",
+  // Botón turquesa primario
+  const btnPrimary = {
+    background: "#4ec9b8", color: "#0a0a0a", border: "none",
+    padding: "10px 20px", borderRadius: 8, cursor: "pointer",
+    fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 600,
+    letterSpacing: "0.02em", display: "inline-flex", alignItems: "center", gap: 6,
+    transition: "background 0.15s",
   };
+  // Botón outline
   const btnGhost = {
-    background: "transparent", color: "#b8864a", border: "1px solid #b8864a",
-    padding: "6px 12px", borderRadius: 4, cursor: "pointer",
-    fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize: 10, fontWeight: 700,
-    letterSpacing: "0.1em", textTransform: "uppercase",
+    background: "transparent", color: "#ddd",
+    border: "1px solid rgba(255,255,255,0.15)",
+    padding: "7px 12px", borderRadius: 6, cursor: "pointer",
+    fontFamily: "'Inter', sans-serif", fontSize: 11, fontWeight: 500,
+    display: "inline-flex", alignItems: "center", gap: 5,
+    transition: "all 0.15s",
+  };
+  // Botón borrar
+  const btnDelete = {
+    background: "transparent", color: "#e88",
+    border: "1px solid rgba(200,80,80,0.3)",
+    padding: "7px 10px", borderRadius: 6, cursor: "pointer",
+    display: "inline-flex", alignItems: "center", justifyContent: "center",
+    transition: "all 0.15s",
   };
   const inp = {
-    padding: "6px 8px", border: "1px solid #d0ccc6", borderRadius: 4,
-    fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize: 12, background: "#fff",
-    color: "#1a1a1a", colorScheme: "light",
+    padding: "10px 12px", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8,
+    fontFamily: "'Inter', sans-serif", fontSize: 13,
+    background: "rgba(20,20,20,0.8)",
+    color: "#f0f0f0", outline: "none",
+    boxSizing: "border-box",
   };
 
   return (
     <div style={overlay} onClick={onCerrar}>
       <div style={modal} onClick={e => e.stopPropagation()}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, borderBottom: "1px solid #e0ddd8", paddingBottom: 10 }}>
-          <h2 style={{ margin: 0, fontSize: 14, letterSpacing: "0.15em", textTransform: "uppercase", color: "#1a1a1a" }}>📁 Gestión de Proyectos</h2>
-          <button onClick={onCerrar} style={{ background: "transparent", color: "#888", border: "1px solid #ccc", padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>Cerrar</button>
+        {/* Cabecera */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, paddingBottom: 20, borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <div style={{ width: 44, height: 44, background: "rgba(78,201,184,0.08)", border: "1px solid rgba(78,201,184,0.2)", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <svg width="26" height="20" viewBox="0 0 44 34">
+                <polygon points="0,0 18,17 0,34" fill="#3a4a52"/>
+                <polygon points="11,0 29,17 11,34" fill="#8dcfc4" opacity="0.85"/>
+                <polygon points="22,0 40,17 22,34" fill="#4ec9b8"/>
+              </svg>
+            </div>
+            <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 20, fontWeight: 500, color: "#f0f0f0", letterSpacing: "-0.01em" }}>
+              Gestión de proyectos
+            </div>
+          </div>
+          <button onClick={onCerrar} style={btnGhost}>Cerrar</button>
         </div>
 
-        {error && <div style={{ background: "#fee", color: "#900", padding: 8, borderRadius: 4, marginBottom: 10, fontSize: 11 }}>Error: {error}</div>}
+        {error && (
+          <div style={{ padding: 12, background: "rgba(200,80,80,0.15)", border: "1px solid rgba(200,80,80,0.4)", borderRadius: 8, color: "#e88", fontSize: 12, marginBottom: 14 }}>
+            Error: {error}
+          </div>
+        )}
 
         {/* Botón nuevo */}
         {!mostrarNuevo && (
-          <button onClick={() => setMostrarNuevo(true)} style={{ ...btnGold, marginBottom: 12 }}>+ Nuevo proyecto</button>
+          <div style={{ textAlign: "center", marginBottom: 20 }}>
+            <button
+              onClick={() => setMostrarNuevo(true)}
+              style={{ ...btnPrimary, padding: "12px 28px", fontSize: 13, boxShadow: "0 4px 16px rgba(78,201,184,0.2)" }}
+              onMouseEnter={e => e.currentTarget.style.background = "#5ed9c8"}
+              onMouseLeave={e => e.currentTarget.style.background = "#4ec9b8"}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Nuevo proyecto
+            </button>
+          </div>
         )}
 
         {/* Formulario nuevo */}
         {mostrarNuevo && (
-          <div style={{ background: "#fff", padding: 12, borderRadius: 4, marginBottom: 14, border: "1px solid #e0ddd8" }}>
+          <div style={{ background: "rgba(30,30,30,0.6)", padding: 16, borderRadius: 10, marginBottom: 20, border: "1px solid rgba(78,201,184,0.2)" }}>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto auto", gap: 8, alignItems: "center" }}>
               <input placeholder="Nombre del proyecto" value={nuevoForm.nombre} onChange={e => setNuevoForm({...nuevoForm, nombre: e.target.value})} style={inp} />
               <input placeholder="Productora" value={nuevoForm.productora} onChange={e => setNuevoForm({...nuevoForm, productora: e.target.value})} style={inp} />
-              <button onClick={onAdd} style={btnGold}>Crear</button>
+              <button onClick={onAdd} style={btnPrimary}>Crear</button>
               <button onClick={() => { setMostrarNuevo(false); setNuevoForm({ nombre: "", productora: "" }); }} style={btnGhost}>Cancelar</button>
             </div>
           </div>
         )}
 
-        {cargando && <div style={{ padding: 20, textAlign: "center", color: "#888" }}>Cargando...</div>}
+        {cargando && <div style={{ padding: 20, textAlign: "center", color: "#888", fontSize: 13 }}>Cargando...</div>}
 
         {/* Lista de proyectos */}
         {!cargando && proyectos.length === 0 && (
-          <div style={{ padding: 20, textAlign: "center", color: "#888", fontSize: 12 }}>No hay proyectos. Crea el primero.</div>
+          <div style={{ padding: 24, textAlign: "center", color: "#888", fontSize: 13, background: "rgba(30,30,30,0.4)", borderRadius: 10, border: "1px solid rgba(255,255,255,0.06)" }}>
+            No hay proyectos. Crea el primero.
+          </div>
         )}
 
-        {!cargando && proyectos.map(p => (
-          <div key={p.id} style={{ background: "#fff", padding: 12, borderRadius: 4, marginBottom: 8, border: "1px solid #e0ddd8" }}>
-            {editando?.id === p.id ? (
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto auto auto", gap: 8, alignItems: "center" }}>
-                <input value={editando.nombre} onChange={e => setEditando({...editando, nombre: e.target.value})} style={inp} />
-                <input value={editando.productora} onChange={e => setEditando({...editando, productora: e.target.value})} style={inp} />
-                <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11 }}>
-                  <input type="checkbox" checked={editando.activo} onChange={e => setEditando({...editando, activo: e.target.checked})} /> Activo
-                </label>
-                <button onClick={onGuardarEdit} style={btnGold}>Guardar</button>
-                <button onClick={() => setEditando(null)} style={btnGhost}>Cancelar</button>
-              </div>
-            ) : (
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto auto auto auto auto auto", gap: 8, alignItems: "center" }}>
-                <div style={{ fontWeight: 700, color: p.activo ? "#1a1a1a" : "#999" }}>
-                  {p.nombre} {!p.activo && <span style={{ fontSize: 9, color: "#c00" }}>(inactivo)</span>}
-                </div>
-                <div style={{ fontSize: 11, color: "#666" }}>{p.productora}</div>
-                <div style={{ fontSize: 10, color: "#888" }}>
-                  {asignaciones.filter(a => a.proyecto_id === p.id).length} usuarios
-                </div>
-                <button onClick={() => setProyectoAsignar(proyectoAsignar?.id === p.id ? null : p)} style={btnGhost}>👥 Usuarios</button>
-                <button onClick={() => setProyectoConCalendario(p)} style={btnGhost}>📅 Calendario</button>
-                <button onClick={() => setEditando({ id: p.id, nombre: p.nombre, productora: p.productora, activo: p.activo })} style={btnGhost}>Editar</button>
-                <button onClick={() => onDuplicar(p)} style={btnGhost} title="Duplicar proyecto y calendario (sin perfiles)">📋 Duplicar</button>
-                <button onClick={() => onBorrar(p)} style={{ ...btnGhost, borderColor: "#c00", color: "#c00" }}>🗑</button>
-              </div>
-            )}
-
-            {/* Sub-panel asignación usuarios */}
-            {proyectoAsignar?.id === p.id && (
-              <div style={{ marginTop: 12, padding: 10, background: "#f0ede8", borderRadius: 4, border: "1px solid #d0ccc6" }}>
-                <div style={{ fontSize: 10, color: "#666", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.1em" }}>
-                  Marca los usuarios que pueden acceder a este proyecto:
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 6 }}>
-                  {usuarios.filter(u => !u.es_admin && u.activo).map(u => (
-                    <label key={u.id} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, padding: "4px 6px", background: "#fff", borderRadius: 3, cursor: "pointer" }}>
-                      <input
-                        type="checkbox"
-                        checked={estaAsignado(u.id, p.id)}
-                        onChange={() => toggleAsignacion(u.id, p.id)}
-                      />
-                      {u.nombre}
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {!cargando && proyectos.map(p => {
+            const numUsers = asignaciones.filter(a => a.proyecto_id === p.id).length;
+            return (
+              <div key={p.id} style={{
+                background: "rgba(30,30,30,0.6)",
+                padding: "14px 18px", borderRadius: 10,
+                border: "1px solid rgba(255,255,255,0.08)",
+                transition: "all 0.15s",
+              }}
+                onMouseEnter={e => { if (editando?.id !== p.id) { e.currentTarget.style.background = "rgba(78,201,184,0.06)"; e.currentTarget.style.borderColor = "rgba(78,201,184,0.2)"; } }}
+                onMouseLeave={e => { if (editando?.id !== p.id) { e.currentTarget.style.background = "rgba(30,30,30,0.6)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)"; } }}
+              >
+                {editando?.id === p.id ? (
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto auto auto", gap: 8, alignItems: "center" }}>
+                    <input value={editando.nombre} onChange={e => setEditando({...editando, nombre: e.target.value})} style={inp} />
+                    <input value={editando.productora} onChange={e => setEditando({...editando, productora: e.target.value})} style={inp} />
+                    <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#ddd" }}>
+                      <input type="checkbox" checked={editando.activo} onChange={e => setEditando({...editando, activo: e.target.checked})} /> Activo
                     </label>
-                  ))}
-                  {usuarios.filter(u => !u.es_admin && u.activo).length === 0 && (
-                    <div style={{ fontSize: 11, color: "#888", fontStyle: "italic" }}>
-                      No hay usuarios normales activos. Los admins ven todos los proyectos automáticamente.
+                    <button onClick={onGuardarEdit} style={btnPrimary}>Guardar</button>
+                    <button onClick={() => setEditando(null)} style={btnGhost}>Cancelar</button>
+                  </div>
+                ) : (
+                  <div style={{ display: "grid", gridTemplateColumns: "100px 90px 90px 1fr auto", gap: 14, alignItems: "center" }}>
+                    <div style={{ fontSize: 15, fontWeight: 600, color: p.activo ? "#f0f0f0" : "#666", letterSpacing: "-0.01em" }}>
+                      {p.nombre}
+                      {!p.activo && <span style={{ fontSize: 9, color: "#e88", marginLeft: 6, fontWeight: 500 }}>(inactivo)</span>}
                     </div>
-                  )}
-                </div>
+                    <div style={{ fontSize: 12, color: "#888", letterSpacing: "0.05em" }}>{p.productora}</div>
+                    <div style={{ fontSize: 11, color: numUsers > 0 ? "#4ec9b8" : "#666", fontWeight: numUsers > 0 ? 600 : 400 }}>
+                      {numUsers} usuario{numUsers === 1 ? "" : "s"}
+                    </div>
+                    <div></div>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <button onClick={() => setProyectoAsignar(proyectoAsignar?.id === p.id ? null : p)} style={btnGhost} title="Usuarios">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                        Usuarios
+                      </button>
+                      <button onClick={() => setProyectoConCalendario(p)} style={btnGhost} title="Calendario">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                        Calendario
+                      </button>
+                      <button onClick={() => setEditando({ id: p.id, nombre: p.nombre, productora: p.productora, activo: p.activo })} style={btnGhost} title="Editar">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                        Editar
+                      </button>
+                      <button onClick={() => onDuplicar(p)} style={btnGhost} title="Duplicar proyecto y calendario (sin perfiles)">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                        Duplicar
+                      </button>
+                      <button onClick={() => onBorrar(p)} style={btnDelete} title="Borrar">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Sub-panel asignación usuarios */}
+                {proyectoAsignar?.id === p.id && (
+                  <div style={{ marginTop: 14, padding: 14, background: "rgba(20,20,20,0.6)", borderRadius: 8, border: "1px solid rgba(78,201,184,0.2)" }}>
+                    <div style={{ fontSize: 11, color: "#4ec9b8", marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 600 }}>
+                      Marca los usuarios que pueden acceder a este proyecto:
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 6 }}>
+                      {usuarios.filter(u => !u.es_admin && u.activo).map(u => (
+                        <label key={u.id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, padding: "6px 10px", background: "rgba(30,30,30,0.6)", borderRadius: 6, cursor: "pointer", color: "#ddd", border: "1px solid rgba(255,255,255,0.06)" }}>
+                          <input
+                            type="checkbox"
+                            checked={estaAsignado(u.id, p.id)}
+                            onChange={() => toggleAsignacion(u.id, p.id)}
+                            style={{ accentColor: "#4ec9b8" }}
+                          />
+                          {u.nombre}
+                        </label>
+                      ))}
+                      {usuarios.filter(u => !u.es_admin && u.activo).length === 0 && (
+                        <div style={{ fontSize: 12, color: "#888", fontStyle: "italic" }}>
+                          No hay usuarios normales activos. Los admins ven todos los proyectos automáticamente.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        ))}
+            );
+          })}
+        </div>
       </div>
       {/* v55: modal calendario del proyecto */}
       {proyectoConCalendario && (
@@ -9590,17 +9683,17 @@ function PanelCalendarioProyecto({ proyecto, usuarioActual, onCerrar }) {
     { key: "bilbao", label: "Bilbao" },
   ];
 
-  // ── Colores por estado
+  // ── Colores por estado (v106: fosforitos alto contraste sobre fondo oscuro)
   const COLORES = {
-    laboral:    { bg: "#e8f0e0", border: "#8ab070", txt: "#3a5a2a" },
-    festivo:    { bg: "#fde0e0", border: "#c05050", txt: "#8a2020" }, // festivo NO trabajado
-    festivoTrab:{ bg: "#ffe8c8", border: "#e89838", txt: "#8a5820" }, // festivo trabajado (naranja)
-    rodaje:     { bg: "#faf1e0", border: "#c8963a", txt: "#7a5a2a" }, // dorado
-    vacaciones: { bg: "#e0edf5", border: "#5090c0", txt: "#204878" }, // azul
-    descanso:   { bg: "#ece0f0", border: "#8a5aa0", txt: "#502870" }, // v58: morado
-    especial:   { bg: "#ffd6e8", border: "#d63a7a", txt: "#8a1e4a" }, // v70: jornada especial (rosa fuerte)
-    finde:      { bg: "#f0ede8", border: "#d0ccc6", txt: "#999" },
-    fuera:      { bg: "#fafafa", border: "#eee", txt: "#ccc" },
+    laboral:    { bg: "#00e676", border: "#00e676", txt: "#00280d", label: "" },              // verde neón
+    festivo:    { bg: "#ff1744", border: "#ff1744", txt: "#ffffff", label: "" },              // rojo neón (usa nombre real)
+    festivoTrab:{ bg: "#ff9100", border: "#ff9100", txt: "#2a1500", label: "TRAB" },          // naranja neón
+    rodaje:     { bg: "#ffea00", border: "#ffea00", txt: "#2a2400", label: "ROD" },           // amarillo neón
+    vacaciones: { bg: "#00e5ff", border: "#00e5ff", txt: "#002d33", label: "VAC" },           // cyan neón
+    descanso:   { bg: "#c0c0c0", border: "#d0d0d0", txt: "#1a1a1a", label: "DESC" },          // gris claro
+    especial:   { bg: "#ff4081", border: "#ff4081", txt: "#ffffff", label: "ESP" },           // rosa/magenta
+    finde:      { bg: "#2a2a2a", border: "#444", txt: "#888", label: "" },                     // gris oscuro
+    fuera:      { bg: "rgba(20,20,20,0.4)", border: "rgba(255,255,255,0.05)", txt: "#444", label: "" },
   };
 
   // ── Cargar calendario desde Supabase
@@ -9846,47 +9939,118 @@ function PanelCalendarioProyecto({ proyecto, usuarioActual, onCerrar }) {
     return { color, info, esFestivo, esFinde };
   };
 
-  // ── Estilos comunes
-  const overlay = { position: "fixed", inset: 0, background: "rgba(20,20,20,0.8)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100 };
-  const modal = { background: "#faf7f2", padding: 20, borderRadius: 6, maxWidth: 900, width: "94%", maxHeight: "92vh", overflowY: "auto", color: "#1a1a1a", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", border: "1px solid #b8864a" };
-  const btnGold = { background: "#b8864a", color: "#fff", border: "none", padding: "8px 14px", borderRadius: 4, cursor: "pointer", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" };
-  const btnGhost = { background: "transparent", color: "#b8864a", border: "1px solid #b8864a", padding: "6px 12px", borderRadius: 4, cursor: "pointer", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" };
-  const inp = { padding: "8px 10px", border: "1px solid #d0ccc6", borderRadius: 4, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize: 12, background: "#fff", color: "#1a1a1a", colorScheme: "light", width: "100%" };
-  const labelStyle = { display: "block", fontSize: 9, color: "#666", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 4 };
+  // ── Estilos comunes v106 (paleta oscura)
+  const overlay = {
+    position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)",
+    backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)",
+    display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100,
+    padding: 12,
+  };
+  const modal = {
+    background: "rgba(20,20,20,0.96)",
+    backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)",
+    border: "1px solid rgba(255,255,255,0.08)",
+    borderRadius: 16, padding: "24px 28px",
+    maxWidth: 1800, width: "98%",
+    maxHeight: "96vh", overflowY: "auto",
+    color: "#f0f0f0",
+    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+    boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
+  };
+  const btnPrimary = {
+    background: "#4ec9b8", color: "#0a0a0a", border: "none",
+    padding: "10px 20px", borderRadius: 8, cursor: "pointer",
+    fontFamily: "'Inter', sans-serif", fontSize: 13, fontWeight: 600,
+    letterSpacing: "0.02em", display: "inline-flex", alignItems: "center", gap: 6,
+    transition: "background 0.15s",
+  };
+  const btnGhost = {
+    background: "transparent", color: "#ddd",
+    border: "1px solid rgba(255,255,255,0.15)",
+    padding: "8px 16px", borderRadius: 8, cursor: "pointer",
+    fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 500,
+    display: "inline-flex", alignItems: "center", gap: 6,
+    transition: "all 0.15s",
+  };
+  const btnDelete = {
+    background: "transparent", color: "#e88",
+    border: "1px solid rgba(200,80,80,0.3)",
+    padding: "10px 18px", borderRadius: 8, cursor: "pointer",
+    fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 500,
+    display: "inline-flex", alignItems: "center", gap: 6,
+    transition: "all 0.15s",
+  };
+  const inp = {
+    padding: "12px 14px", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8,
+    fontFamily: "'Inter', sans-serif", fontSize: 14, fontWeight: 500,
+    background: "rgba(20,20,20,0.8)",
+    color: "#f0f0f0", outline: "none",
+    boxSizing: "border-box", width: "100%",
+  };
+  // Select con chevron custom (fix cortes tipo "Madrid" y "Rodaje")
+  const sel = {
+    ...inp,
+    padding: "12px 40px 12px 14px",
+    WebkitAppearance: "none",
+    MozAppearance: "none",
+    appearance: "none",
+    backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>")`,
+    backgroundRepeat: "no-repeat",
+    backgroundPosition: "right 14px center",
+    cursor: "pointer",
+  };
+  const labelStyle = {
+    display: "block", fontSize: 11, color: "#888",
+    textTransform: "uppercase", letterSpacing: "0.05em",
+    marginBottom: 6, fontWeight: 500, fontFamily: "'Inter', sans-serif",
+  };
 
   return (
     <div style={overlay} onClick={() => { if (popup) setPopup(null); else onCerrar(); }}>
       <div style={modal} onClick={e => e.stopPropagation()}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, borderBottom: "1px solid #e0ddd8", paddingBottom: 10 }}>
-          <div>
-            <h2 style={{ margin: 0, fontSize: 14, letterSpacing: "0.15em", textTransform: "uppercase", color: "#1a1a1a" }}>📅 Calendario del proyecto</h2>
-            <div style={{ fontSize: 11, color: "#888", marginTop: 3, fontWeight: 700 }}>{proyecto.nombre} · {proyecto.productora}</div>
+        {/* Cabecera */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, paddingBottom: 18, borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <div style={{ width: 44, height: 44, background: "rgba(78,201,184,0.08)", border: "1px solid rgba(78,201,184,0.2)", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4ec9b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+              </svg>
+            </div>
+            <div>
+              <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 20, fontWeight: 500, color: "#f0f0f0", letterSpacing: "-0.01em" }}>
+                Calendario del proyecto
+              </div>
+              <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, color: "#888", marginTop: 2 }}>
+                {proyecto.nombre} · {proyecto.productora}
+              </div>
+            </div>
           </div>
-          <button onClick={onCerrar} style={{ background: "transparent", color: "#888", border: "1px solid #ccc", padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>Cerrar</button>
+          <button onClick={onCerrar} style={btnGhost}>Cerrar</button>
         </div>
 
-        {cargando && <div style={{ padding: 20, textAlign: "center", color: "#888" }}>Cargando...</div>}
-        {error && <div style={{ background: "#fee", color: "#900", padding: 8, borderRadius: 4, marginBottom: 10, fontSize: 11 }}>Error: {error}</div>}
+        {cargando && <div style={{ padding: 20, textAlign: "center", color: "#888", fontFamily: "'Inter', sans-serif" }}>Cargando...</div>}
+        {error && <div style={{ background: "rgba(200,80,80,0.15)", border: "1px solid rgba(200,80,80,0.4)", color: "#e88", padding: 12, borderRadius: 8, marginBottom: 12, fontSize: 12 }}>Error: {error}</div>}
         {mensaje && (
           <div style={{
-            padding: 10, borderRadius: 4, marginBottom: 12, fontSize: 11,
-            background: mensaje.tipo === "ok" ? "#e8f5e8" : "#fdf0f0",
-            border: `1px solid ${mensaje.tipo === "ok" ? "#c0e0c0" : "#e8c0c0"}`,
-            color: mensaje.tipo === "ok" ? "#2a7a50" : "#b02020",
+            padding: 12, borderRadius: 8, marginBottom: 12, fontSize: 12,
+            background: mensaje.tipo === "ok" ? "rgba(78,201,184,0.12)" : "rgba(200,80,80,0.15)",
+            border: `1px solid ${mensaje.tipo === "ok" ? "rgba(78,201,184,0.35)" : "rgba(200,80,80,0.4)"}`,
+            color: mensaje.tipo === "ok" ? "#4ec9b8" : "#e88",
+            fontFamily: "'Inter', sans-serif",
           }}>{mensaje.texto}</div>
         )}
 
         {!cargando && (
           <>
             {calendario === false && (
-              <div style={{ padding: 12, background: "#fdf8f0", border: "1px solid #e0d0a8", borderRadius: 4, marginBottom: 14, fontSize: 11, color: "#7a5a2a" }}>
-                Este proyecto todavía no tiene calendario. Rellena las fechas y comunidad y guarda para empezar.
+              <div style={{ padding: 14, background: "rgba(78,201,184,0.06)", border: "1px solid rgba(78,201,184,0.2)", borderRadius: 10, marginBottom: 14, fontSize: 12, color: "#4ec9b8", fontFamily: "'Inter', sans-serif" }}>
+                Este proyecto todavía no tiene calendario. Rellena las fechas y calendario laboral y guarda para empezar.
               </div>
             )}
 
-            {/* Formulario básico */}
-            <div style={{ background: "#fff", padding: 14, borderRadius: 4, marginBottom: 14, border: "1px solid #e0ddd8" }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+            {/* Formulario básico: fechas + calendario laboral */}
+            <div style={{ background: "rgba(30,30,30,0.5)", border: "1px solid rgba(255,255,255,0.06)", padding: 20, borderRadius: 12, marginBottom: 14 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14 }}>
                 <div>
                   <label style={labelStyle}>Fecha inicio</label>
                   <input type="date" value={form.fechaInicio} onChange={e => { setForm({...form, fechaInicio: e.target.value}); setTocado(true); }} style={inp} />
@@ -9896,59 +10060,59 @@ function PanelCalendarioProyecto({ proyecto, usuarioActual, onCerrar }) {
                   <input type="date" value={form.fechaFin} onChange={e => { setForm({...form, fechaFin: e.target.value}); setTocado(true); }} style={inp} />
                 </div>
                 <div>
-                  <label style={labelStyle}>Comunidad (festivos)</label>
-                  <select value={form.comunidad} onChange={e => { setForm({...form, comunidad: e.target.value}); setTocado(true); }} style={inp}>
-                    <option value="">— Elegir —</option>
-                    {COMUNIDADES.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
+                  <label style={labelStyle}>Calendario laboral</label>
+                  <select value={form.comunidad} onChange={e => { setForm({...form, comunidad: e.target.value}); setTocado(true); }} style={sel}>
+                    <option value="" style={{ background: "#141414" }}>— Elegir —</option>
+                    {COMUNIDADES.map(c => <option key={c.key} value={c.key} style={{ background: "#141414" }}>{c.label}</option>)}
                   </select>
                 </div>
               </div>
             </div>
 
-            {/* v86: Modos por defecto del proyecto (vacaciones + indemnización) */}
-            <div style={{ background: "#faf3ea", padding: 14, borderRadius: 4, marginBottom: 14, border: "1px solid #d4b988" }}>
-              <div style={{ fontSize: 9, color: "#8a5030", letterSpacing: "0.14em", textTransform: "uppercase", fontWeight: 700, marginBottom: 10 }}>
-                ⚙️ Modo por defecto para perfiles de este proyecto
+            {/* Modo por defecto */}
+            <div style={{ background: "rgba(30,30,30,0.5)", border: "1px solid rgba(255,255,255,0.06)", padding: 20, borderRadius: 12, marginBottom: 14 }}>
+              <div style={{ fontSize: 11, color: "#888", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 500, marginBottom: 14, textAlign: "center", fontFamily: "'Inter', sans-serif" }}>
+                Modo por defecto para perfiles de este proyecto
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
 
-                <div style={{ background: "#fff", border: "1px solid #e0d4b8", borderRadius: 4, padding: "10px 12px" }}>
-                  <div style={{ fontSize: 10, color: "#666", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 8, fontWeight: 700 }}>Vacaciones</div>
-                  <label style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 8px", background: form.modoVacaciones === "mes_a_mes" ? "#f8f5ff" : "transparent", borderRadius: 3, marginBottom: 4, cursor: "pointer" }}>
-                    <input type="radio" name="modo-vac" checked={form.modoVacaciones === "mes_a_mes"} onChange={() => { setForm({...form, modoVacaciones: "mes_a_mes"}); setTocado(true); }} />
-                    <span style={{ fontSize: 11, color: "#1a1a1a" }}>Prorrateadas (mes a mes)</span>
+                <div style={{ background: "rgba(20,20,20,0.6)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: 14 }}>
+                  <div style={{ fontSize: 11, color: "#4ec9b8", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 600, marginBottom: 10, textAlign: "center", fontFamily: "'Inter', sans-serif" }}>Vacaciones</div>
+                  <label style={{ display: "flex", alignItems: "center", gap: 10, padding: 8, borderRadius: 6, background: form.modoVacaciones === "mes_a_mes" ? "rgba(78,201,184,0.08)" : "transparent", marginBottom: 4, cursor: "pointer", fontFamily: "'Inter', sans-serif" }}>
+                    <input type="radio" name="modo-vac" checked={form.modoVacaciones === "mes_a_mes"} onChange={() => { setForm({...form, modoVacaciones: "mes_a_mes"}); setTocado(true); }} style={{ accentColor: "#4ec9b8" }} />
+                    <span style={{ fontSize: 13, color: "#f0f0f0" }}>Prorrateadas (mes a mes)</span>
                   </label>
-                  <label style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 8px", background: form.modoVacaciones === "al_final" ? "#f8f5ff" : "transparent", borderRadius: 3, cursor: "pointer" }}>
-                    <input type="radio" name="modo-vac" checked={form.modoVacaciones === "al_final"} onChange={() => { setForm({...form, modoVacaciones: "al_final"}); setTocado(true); }} />
-                    <span style={{ fontSize: 11, color: "#1a1a1a" }}>Al final del contrato</span>
+                  <label style={{ display: "flex", alignItems: "center", gap: 10, padding: 8, borderRadius: 6, background: form.modoVacaciones === "al_final" ? "rgba(78,201,184,0.08)" : "transparent", cursor: "pointer", fontFamily: "'Inter', sans-serif" }}>
+                    <input type="radio" name="modo-vac" checked={form.modoVacaciones === "al_final"} onChange={() => { setForm({...form, modoVacaciones: "al_final"}); setTocado(true); }} style={{ accentColor: "#4ec9b8" }} />
+                    <span style={{ fontSize: 13, color: "#f0f0f0" }}>Al final del contrato</span>
                   </label>
                 </div>
 
-                <div style={{ background: "#fff", border: "1px solid #e0d4b8", borderRadius: 4, padding: "10px 12px" }}>
-                  <div style={{ fontSize: 10, color: "#666", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 8, fontWeight: 700 }}>Indemnización</div>
-                  <label style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 8px", background: form.modoIndemnizacion === "mes_a_mes" ? "#f8f5ff" : "transparent", borderRadius: 3, marginBottom: 4, cursor: "pointer" }}>
-                    <input type="radio" name="modo-ind" checked={form.modoIndemnizacion === "mes_a_mes"} onChange={() => { setForm({...form, modoIndemnizacion: "mes_a_mes"}); setTocado(true); }} />
-                    <span style={{ fontSize: 11, color: "#1a1a1a" }}>Prorrateada (mes a mes)</span>
+                <div style={{ background: "rgba(20,20,20,0.6)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: 14 }}>
+                  <div style={{ fontSize: 11, color: "#4ec9b8", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 600, marginBottom: 10, textAlign: "center", fontFamily: "'Inter', sans-serif" }}>Indemnización</div>
+                  <label style={{ display: "flex", alignItems: "center", gap: 10, padding: 8, borderRadius: 6, background: form.modoIndemnizacion === "mes_a_mes" ? "rgba(78,201,184,0.08)" : "transparent", marginBottom: 4, cursor: "pointer", fontFamily: "'Inter', sans-serif" }}>
+                    <input type="radio" name="modo-ind" checked={form.modoIndemnizacion === "mes_a_mes"} onChange={() => { setForm({...form, modoIndemnizacion: "mes_a_mes"}); setTocado(true); }} style={{ accentColor: "#4ec9b8" }} />
+                    <span style={{ fontSize: 13, color: "#f0f0f0" }}>Prorrateada (mes a mes)</span>
                   </label>
-                  <label style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 8px", background: form.modoIndemnizacion === "al_final" ? "#f8f5ff" : "transparent", borderRadius: 3, cursor: "pointer" }}>
-                    <input type="radio" name="modo-ind" checked={form.modoIndemnizacion === "al_final"} onChange={() => { setForm({...form, modoIndemnizacion: "al_final"}); setTocado(true); }} />
-                    <span style={{ fontSize: 11, color: "#1a1a1a" }}>Al final del contrato</span>
+                  <label style={{ display: "flex", alignItems: "center", gap: 10, padding: 8, borderRadius: 6, background: form.modoIndemnizacion === "al_final" ? "rgba(78,201,184,0.08)" : "transparent", cursor: "pointer", fontFamily: "'Inter', sans-serif" }}>
+                    <input type="radio" name="modo-ind" checked={form.modoIndemnizacion === "al_final"} onChange={() => { setForm({...form, modoIndemnizacion: "al_final"}); setTocado(true); }} style={{ accentColor: "#4ec9b8" }} />
+                    <span style={{ fontSize: 13, color: "#f0f0f0" }}>Al final del contrato</span>
                   </label>
                 </div>
 
               </div>
-              <div style={{ marginTop: 10, fontSize: 8.5, color: "#a08050", fontStyle: "italic" }}>
+              <div style={{ marginTop: 12, fontSize: 11, color: "#666", fontStyle: "italic", textAlign: "center", fontFamily: "'Inter', sans-serif" }}>
                 Al crear un nuevo perfil se aplicará esta configuración. Los perfiles existentes te preguntará si quieres actualizarlos al cargarlos.
               </div>
             </div>
 
-            {/* Añadir tramo */}
+            {/* Añadir tramo — botón centrado abajo, campos ocupan todo el ancho */}
             {form.fechaInicio && form.fechaFin && (
-              <div style={{ background: "#fff", padding: 14, borderRadius: 4, marginBottom: 14, border: "1px solid #e0ddd8" }}>
-                <div style={{ fontSize: 11, color: "#666", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 10, fontWeight: 700 }}>
+              <div style={{ background: "rgba(30,30,30,0.5)", border: "1px solid rgba(255,255,255,0.06)", padding: 20, borderRadius: 12, marginBottom: 18 }}>
+                <div style={{ fontSize: 11, color: "#888", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 14, fontWeight: 500, textAlign: "center", fontFamily: "'Inter', sans-serif" }}>
                   Añadir tramo (rodaje / vacaciones)
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr auto", gap: 8, alignItems: "end" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 14 }}>
                   <div>
                     <label style={labelStyle}>Desde</label>
                     <input type="date" min={form.fechaInicio} max={form.fechaFin} value={tramoForm.desde} onChange={e => setTramoForm({...tramoForm, desde: e.target.value})} style={inp} />
@@ -9959,39 +10123,55 @@ function PanelCalendarioProyecto({ proyecto, usuarioActual, onCerrar }) {
                   </div>
                   <div>
                     <label style={labelStyle}>Tipo</label>
-                    <select value={tramoForm.tipo} onChange={e => setTramoForm({...tramoForm, tipo: e.target.value})} style={inp}>
-                      <option value="rodaje">Rodaje</option>
-                      <option value="vacaciones">Vacaciones</option>
+                    <select value={tramoForm.tipo} onChange={e => setTramoForm({...tramoForm, tipo: e.target.value})} style={sel}>
+                      <option value="rodaje" style={{ background: "#141414" }}>Rodaje</option>
+                      <option value="vacaciones" style={{ background: "#141414" }}>Vacaciones</option>
                     </select>
                   </div>
-                  <button onClick={addTramo} style={btnGold}>+ Añadir</button>
+                </div>
+                <div style={{ textAlign: "center" }}>
+                  <button onClick={addTramo} style={{ ...btnPrimary, padding: "12px 32px", boxShadow: "0 4px 16px rgba(78,201,184,0.2)" }}
+                    onMouseEnter={e => e.currentTarget.style.background = "#5ed9c8"}
+                    onMouseLeave={e => e.currentTarget.style.background = "#4ec9b8"}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    Añadir tramo
+                  </button>
                 </div>
               </div>
             )}
 
-            {/* Mini-calendario mensual */}
+            {/* Mini-calendario mensual (v106: 2 meses en paralelo) */}
             {mesesDisp.length > 0 && (
-              <div style={{ background: "#fff", padding: 14, borderRadius: 4, marginBottom: 14, border: "1px solid #e0ddd8" }}>
-                {/* Navegación mes */}
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <div style={{ background: "rgba(30,30,30,0.4)", padding: 20, borderRadius: 12, marginBottom: 18, border: "1px solid rgba(255,255,255,0.06)" }}>
+                {/* Navegación */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
                   <button
-                    onClick={() => setMesActual(mesesDisp[Math.max(0, idxMes - 1)])}
+                    onClick={() => setMesActual(mesesDisp[Math.max(0, idxMes - 2)])}
                     disabled={idxMes <= 0}
                     style={{ ...btnGhost, opacity: idxMes <= 0 ? 0.3 : 1, cursor: idxMes <= 0 ? "not-allowed" : "pointer" }}
-                  >◀ Anterior</button>
-                  <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>
-                    {nombreMes(mesActual)}
-                    <span style={{ fontSize: 9, color: "#888", marginLeft: 8, fontWeight: 400 }}>{idxMes + 1} / {mesesDisp.length}</span>
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                    Anteriores
+                  </button>
+                  <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 13, color: "#4ec9b8", letterSpacing: "0.1em", fontWeight: 600 }}>
+                    {(() => {
+                      const idxNext = Math.min(mesesDisp.length - 1, idxMes + 1);
+                      const isNextDifferent = idxNext > idxMes;
+                      return isNextDifferent ? `${idxMes + 1}-${idxNext + 1} / ${mesesDisp.length}` : `${idxMes + 1} / ${mesesDisp.length}`;
+                    })()}
                   </div>
                   <button
-                    onClick={() => setMesActual(mesesDisp[Math.min(mesesDisp.length - 1, idxMes + 1)])}
+                    onClick={() => setMesActual(mesesDisp[Math.min(mesesDisp.length - 1, idxMes + 2)])}
                     disabled={idxMes >= mesesDisp.length - 1}
                     style={{ ...btnGhost, opacity: idxMes >= mesesDisp.length - 1 ? 0.3 : 1, cursor: idxMes >= mesesDisp.length - 1 ? "not-allowed" : "pointer" }}
-                  >Siguiente ▶</button>
+                  >
+                    Siguientes
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+                  </button>
                 </div>
 
                 {/* Leyenda */}
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10, fontSize: 9 }}>
+                <div style={{ display: "flex", gap: 14, flexWrap: "wrap", padding: "12px 16px", background: "rgba(20,20,20,0.5)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 8, marginBottom: 14, justifyContent: "center", fontFamily: "'Inter', sans-serif" }}>
                   {[
                     { l: "Laboral", c: COLORES.laboral },
                     { l: "Fin de semana", c: COLORES.finde },
@@ -10002,59 +10182,84 @@ function PanelCalendarioProyecto({ proyecto, usuarioActual, onCerrar }) {
                     { l: "Descanso", c: COLORES.descanso },
                     { l: "Jornada especial", c: COLORES.especial },
                   ].map(item => (
-                    <div key={item.l} style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                      <span style={{ width: 12, height: 12, borderRadius: 2, background: item.c.bg, border: `1px solid ${item.c.border}` }} />
-                      <span style={{ color: "#666" }}>{item.l}</span>
+                    <div key={item.l} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#ddd" }}>
+                      <span style={{ width: 14, height: 14, borderRadius: 3, background: item.c.bg, border: `1px solid ${item.c.border}` }} />
+                      <span>{item.l}</span>
                     </div>
                   ))}
                 </div>
 
-                {/* Cabecera días de la semana */}
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 3, marginBottom: 4 }}>
-                  {["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"].map(d => (
-                    <div key={d} style={{ fontSize: 9, color: "#666", textAlign: "center", padding: 4, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700 }}>{d}</div>
-                  ))}
-                </div>
-
-                {/* Celdas del mes */}
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 3 }}>
-                  {construirMes()?.map((fecha, i) => {
-                    if (!fecha) return <div key={i} style={{ background: COLORES.fuera.bg, borderRadius: 3, minHeight: 60 }} />;
-                    const iso = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, "0")}-${String(fecha.getDate()).padStart(2, "0")}`;
-                    const enRango = iso >= form.fechaInicio && iso <= form.fechaFin;
-                    if (!enRango) return <div key={i} style={{ background: COLORES.fuera.bg, border: `1px solid ${COLORES.fuera.border}`, borderRadius: 3, minHeight: 60, padding: 4, fontSize: 11, color: COLORES.fuera.txt }}>{fecha.getDate()}</div>;
-                    const { color, info, esFestivo } = getEstadoDia(iso);
-                    const nombreFestivo = esFestivo ? festivosComunidad.find(f => f.fecha === iso)?.nombre : null;
+                {/* 2 MESES EN PARALELO */}
+                <div style={{ display: "grid", gridTemplateColumns: idxMes + 1 < mesesDisp.length ? "1fr 1fr" : "1fr", gap: 20 }}>
+                  {[mesActual, mesesDisp[idxMes + 1]].filter(Boolean).map((mes, mesIdx) => {
+                    const construirMesAux = (ymStr) => {
+                      if (!ymStr) return null;
+                      const [y, m] = ymStr.split("-").map(Number);
+                      const primer = new Date(y, m - 1, 1);
+                      const ultimo = new Date(y, m, 0);
+                      const primerDow = (primer.getDay() + 6) % 7;
+                      const celdas = [];
+                      for (let i = 0; i < primerDow; i++) celdas.push(null);
+                      for (let d = 1; d <= ultimo.getDate(); d++) celdas.push(new Date(y, m - 1, d));
+                      while (celdas.length % 7 !== 0) celdas.push(null);
+                      return celdas;
+                    };
                     return (
-                      <div
-                        key={i}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const rect = e.currentTarget.getBoundingClientRect();
-                          setPopup({ fecha: iso, x: rect.left, y: rect.bottom + 4, yTop: rect.top - 4, esFestivo });
-                        }}
-                        style={{
-                          background: color.bg,
-                          border: `1px solid ${color.border}`,
-                          borderRadius: 3, minHeight: 60, padding: 4,
-                          cursor: "pointer", position: "relative",
-                          transition: "transform 0.1s",
-                        }}
-                        onMouseEnter={e => e.currentTarget.style.transform = "scale(1.03)"}
-                        onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}
-                        title={nombreFestivo || ""}
-                      >
-                        <div style={{ fontSize: 12, fontWeight: 700, color: color.txt }}>{fecha.getDate()}</div>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 1, marginTop: 2, fontSize: 8, color: color.txt, opacity: 0.85 }}>
-                          {info.rodaje && <span>🎬 rod</span>}
-                          {info.vacaciones && <span>🏖 vac</span>}
-                          {info.descanso && <span>🌙 desc</span>}
-                          {info.especial && <span>⭐ esp</span>}
-                          {esFestivo && info.festivo_trabajado && <span>✓ trab</span>}
+                      <div key={mes}>
+                        <div style={{ textAlign: "center", fontFamily: "'Inter', sans-serif", fontSize: 16, fontWeight: 500, color: "#f0f0f0", letterSpacing: "-0.01em", marginBottom: 10, textTransform: "uppercase" }}>
+                          {nombreMes(mes)}
                         </div>
-                        {esFestivo && !info.festivo_trabajado && (
-                          <div style={{ fontSize: 7, color: color.txt, marginTop: 1, opacity: 0.7, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{nombreFestivo}</div>
-                        )}
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 5, marginBottom: 4 }}>
+                          {["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"].map(d => (
+                            <div key={d} style={{ fontFamily: "'Inter', sans-serif", fontSize: 11, color: "#888", textAlign: "center", padding: "6px 0", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 600 }}>{d}</div>
+                          ))}
+                        </div>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 5 }}>
+                          {construirMesAux(mes)?.map((fecha, i) => {
+                            if (!fecha) return <div key={i} style={{ minHeight: 70 }} />;
+                            const iso = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, "0")}-${String(fecha.getDate()).padStart(2, "0")}`;
+                            const enRango = iso >= form.fechaInicio && iso <= form.fechaFin;
+                            if (!enRango) return <div key={i} style={{ background: COLORES.fuera.bg, border: `1px solid ${COLORES.fuera.border}`, borderRadius: 6, minHeight: 70, padding: 8, fontSize: 13, color: COLORES.fuera.txt, fontFamily: "'Inter', sans-serif", fontWeight: 500 }}>{fecha.getDate()}</div>;
+                            const { color, info, esFestivo } = getEstadoDia(iso);
+                            const nombreFestivo = esFestivo ? festivosComunidad.find(f => f.fecha === iso)?.nombre : null;
+                            // Etiqueta textual del día
+                            let etiqueta = "";
+                            if (esFestivo && info.festivo_trabajado) etiqueta = "TRAB";
+                            else if (esFestivo) etiqueta = nombreFestivo || "FEST";
+                            else if (info.vacaciones) etiqueta = "VAC";
+                            else if (info.descanso) etiqueta = "DESC";
+                            else if (info.especial) etiqueta = "ESP";
+                            else if (info.rodaje) etiqueta = "ROD";
+                            return (
+                              <div
+                                key={i}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const rect = e.currentTarget.getBoundingClientRect();
+                                  setPopup({ fecha: iso, x: rect.left, y: rect.bottom + 4, yTop: rect.top - 4, esFestivo });
+                                }}
+                                style={{
+                                  background: color.bg,
+                                  border: `1px solid ${color.border}`,
+                                  borderRadius: 6, minHeight: 70, padding: 8,
+                                  cursor: "pointer", position: "relative",
+                                  transition: "transform 0.1s, box-shadow 0.1s",
+                                  fontFamily: "'Inter', sans-serif",
+                                }}
+                                onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.04)"; e.currentTarget.style.boxShadow = `0 4px 12px ${color.bg}55`; e.currentTarget.style.zIndex = "5"; }}
+                                onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.zIndex = "auto"; }}
+                                title={nombreFestivo || ""}
+                              >
+                                <div style={{ fontSize: 15, fontWeight: 700, color: color.txt }}>{fecha.getDate()}</div>
+                                {etiqueta && (
+                                  <div style={{ fontSize: 10, fontWeight: 700, color: "#fff", marginTop: 3, textShadow: "0 1px 2px rgba(0,0,0,0.5)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", letterSpacing: "0.03em" }}>
+                                    {etiqueta}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
                     );
                   })}
@@ -10064,11 +10269,10 @@ function PanelCalendarioProyecto({ proyecto, usuarioActual, onCerrar }) {
 
             {/* Popup al clicar día */}
             {popup && (() => {
-              const POPUP_H = 340; // altura aproximada del popup
-              const POPUP_W = 220;
+              const POPUP_H = 340;
+              const POPUP_W = 240;
               const espacioAbajo = window.innerHeight - popup.y;
               const cabajo = espacioAbajo >= POPUP_H + 10;
-              // Si no cabe abajo, colocarlo arriba (popup.yTop es la parte superior del día)
               const topFinal = cabajo
                 ? Math.min(popup.y, window.innerHeight - POPUP_H - 10)
                 : Math.max(10, popup.yTop - POPUP_H);
@@ -10078,56 +10282,63 @@ function PanelCalendarioProyecto({ proyecto, usuarioActual, onCerrar }) {
                 position: "fixed",
                 left: leftFinal,
                 top: topFinal,
-                background: "#fff", border: "1px solid #b8864a", borderRadius: 6,
-                padding: 10, zIndex: 1200, boxShadow: "0 4px 20px rgba(0,0,0,0.3)",
+                background: "rgba(20,20,20,0.98)",
+                backdropFilter: "blur(20px)",
+                WebkitBackdropFilter: "blur(20px)",
+                border: "1px solid rgba(78,201,184,0.3)",
+                borderRadius: 12,
+                padding: 14, zIndex: 1200,
+                boxShadow: "0 8px 32px rgba(0,0,0,0.6)",
                 width: POPUP_W,
+                fontFamily: "'Inter', sans-serif",
               }} onClick={e => e.stopPropagation()}>
-                <div style={{ fontSize: 10, color: "#666", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700 }}>
+                <div style={{ fontSize: 12, color: "#4ec9b8", marginBottom: 12, letterSpacing: "0.05em", fontWeight: 600 }}>
                   {popup.fecha}
                 </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                  <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 11, padding: "4px 6px", background: "#f0ede8", borderRadius: 3 }}>
-                    <input type="checkbox" checked={!!(dias[popup.fecha]?.rodaje)} onChange={() => toggleProp(popup.fecha, "rodaje")} />
-                    <span>🎬 Rodaje</span>
-                  </label>
-                  <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 11, padding: "4px 6px", background: "#f0ede8", borderRadius: 3 }}>
-                    <input type="checkbox" checked={!!(dias[popup.fecha]?.vacaciones)} onChange={() => toggleProp(popup.fecha, "vacaciones")} />
-                    <span>🏖 Vacaciones</span>
-                  </label>
-                  <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 11, padding: "4px 6px", background: "#f0ede8", borderRadius: 3 }}>
-                    <input type="checkbox" checked={!!(dias[popup.fecha]?.descanso)} onChange={() => toggleProp(popup.fecha, "descanso")} />
-                    <span>🌙 Descanso</span>
-                  </label>
-                  <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 11, padding: "4px 6px", background: "#f0ede8", borderRadius: 3 }}>
-                    <input type="checkbox" checked={!!(dias[popup.fecha]?.especial)} onChange={() => toggleProp(popup.fecha, "especial")} />
-                    <span>⭐ Jornada especial</span>
-                  </label>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {[
+                    { key: "rodaje", label: "Rodaje" },
+                    { key: "vacaciones", label: "Vacaciones" },
+                    { key: "descanso", label: "Descanso" },
+                    { key: "especial", label: "Jornada especial" },
+                  ].map(item => (
+                    <label key={item.key} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 13, padding: "8px 10px", background: dias[popup.fecha]?.[item.key] ? "rgba(78,201,184,0.12)" : "rgba(255,255,255,0.03)", border: `1px solid ${dias[popup.fecha]?.[item.key] ? "rgba(78,201,184,0.3)" : "rgba(255,255,255,0.05)"}`, borderRadius: 6, color: "#f0f0f0" }}>
+                      <input type="checkbox" checked={!!(dias[popup.fecha]?.[item.key])} onChange={() => toggleProp(popup.fecha, item.key)} style={{ accentColor: "#4ec9b8" }} />
+                      <span>{item.label}</span>
+                    </label>
+                  ))}
                   {popup.esFestivo && (
-                    <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 11, padding: "4px 6px", background: "#f0ede8", borderRadius: 3 }}>
-                      <input type="checkbox" checked={!!(dias[popup.fecha]?.festivo_trabajado)} onChange={() => toggleProp(popup.fecha, "festivo_trabajado")} />
-                      <span>✓ Festivo trabajado</span>
+                    <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 13, padding: "8px 10px", background: dias[popup.fecha]?.festivo_trabajado ? "rgba(255,145,0,0.15)" : "rgba(255,255,255,0.03)", border: `1px solid ${dias[popup.fecha]?.festivo_trabajado ? "rgba(255,145,0,0.4)" : "rgba(255,255,255,0.05)"}`, borderRadius: 6, color: "#f0f0f0" }}>
+                      <input type="checkbox" checked={!!(dias[popup.fecha]?.festivo_trabajado)} onChange={() => toggleProp(popup.fecha, "festivo_trabajado")} style={{ accentColor: "#ff9100" }} />
+                      <span>Festivo trabajado</span>
                     </label>
                   )}
-                  <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 11, padding: "4px 6px", background: "#f0ede8", borderRadius: 3 }}>
-                    <input type="checkbox" checked={!!(dias[popup.fecha]?.laboral)} onChange={() => toggleLaboral(popup.fecha)} />
-                    <span>💼 Laboral</span>
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 13, padding: "8px 10px", background: dias[popup.fecha]?.laboral ? "rgba(0,230,118,0.12)" : "rgba(255,255,255,0.03)", border: `1px solid ${dias[popup.fecha]?.laboral ? "rgba(0,230,118,0.35)" : "rgba(255,255,255,0.05)"}`, borderRadius: 6, color: "#f0f0f0" }}>
+                    <input type="checkbox" checked={!!(dias[popup.fecha]?.laboral)} onChange={() => toggleLaboral(popup.fecha)} style={{ accentColor: "#00e676" }} />
+                    <span>Laboral</span>
                   </label>
                 </div>
-                <button onClick={() => setPopup(null)} style={{ ...btnGhost, width: "100%", marginTop: 8 }}>Cerrar</button>
+                <button onClick={() => setPopup(null)} style={{ ...btnGhost, width: "100%", marginTop: 10, justifyContent: "center" }}>Cerrar</button>
               </div>
               );
             })()}
 
-            {/* Barra inferior: guardar / borrar */}
-            <div style={{ display: "flex", gap: 8, marginTop: 14, justifyContent: "space-between", position: "sticky", bottom: -20, background: "#faf7f2", padding: "12px 0 4px", borderTop: "1px solid #e0ddd8" }}>
+            {/* Barra inferior */}
+            <div style={{ display: "flex", gap: 8, marginTop: 14, justifyContent: "space-between", alignItems: "center", position: "sticky", bottom: -24, background: "rgba(20,20,20,0.96)", padding: "16px 0 4px", borderTop: "1px solid rgba(255,255,255,0.08)" }}>
               <div>
                 {esAdmin && calendario && calendario.id && (
-                  <button onClick={eliminar} style={{ ...btnGhost, borderColor: "#c00", color: "#c00" }}>🗑 Borrar calendario</button>
+                  <button onClick={eliminar} style={btnDelete}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                    Borrar calendario
+                  </button>
                 )}
               </div>
-              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                {tocado && <span style={{ fontSize: 10, color: "#c8963a", fontStyle: "italic" }}>Cambios sin guardar</span>}
-                <button onClick={guardar} disabled={guardando} style={{ ...btnGold, cursor: guardando ? "wait" : "pointer" }}>
+              <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                {tocado && <span style={{ fontSize: 12, color: "#ff9100", fontStyle: "italic", fontFamily: "'Inter', sans-serif" }}>Cambios sin guardar</span>}
+                <button onClick={guardar} disabled={guardando} style={{ ...btnPrimary, padding: "12px 28px", cursor: guardando ? "wait" : "pointer", boxShadow: "0 4px 16px rgba(78,201,184,0.2)" }}
+                  onMouseEnter={e => { if (!guardando) e.currentTarget.style.background = "#5ed9c8"; }}
+                  onMouseLeave={e => { if (!guardando) e.currentTarget.style.background = "#4ec9b8"; }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
                   {guardando ? "Guardando..." : (calendario && calendario.id ? "Guardar cambios" : "Crear calendario")}
                 </button>
               </div>
