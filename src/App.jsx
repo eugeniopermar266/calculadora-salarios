@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v107";
+const APP_VERSION = "v108";
 
 // v97: Departamentos de un rodaje audiovisual (obligatorio en cada perfil)
 const DEPARTAMENTOS = [
@@ -10286,12 +10286,11 @@ function PanelCalendarioProyecto({ proyecto, usuarioActual, onCerrar }) {
               </div>
             )}
 
-            {/* Popup al clicar día (v107: siempre hacia arriba encima del día) */}
+            {/* Popup al clicar día (v108: compacto, siempre arriba) */}
             {popup && (() => {
-              const POPUP_H = 340;
-              const POPUP_W = 240;
-              // Siempre hacia arriba: colocar la base del popup justo encima del día pulsado
-              // popup.yTop es la parte superior del día → base del popup = yTop
+              const POPUP_H = popup.esFestivo ? 235 : 210;
+              const POPUP_W = 200;
+              // Siempre hacia arriba: base del popup pegada encima del día
               const topFinal = Math.max(10, popup.yTop - POPUP_H);
               // Centrar horizontalmente sobre el día
               const xCenter = popup.xCenter ?? popup.x;
@@ -10306,39 +10305,39 @@ function PanelCalendarioProyecto({ proyecto, usuarioActual, onCerrar }) {
                 backdropFilter: "blur(20px)",
                 WebkitBackdropFilter: "blur(20px)",
                 border: "1px solid rgba(78,201,184,0.3)",
-                borderRadius: 12,
-                padding: 14, zIndex: 1200,
+                borderRadius: 10,
+                padding: 10, zIndex: 1200,
                 boxShadow: "0 8px 32px rgba(0,0,0,0.6)",
                 width: POPUP_W,
                 fontFamily: "'Inter', sans-serif",
               }} onClick={e => e.stopPropagation()}>
-                <div style={{ fontSize: 12, color: "#4ec9b8", marginBottom: 12, letterSpacing: "0.05em", fontWeight: 600 }}>
+                <div style={{ fontSize: 11, color: "#4ec9b8", marginBottom: 8, letterSpacing: "0.04em", fontWeight: 600 }}>
                   {popup.fecha}
                 </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                   {[
                     { key: "rodaje", label: "Rodaje" },
                     { key: "vacaciones", label: "Vacaciones" },
                     { key: "descanso", label: "Descanso" },
                     { key: "especial", label: "Jornada especial" },
                   ].map(item => (
-                    <label key={item.key} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 13, padding: "8px 10px", background: dias[popup.fecha]?.[item.key] ? "rgba(78,201,184,0.12)" : "rgba(255,255,255,0.03)", border: `1px solid ${dias[popup.fecha]?.[item.key] ? "rgba(78,201,184,0.3)" : "rgba(255,255,255,0.05)"}`, borderRadius: 6, color: "#f0f0f0" }}>
-                      <input type="checkbox" checked={!!(dias[popup.fecha]?.[item.key])} onChange={() => toggleProp(popup.fecha, item.key)} style={{ accentColor: "#4ec9b8" }} />
+                    <label key={item.key} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 12, padding: "5px 8px", background: dias[popup.fecha]?.[item.key] ? "rgba(78,201,184,0.12)" : "rgba(255,255,255,0.03)", border: `1px solid ${dias[popup.fecha]?.[item.key] ? "rgba(78,201,184,0.3)" : "rgba(255,255,255,0.05)"}`, borderRadius: 5, color: "#f0f0f0" }}>
+                      <input type="checkbox" checked={!!(dias[popup.fecha]?.[item.key])} onChange={() => toggleProp(popup.fecha, item.key)} style={{ accentColor: "#4ec9b8", width: 13, height: 13, margin: 0 }} />
                       <span>{item.label}</span>
                     </label>
                   ))}
                   {popup.esFestivo && (
-                    <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 13, padding: "8px 10px", background: dias[popup.fecha]?.festivo_trabajado ? "rgba(255,145,0,0.15)" : "rgba(255,255,255,0.03)", border: `1px solid ${dias[popup.fecha]?.festivo_trabajado ? "rgba(255,145,0,0.4)" : "rgba(255,255,255,0.05)"}`, borderRadius: 6, color: "#f0f0f0" }}>
-                      <input type="checkbox" checked={!!(dias[popup.fecha]?.festivo_trabajado)} onChange={() => toggleProp(popup.fecha, "festivo_trabajado")} style={{ accentColor: "#ff9100" }} />
+                    <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 12, padding: "5px 8px", background: dias[popup.fecha]?.festivo_trabajado ? "rgba(255,145,0,0.15)" : "rgba(255,255,255,0.03)", border: `1px solid ${dias[popup.fecha]?.festivo_trabajado ? "rgba(255,145,0,0.4)" : "rgba(255,255,255,0.05)"}`, borderRadius: 5, color: "#f0f0f0" }}>
+                      <input type="checkbox" checked={!!(dias[popup.fecha]?.festivo_trabajado)} onChange={() => toggleProp(popup.fecha, "festivo_trabajado")} style={{ accentColor: "#ff9100", width: 13, height: 13, margin: 0 }} />
                       <span>Festivo trabajado</span>
                     </label>
                   )}
-                  <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 13, padding: "8px 10px", background: dias[popup.fecha]?.laboral ? "rgba(0,230,118,0.12)" : "rgba(255,255,255,0.03)", border: `1px solid ${dias[popup.fecha]?.laboral ? "rgba(0,230,118,0.35)" : "rgba(255,255,255,0.05)"}`, borderRadius: 6, color: "#f0f0f0" }}>
-                    <input type="checkbox" checked={!!(dias[popup.fecha]?.laboral)} onChange={() => toggleLaboral(popup.fecha)} style={{ accentColor: "#00e676" }} />
+                  <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 12, padding: "5px 8px", background: dias[popup.fecha]?.laboral ? "rgba(0,230,118,0.12)" : "rgba(255,255,255,0.03)", border: `1px solid ${dias[popup.fecha]?.laboral ? "rgba(0,230,118,0.35)" : "rgba(255,255,255,0.05)"}`, borderRadius: 5, color: "#f0f0f0" }}>
+                    <input type="checkbox" checked={!!(dias[popup.fecha]?.laboral)} onChange={() => toggleLaboral(popup.fecha)} style={{ accentColor: "#00e676", width: 13, height: 13, margin: 0 }} />
                     <span>Laboral</span>
                   </label>
                 </div>
-                <button onClick={() => setPopup(null)} style={{ ...btnGhost, width: "100%", marginTop: 10, justifyContent: "center" }}>Cerrar</button>
+                <button onClick={() => setPopup(null)} style={{ ...btnGhost, width: "100%", marginTop: 7, justifyContent: "center", padding: "6px 12px", fontSize: 11 }}>Cerrar</button>
               </div>
               );
             })()}
