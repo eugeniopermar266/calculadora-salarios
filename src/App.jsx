@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v112";
+const APP_VERSION = "v113";
 
 // v97: Departamentos de un rodaje audiovisual (obligatorio en cada perfil)
 const DEPARTAMENTOS = [
@@ -3985,104 +3985,147 @@ ${docHTML}
   return (
     <div style={{ color:"#1a1a1a", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", padding:"32px 32px" }}>
 
-      {/* Header */}
-      
-      {/* Header */}
+      {/* v113: Header rediseñado con logo Bdprodtools + Payroll cost calculator + botones nueva estética */}
       <div style={{ maxWidth:1400, margin:"0 auto 24px" }}>
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center",
-                      background:"#1a1a1a", borderRadius:8, padding:"16px 24px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-            <div style={{ background:"#c8a96e", color:"#1a1a1a", padding:"10px 16px", borderRadius:4, fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontWeight:700, fontSize:16, letterSpacing:"0.15em" }}>
-              BD PROD TOOLS
-            </div>
+                      background:"#1a1a1a", borderRadius:10, padding:"24px 28px",
+                      border: "1px solid rgba(255,255,255,0.05)" }}>
+          {/* Logo Bdprodtools real */}
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <img src="/logo.png" alt="Bdprodtools" style={{ height: 50, width: "auto" }} />
           </div>
           <div style={{ textAlign:"right" }}>
-            <div style={{ fontSize:9, letterSpacing:"0.25em", color:"#b8864a", textTransform:"uppercase", marginBottom:4 }}>Desglose Salarial · {es40h ? "40 Horas" : "45 Horas"}</div>
-            <div style={{ fontSize:18, fontWeight:700, letterSpacing:"0.07em", color:"#f0e6d0", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>CALCULADORA DE SALARIOS</div>
-            {(nombre||puesto) && <div style={{ fontSize:12, color:"#b8864a", marginTop:4, fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>{[nombre,puesto].filter(Boolean).join(" · ")}</div>}
-            <div className="no-print" style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8, justifyContent: "flex-end" }}>
-              {/* v98: 5 botones de perfiles */}
+            <div style={{ fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontSize:14, letterSpacing:"0.18em", color:"#4ec9b8", textTransform:"uppercase", fontWeight: 700, marginBottom:6 }}>Desglose Salarial · {es40h ? "40 Horas" : "45 Horas"}</div>
+            <div style={{ fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontSize:24, fontWeight:500, letterSpacing:"-0.01em", color:"#f0f0f0" }}>Payroll cost calculator</div>
+            {(nombre||puesto) && <div style={{ fontFamily: "'Inter', sans-serif", fontSize:12, color:"#888", marginTop:6 }}>{[nombre,puesto].filter(Boolean).join(" · ")}</div>}
+            <div className="no-print" style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 14, justifyContent: "flex-end", alignItems: "center" }}>
+              {/* v113: Cargar (turquesa sólido — acción principal) */}
               <button
                 onClick={() => { setMostrarModalCargar(true); if (accionesPerfiles?.recargar) accionesPerfiles.recargar(); }}
-                style={{ padding: "6px 10px", fontSize: 9, fontFamily: "'Courier Prime', 'Courier New', monospace", letterSpacing: "0.08em", textTransform: "uppercase", borderRadius: 3, cursor: "pointer", fontWeight: 700, border: "1px solid #5a8a5a", background: "#5a8a5a", color: "#f2f5f7" }}
+                style={{ padding: "8px 14px", fontSize: 11, fontFamily: "'Inter', sans-serif", letterSpacing: "0.03em", borderRadius: 6, cursor: "pointer", fontWeight: 600, border: "none", background: "#4ec9b8", color: "#0a0a0a", display: "flex", alignItems: "center", gap: 5, transition: "background 0.15s" }}
+                onMouseEnter={e => e.currentTarget.style.background = "#5ed9c8"}
+                onMouseLeave={e => e.currentTarget.style.background = "#4ec9b8"}
                 title="Cargar un perfil guardado"
-              >📂 Cargar</button>
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                Cargar
+              </button>
+              {/* Guardar (turquesa outline) */}
               <button
                 onClick={() => {
-                  // Sugerir nombre
                   const partes = [proyecto, productora, nombre, puesto].filter(Boolean);
                   const sug = partes.join(" · ") || "Nuevo perfil";
                   setNombreGuardarModal(sug);
                   setMostrarModalGuardar(true);
                 }}
-                style={{ padding: "6px 10px", fontSize: 9, fontFamily: "'Courier Prime', 'Courier New', monospace", letterSpacing: "0.08em", textTransform: "uppercase", borderRadius: 3, cursor: "pointer", fontWeight: 700, border: "1px solid #5a8a5a", background: "transparent", color: "#a0d0a0" }}
+                style={{ padding: "8px 14px", fontSize: 11, fontFamily: "'Inter', sans-serif", letterSpacing: "0.03em", borderRadius: 6, cursor: "pointer", fontWeight: 600, border: "1px solid rgba(78,201,184,0.35)", background: "transparent", color: "#4ec9b8", display: "flex", alignItems: "center", gap: 5, transition: "all 0.15s" }}
+                onMouseEnter={e => { e.currentTarget.style.background = "rgba(78,201,184,0.1)"; e.currentTarget.style.borderColor = "#4ec9b8"; }}
+                onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = "rgba(78,201,184,0.35)"; }}
                 title="Guardar el perfil actual"
-              >💾 Guardar</button>
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                Guardar
+              </button>
+              {/* Importar (gris outline — utilidad) */}
               <label
-                style={{ padding: "6px 10px", fontSize: 9, fontFamily: "'Courier Prime', 'Courier New', monospace", letterSpacing: "0.08em", textTransform: "uppercase", borderRadius: 3, cursor: "pointer", fontWeight: 700, border: "1px solid #6a7a9a", background: "transparent", color: "#a0b8d8", display: "inline-block" }}
+                style={{ padding: "8px 14px", fontSize: 11, fontFamily: "'Inter', sans-serif", letterSpacing: "0.03em", borderRadius: 6, cursor: "pointer", fontWeight: 600, border: "1px solid rgba(255,255,255,0.15)", background: "transparent", color: "#ddd", display: "inline-flex", alignItems: "center", gap: 5, transition: "all 0.15s" }}
+                onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.05)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.3)"; }}
+                onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.15)"; }}
                 title="Importar perfil desde archivo JSON"
               >
-                📥 Importar
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Importar
                 <input type="file" accept=".json,application/json" onChange={(e) => { if (accionesPerfiles?.importarDesdeArchivo && e.target.files[0]) { accionesPerfiles.importarDesdeArchivo(e.target.files[0]); e.target.value = ""; } }} style={{ display: "none" }} />
               </label>
+              {/* JSON (gris outline) */}
               <button
                 onClick={() => accionesPerfiles?.exportarJSON && accionesPerfiles.exportarJSON()}
-                style={{ padding: "6px 10px", fontSize: 9, fontFamily: "'Courier Prime', 'Courier New', monospace", letterSpacing: "0.08em", textTransform: "uppercase", borderRadius: 3, cursor: "pointer", fontWeight: 700, border: "1px solid #6a7a9a", background: "transparent", color: "#a0b8d8" }}
+                style={{ padding: "8px 14px", fontSize: 11, fontFamily: "'Inter', sans-serif", letterSpacing: "0.03em", borderRadius: 6, cursor: "pointer", fontWeight: 600, border: "1px solid rgba(255,255,255,0.15)", background: "transparent", color: "#ddd", display: "flex", alignItems: "center", gap: 5, transition: "all 0.15s" }}
+                onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.05)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.3)"; }}
+                onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.15)"; }}
                 title="Descargar el perfil actual como JSON"
-              >📤 JSON</button>
+              >JSON</button>
+              {/* Limpiar (naranja outline — destructiva) */}
               <button
                 onClick={() => {
                   if (!confirm("¿Vaciar TODOS los campos del perfil actual?\n\nSe perderán los datos no guardados.")) return;
-                  // Recargar con datos vacíos
                   window.location.reload();
                 }}
-                style={{ padding: "6px 10px", fontSize: 9, fontFamily: "'Courier Prime', 'Courier New', monospace", letterSpacing: "0.08em", textTransform: "uppercase", borderRadius: 3, cursor: "pointer", fontWeight: 700, border: "1px solid #a08050", background: "transparent", color: "#e0b878" }}
+                style={{ padding: "8px 14px", fontSize: 11, fontFamily: "'Inter', sans-serif", letterSpacing: "0.03em", borderRadius: 6, cursor: "pointer", fontWeight: 600, border: "1px solid rgba(255,145,0,0.4)", background: "transparent", color: "#ff9100", display: "flex", alignItems: "center", gap: 5, transition: "all 0.15s" }}
+                onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,145,0,0.1)"; e.currentTarget.style.borderColor = "#ff9100"; }}
+                onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = "rgba(255,145,0,0.4)"; }}
                 title="Vaciar todos los campos"
-              >🧹 Limpiar</button>
-              {/* Separador vertical */}
-              <div style={{ width: 1, background: "#444", margin: "0 2px" }}></div>
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
+                Limpiar
+              </button>
+              {/* Separador */}
+              <span style={{ width: 1, background: "rgba(255,255,255,0.1)", height: 20, margin: "0 4px" }}></span>
+              {/* CSV (azul — exportación) */}
               <button
                 onClick={exportarCSV45}
                 disabled={!p || desglose45.length === 0}
                 style={{
-                  padding: "6px 12px", fontSize: 9, fontFamily: "'Courier Prime', 'Courier New', monospace",
-                  letterSpacing: "0.1em", textTransform: "uppercase", borderRadius: 3,
-                  cursor: (p && desglose45.length) ? "pointer" : "not-allowed", fontWeight: 700,
-                  border: "1px solid #b8864a",
-                  background: (p && desglose45.length) ? "#b8864a" : "transparent",
-                  color: (p && desglose45.length) ? "#f2f5f7" : "#666",
+                  padding: "8px 14px", fontSize: 11, fontFamily: "'Inter', sans-serif",
+                  letterSpacing: "0.03em", borderRadius: 6,
+                  cursor: (p && desglose45.length) ? "pointer" : "not-allowed", fontWeight: 600,
+                  border: "none",
+                  background: (p && desglose45.length) ? "#2196f3" : "rgba(33,150,243,0.2)",
+                  color: (p && desglose45.length) ? "#fff" : "#666",
                   opacity: (p && desglose45.length) ? 1 : 0.5,
+                  display: "flex", alignItems: "center", gap: 5,
+                  transition: "background 0.15s",
                 }}
+                onMouseEnter={e => { if (p && desglose45.length) e.currentTarget.style.background = "#42a5f5"; }}
+                onMouseLeave={e => { if (p && desglose45.length) e.currentTarget.style.background = "#2196f3"; }}
                 title="Descargar nómina como CSV (Excel)"
-              >⬇ CSV</button>
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                CSV
+              </button>
+              {/* PDF (rojo — exportación) */}
               <button
                 onClick={exportarPDF45}
                 disabled={!p || desglose45.length === 0}
                 style={{
-                  padding: "6px 12px", fontSize: 9, fontFamily: "'Courier Prime', 'Courier New', monospace",
-                  letterSpacing: "0.1em", textTransform: "uppercase", borderRadius: 3,
-                  cursor: (p && desglose45.length) ? "pointer" : "not-allowed", fontWeight: 700,
-                  border: "1px solid #b8864a",
-                  background: (p && desglose45.length) ? "#b8864a" : "transparent",
-                  color: (p && desglose45.length) ? "#f2f5f7" : "#666",
+                  padding: "8px 14px", fontSize: 11, fontFamily: "'Inter', sans-serif",
+                  letterSpacing: "0.03em", borderRadius: 6,
+                  cursor: (p && desglose45.length) ? "pointer" : "not-allowed", fontWeight: 600,
+                  border: "none",
+                  background: (p && desglose45.length) ? "#d32f2f" : "rgba(211,47,47,0.2)",
+                  color: (p && desglose45.length) ? "#fff" : "#666",
                   opacity: (p && desglose45.length) ? 1 : 0.5,
+                  display: "flex", alignItems: "center", gap: 5,
+                  transition: "background 0.15s",
                 }}
+                onMouseEnter={e => { if (p && desglose45.length) e.currentTarget.style.background = "#f44336"; }}
+                onMouseLeave={e => { if (p && desglose45.length) e.currentTarget.style.background = "#d32f2f"; }}
                 title="Abrir vista de PDF (Guardar HTML / Imprimir / Cerrar)"
-              >🖨 PDF</button>
-              {/* v94: Exportar Listado (solo admin/coordinador) */}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="14" y2="17"/></svg>
+                PDF
+              </button>
+              {/* Listado (turquesa sólido — acción especial admin) */}
               {(esAdmin || esCoordinadorApp45) && (
                 <button
                   onClick={() => setMostrarExportarListado(true)}
                   style={{
-                    padding: "6px 12px", fontSize: 9, fontFamily: "'Courier Prime', 'Courier New', monospace",
-                    letterSpacing: "0.1em", textTransform: "uppercase", borderRadius: 3,
+                    padding: "8px 14px", fontSize: 11, fontFamily: "'Inter', sans-serif",
+                    letterSpacing: "0.03em", borderRadius: 6,
                     cursor: "pointer", fontWeight: 700,
-                    border: "1px solid #5a8a5a",
-                    background: "#5a8a5a",
-                    color: "#f2f5f7",
+                    border: "none",
+                    background: "#4ec9b8",
+                    color: "#0a0a0a",
+                    display: "flex", alignItems: "center", gap: 5,
+                    transition: "background 0.15s",
                   }}
+                  onMouseEnter={e => e.currentTarget.style.background = "#5ed9c8"}
+                  onMouseLeave={e => e.currentTarget.style.background = "#4ec9b8"}
                   title="Exportar listado de perfiles del proyecto a Excel/CSV"
-                >📊 Listado</button>
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                  Listado
+                </button>
               )}
             </div>
           </div>
@@ -10740,32 +10783,35 @@ function PanelFestivos({ usuarioActual, onCerrar, onCambios }) {
 // ═══════════════════════════════════════════════════════════════════════
 
 function BannerSesion({ usuario, proyectoActivo, onLogout, onAdmin, onLogs, onPuestos, onProyectos, onFestivos, tab, onChangeTab }) {
+  // v113: botón pestaña principal (45H/40H) — negro con letra blanca, turquesa al activar
   const tabBtn = (id, label) => {
     const activa = tab === id;
     return (
       <button
         onClick={() => onChangeTab(id)}
         style={{
-          background: activa ? "#c8a96e" : "transparent",
-          color: activa ? "#1a1a1a" : "#aaa",
-          border: `1px solid ${activa ? "#c8a96e" : "#444"}`,
-          padding: "5px 14px",
-          borderRadius: 4,
+          background: activa ? "#4ec9b8" : "#0a0a0a",
+          color: activa ? "#0a0a0a" : "#f0f0f0",
+          border: `1px solid ${activa ? "#4ec9b8" : "rgba(255,255,255,0.15)"}`,
+          padding: "10px 24px",
+          borderRadius: 6,
           cursor: "pointer",
-          fontSize: 10,
-          fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace",
+          fontSize: 13,
+          fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
           fontWeight: 700,
-          letterSpacing: "0.12em",
+          letterSpacing: "0.05em",
           textTransform: "uppercase",
           transition: "all 0.15s",
         }}
+        onMouseEnter={e => { if (!activa) { e.currentTarget.style.background = "#4ec9b8"; e.currentTarget.style.color = "#0a0a0a"; e.currentTarget.style.borderColor = "#4ec9b8"; } }}
+        onMouseLeave={e => { if (!activa) { e.currentTarget.style.background = "#0a0a0a"; e.currentTarget.style.color = "#f0f0f0"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.15)"; } }}
       >
         {label}
       </button>
     );
   };
 
-  // Botón "Coste Empresa" con control de acceso (solo admin)
+  // v113: Coste Empresa (mismo estilo que tabBtn pero con control de acceso admin)
   const tabCosteEmpresa = () => {
     const id = "costeEmpresa";
     const activa = tab === id;
@@ -10781,69 +10827,155 @@ function BannerSesion({ usuario, proyectoActivo, onLogout, onAdmin, onLogs, onPu
         }}
         title={esAdmin ? "" : "Acceso restringido a admin"}
         style={{
-          background: activa ? "#c8a96e" : "transparent",
-          color: activa ? "#1a1a1a" : (esAdmin ? "#aaa" : "#666"),
-          border: `1px solid ${activa ? "#c8a96e" : (esAdmin ? "#444" : "#333")}`,
-          padding: "5px 14px",
-          borderRadius: 4,
+          background: activa ? "#4ec9b8" : "#0a0a0a",
+          color: activa ? "#0a0a0a" : (esAdmin ? "#f0f0f0" : "#666"),
+          border: `1px solid ${activa ? "#4ec9b8" : "rgba(255,255,255,0.15)"}`,
+          padding: "10px 24px",
+          borderRadius: 6,
           cursor: "pointer",
-          fontSize: 10,
-          fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace",
+          fontSize: 13,
+          fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
           fontWeight: 700,
-          letterSpacing: "0.12em",
+          letterSpacing: "0.05em",
           textTransform: "uppercase",
           transition: "all 0.15s",
           opacity: (esAdmin || activa) ? 1 : 0.6,
         }}
+        onMouseEnter={e => { if (!activa && esAdmin) { e.currentTarget.style.background = "#4ec9b8"; e.currentTarget.style.color = "#0a0a0a"; e.currentTarget.style.borderColor = "#4ec9b8"; } }}
+        onMouseLeave={e => { if (!activa && esAdmin) { e.currentTarget.style.background = "#0a0a0a"; e.currentTarget.style.color = "#f0f0f0"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.15)"; } }}
       >
         {!esAdmin && "🔒 "}Coste Empresa
       </button>
     );
   };
 
+  // v113: botón secundario negro con letra blanca, hover azul
+  const btnSecondary = (onClick, icon, label, isActive) => (
+    <button
+      onClick={onClick}
+      style={{
+        background: isActive ? "#2196f3" : "#0a0a0a",
+        color: "#fff",
+        border: `1px solid ${isActive ? "#2196f3" : "rgba(255,255,255,0.15)"}`,
+        padding: "9px 18px",
+        borderRadius: 6,
+        cursor: "pointer",
+        fontSize: 12,
+        fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+        fontWeight: 700,
+        letterSpacing: "0.05em",
+        textTransform: "uppercase",
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        transition: "all 0.15s",
+      }}
+      onMouseEnter={e => { if (!isActive) { e.currentTarget.style.background = "#2196f3"; e.currentTarget.style.borderColor = "#2196f3"; } }}
+      onMouseLeave={e => { if (!isActive) { e.currentTarget.style.background = "#0a0a0a"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.15)"; } }}
+    >
+      {icon}
+      {label}
+    </button>
+  );
+
   return (
-    <div className="no-print" style={{
-      background: "#1a1a1a", color: "#dfe4e8", padding: "8px 16px",
-      display: "flex", alignItems: "center", justifyContent: "space-between",
-      fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize: 11, letterSpacing: "0.08em",
-      gap: 12, flexWrap: "wrap",
-    }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <span style={{ width: 24, height: 24, background: "#c8a96e", color: "#1a1a1a", borderRadius: 4, display: "inline-flex", alignItems: "center", justifyContent: "center", fontWeight: 700 }}>B</span>
-        <span style={{ color: "#888", textTransform: "uppercase", fontSize: 9, letterSpacing: "0.18em" }}>Sesión:</span>
-        <span style={{ fontWeight: 700, color: "#dfe4e8" }}>{usuario.nombre}</span>
-        {usuario.es_admin && <span style={{ background: "#c8a96e", color: "#1a1a1a", padding: "2px 6px", borderRadius: 3, fontSize: 8, fontWeight: 700, letterSpacing: "0.1em" }}>ADMIN</span>}
-        <span style={{ color: "#ffffff", fontSize: 13, letterSpacing: "0.08em", fontWeight: 700, marginLeft: 6 }} title="Versión de la app">{APP_VERSION}</span>
+    <div className="no-print">
+      {/* FILA 1: sesión + user + admin(azul) + versión ------- 45H/40H/CE */}
+      <div style={{
+        background: "#1a1a1a",
+        padding: "14px 24px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        borderBottom: "1px solid #2a2a2a",
+        gap: 12,
+        flexWrap: "wrap",
+        fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <span style={{ color: "#888", textTransform: "uppercase", fontSize: 11, letterSpacing: "0.15em", fontWeight: 500 }}>Sesión:</span>
+          <span style={{ fontWeight: 700, color: "#f0f0f0", fontSize: 14, letterSpacing: "0.02em" }}>{usuario.nombre}</span>
+          {usuario.es_admin && <span style={{ background: "#2196f3", color: "#fff", padding: "4px 12px", borderRadius: 5, fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>ADMIN</span>}
+          <span style={{ color: "#4ec9b8", fontSize: 12, letterSpacing: "0.15em", fontWeight: 700 }} title="Versión de la app">{APP_VERSION}</span>
+        </div>
+
+        {/* Pestañas 45H / 40H / Coste Empresa (derecha) */}
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          {tabBtn("iruna45", "45H")}
+          {tabBtn("tab40", "40H")}
+          {tabCosteEmpresa()}
+        </div>
       </div>
 
-      {/* Pestañas centrales */}
-      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-        {tabBtn("iruna45", "45H")}
-        {tabBtn("tab40", "40H")}
-        {tabCosteEmpresa()}
-      </div>
+      {/* FILA 2: LTN(azul) + USUARIOS/LOGS/COAC/FESTIVOS + CERRAR SESIÓN a la derecha */}
+      <div style={{
+        background: "#1a1a1a",
+        padding: "12px 24px",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        borderBottom: "1px solid #2a2a2a",
+        gap: 12,
+        flexWrap: "wrap",
+        fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+      }}>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          {/* LTN azul (proyecto activo, siempre destacado) */}
+          <button
+            onClick={onProyectos}
+            title="Cambiar de proyecto"
+            style={{
+              background: "#2196f3", color: "#fff",
+              border: "1px solid #2196f3",
+              padding: "9px 18px", borderRadius: 6, cursor: "pointer",
+              fontSize: 12, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+              fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase",
+              display: "flex", alignItems: "center", gap: 6,
+              transition: "all 0.15s",
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = "#42a5f5"; e.currentTarget.style.borderColor = "#42a5f5"; }}
+            onMouseLeave={e => { e.currentTarget.style.background = "#2196f3"; e.currentTarget.style.borderColor = "#2196f3"; }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+            {proyectoActivo?.nombre || "Proyectos"}
+          </button>
 
-      <div style={{ display: "flex", gap: 8 }}>
-        {/* Botón proyectos: TODOS lo ven, muestra el proyecto activo y al pulsar sale al selector */}
+          {usuario.es_admin && (
+            <>
+              {btnSecondary(onAdmin, (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              ), "Usuarios")}
+              {btnSecondary(onLogs, (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+              ), "Logs")}
+              {btnSecondary(onPuestos, (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 7h-3V5a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2v2H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/></svg>
+              ), "COAC")}
+              {btnSecondary(onFestivos, (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              ), "Festivos")}
+            </>
+          )}
+        </div>
+
+        {/* Cerrar sesión a la derecha */}
         <button
-          onClick={onProyectos}
-          title="Cambiar de proyecto"
+          onClick={onLogout}
           style={{
-            background: "#c8a96e", color: "#1a1a1a", border: "1px solid #c8a96e",
-            padding: "4px 12px", borderRadius: 4, cursor: "pointer", fontSize: 10,
-            fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontWeight: 700,
-            letterSpacing: "0.12em", textTransform: "uppercase",
+            background: "transparent", color: "#fff",
+            border: "1px solid rgba(255,255,255,0.2)",
+            padding: "9px 18px", borderRadius: 6, cursor: "pointer",
+            fontSize: 12, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+            fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase",
+            display: "flex", alignItems: "center", gap: 6,
+            transition: "all 0.15s",
           }}
-        >📁 {proyectoActivo?.nombre || "Proyectos"}</button>
-        {usuario.es_admin && (
-          <>
-            <button onClick={onAdmin} style={{ background: "transparent", color: "#c8a96e", border: "1px solid #c8a96e", padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontSize: 10, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" }}>⚙ Usuarios</button>
-            <button onClick={onLogs} style={{ background: "transparent", color: "#c8a96e", border: "1px solid #c8a96e", padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontSize: 10, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" }}>📊 Logs</button>
-            <button onClick={onPuestos} style={{ background: "transparent", color: "#c8a96e", border: "1px solid #c8a96e", padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontSize: 10, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" }}>📋 Puestos</button>
-            <button onClick={onFestivos} style={{ background: "transparent", color: "#c8a96e", border: "1px solid #c8a96e", padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontSize: 10, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" }}>📅 Festivos</button>
-          </>
-        )}
-        <button onClick={onLogout} style={{ background: "transparent", color: "#aaa", border: "1px solid #444", padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontSize: 10, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", letterSpacing: "0.1em", textTransform: "uppercase" }}>Cerrar sesión</button>
+          onMouseEnter={e => { e.currentTarget.style.background = "rgba(200,80,80,0.15)"; e.currentTarget.style.borderColor = "rgba(200,80,80,0.4)"; }}
+          onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.2)"; }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          Cerrar sesión
+        </button>
       </div>
     </div>
   );
