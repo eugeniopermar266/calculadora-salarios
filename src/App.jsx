@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v114";
+const APP_VERSION = "v115";
 
 // v97: Departamentos de un rodaje audiovisual (obligatorio en cada perfil)
 const DEPARTAMENTOS = [
@@ -1753,9 +1753,9 @@ function GestorPerfiles({ tabId, datosActuales, onCargarPerfil, onRegistrarAccio
 
   return (
     <div style={{ background:"#f2f5f7", border:"1px solid #d5d9dc", borderRadius:8, padding:"12px 14px", marginBottom:20 }}>
-      <div style={{ fontSize:10, letterSpacing:"0.2em", color:"#4ec9b8", textTransform:"uppercase", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-        <span>▸ Perfiles Guardados {perfiles.length > 0 && <span style={{ color:"#888", marginLeft:4 }}>({perfiles.length})</span>}{cargando && <span style={{ color:"#888", marginLeft:6, fontSize:8 }}>· cargando…</span>}</span>
-        <span style={{ fontSize:8, color:"#999", fontStyle:"italic", letterSpacing:"0.05em", textTransform:"none" }}>usa la barra superior ↑</span>
+      <div style={{ fontSize:12, letterSpacing:"0.15em", color:"#1a1a1a", textTransform:"uppercase", display:"flex", justifyContent:"space-between", alignItems:"center", fontFamily:"'Inter', -apple-system, sans-serif", fontWeight: 700 }}>
+        <span>▸ Perfiles Guardados {perfiles.length > 0 && <span style={{ color:"#666", marginLeft:4, fontWeight: 500 }}>({perfiles.length})</span>}{cargando && <span style={{ color:"#666", marginLeft:6, fontSize:10, fontWeight: 400, fontStyle:"italic" }}>· cargando…</span>}</span>
+        <span style={{ fontSize:10, color:"#999", fontStyle:"italic", letterSpacing:"0.05em", textTransform:"none", fontFamily:"'Inter', sans-serif", fontWeight: 400 }}>usa la barra superior ↑</span>
       </div>
       {mensaje && (
         <div style={{ marginTop:8, padding:"6px 10px", borderRadius:4, fontSize:10, fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",
@@ -2145,8 +2145,8 @@ function InputsPorMes({ desglose, horasPorMes, setHorasPorMes, vacDiasPorMes, se
                     setHorasPorMes(a);
                   }}
                   title={`Estimado L-V: ${autoH}h (puedes modificarlo)`}
-                  style={{ background: esEstimadoOriginal?"#eef3f8":"#dfe4e8", border:`1px solid ${esEstimadoOriginal?"#b8cce0":"#4a6a9a"}`, borderRadius:4, color:"#2a5a8a", fontFamily:"'Courier Prime', 'Courier New', monospace", fontSize:11, padding:"4px 4px", outline:"none", textAlign:"center", colorScheme:"light", minWidth:0, width:"100%", boxSizing:"border-box" }}
-                  onFocus={e=>e.target.style.borderColor="#4a6a9a"} onBlur={e=>e.target.style.borderColor=esEstimadoOriginal?"#b8cce0":"#4a6a9a"} />
+                  style={{ background: esEstimadoOriginal?"#eef3f8":"#dfe4e8", border:`1px solid ${esEstimadoOriginal?"#d5d9dc":"#4a6a9a"}`, borderRadius:4, color:"#1a1a1a", fontFamily:"'Courier Prime', 'Courier New', monospace", fontSize:11, padding:"4px 4px", outline:"none", textAlign:"center", colorScheme:"light", minWidth:0, width:"100%", boxSizing:"border-box" }}
+                  onFocus={e=>e.target.style.borderColor="#4a6a9a"} onBlur={e=>e.target.style.borderColor=esEstimadoOriginal?"#d5d9dc":"#4a6a9a"} />
               </div>
             );
           })()}
@@ -2178,7 +2178,7 @@ function InputsPorMes({ desglose, horasPorMes, setHorasPorMes, vacDiasPorMes, se
 
       <div style={{ display:"grid", gridTemplateColumns:cols, gap:6, marginTop:8, paddingTop:8, borderTop:"1px solid #d5d9dc" }}>
         <div style={{ fontSize:9, color:"#777", textTransform:"uppercase", letterSpacing:"0.1em", fontFamily:"'Courier Prime', 'Courier New', monospace", display:"flex", alignItems:"center" }}>Total</div>
-        <div style={{ textAlign:"center", fontSize:12, fontWeight:700, color:"#2a5a8a", fontFamily:"'Courier Prime', 'Courier New', monospace" }}>
+        <div style={{ textAlign:"center", fontSize:12, fontWeight:700, color:"#1a1a1a", fontFamily:"'Courier Prime', 'Courier New', monospace" }}>
           {desglose.reduce((s,d,i)=>{
             const v = horasPorMes[i];
             if (v === undefined || v === null || v === "") return s + Math.round(d.semanasLaborables * 5);
@@ -2813,7 +2813,7 @@ function DocumentoImprimible({
                 background: "#fafaf7",
               }}>
                 <div style={{ fontSize: 7, color: "#888", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: 5 }}>{it.l}</div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: it.blue ? "#3a6898" : "#1a1a1a" }}>{fmt(it.v)} €</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: it.blue ? "#1a1a1a" : "#1a1a1a" }}>{fmt(it.v)} €</div>
                 <div style={{ fontSize: 7, color: "#aaa", marginTop: 4 }}>{it.s}</div>
               </td>
             ))}
@@ -2829,7 +2829,7 @@ function DocumentoImprimible({
                   TOTAL MES 40H · <span style={{ color: "#4ec9b8", fontSize: 12 }}>{fmt(baseRef + vacRef + indemRef)} €</span> <span style={{ display: "inline-block", background: "#4ec9b8", color: "#f2f5f7", fontSize: 8, fontWeight: 700, letterSpacing: "0.1em", padding: "1px 5px", borderRadius: 3, marginLeft: 4, verticalAlign: "middle" }}>BRUTOS</span>
                 </td>
                 <td style={{ background: "#f0f6fc", border: "1px solid #c8d8e8", padding: "7px 10px", textAlign: "center", fontSize: 10, fontWeight: 700, color: "#1a1a1a", letterSpacing: "0.04em", width: "50%" }}>
-                  SALARIO EN CONTRATO · <span style={{ color: "#3a6898", fontSize: 12 }}>{fmt(vacAcumulada ? baseRef : (baseRef + vacRef))} €</span> <span style={{ display: "inline-block", background: "#3a6898", color: "#f2f5f7", fontSize: 8, fontWeight: 700, letterSpacing: "0.1em", padding: "1px 5px", borderRadius: 3, marginLeft: 4, verticalAlign: "middle" }}>BRUTOS</span>
+                  SALARIO EN CONTRATO · <span style={{ color: "#1a1a1a", fontSize: 12 }}>{fmt(vacAcumulada ? baseRef : (baseRef + vacRef))} €</span> <span style={{ display: "inline-block", background: "#1a1a1a", color: "#f2f5f7", fontSize: 8, fontWeight: 700, letterSpacing: "0.1em", padding: "1px 5px", borderRadius: 3, marginLeft: 4, verticalAlign: "middle" }}>BRUTOS</span>
                   {vacAcumulada && <div style={{ fontSize: 7.5, color: "#5a7a9a", marginTop: 2, letterSpacing: "0.05em", fontStyle: "italic", fontWeight: 400 }}>Base 40h · vacaciones al final</div>}
                 </td>
               </tr>
@@ -2850,7 +2850,7 @@ function DocumentoImprimible({
                   TOTAL MES 45H TODO INCLUIDO · <span style={{ color: "#4ec9b8", fontSize: 12 }}>{fmt(sumaRef)} €</span> <span style={{ display: "inline-block", background: "#4ec9b8", color: "#f2f5f7", fontSize: 8, fontWeight: 700, letterSpacing: "0.1em", padding: "1px 5px", borderRadius: 3, marginLeft: 4, verticalAlign: "middle" }}>BRUTOS</span>
                 </td>
                 <td style={{ background: "#f0f6fc", border: "1px solid #c8d8e8", padding: "7px 10px", textAlign: "center", fontSize: 10, fontWeight: 700, color: "#1a1a1a", letterSpacing: "0.04em", width: "50%" }}>
-                  SALARIO EN CONTRATO · <span style={{ color: "#3a6898", fontSize: 12 }}>{fmt(baseRef + vacRef)} €</span> <span style={{ display: "inline-block", background: "#3a6898", color: "#f2f5f7", fontSize: 8, fontWeight: 700, letterSpacing: "0.1em", padding: "1px 5px", borderRadius: 3, marginLeft: 4, verticalAlign: "middle" }}>BRUTOS</span>
+                  SALARIO EN CONTRATO · <span style={{ color: "#1a1a1a", fontSize: 12 }}>{fmt(baseRef + vacRef)} €</span> <span style={{ display: "inline-block", background: "#1a1a1a", color: "#f2f5f7", fontSize: 8, fontWeight: 700, letterSpacing: "0.1em", padding: "1px 5px", borderRadius: 3, marginLeft: 4, verticalAlign: "middle" }}>BRUTOS</span>
                 </td>
               </tr>
             </tbody>
@@ -2871,7 +2871,7 @@ function DocumentoImprimible({
             <td style={tdLabel}><strong>Valor Hora:</strong> {fmtE(vHora)}</td>
           </tr>
           <tr>
-            <td style={tdLabel}><strong>Hora Extra ×1,5:</strong> <span style={{ color: "#3a6898" }}>{fmtE(vHoraEx)}</span></td>
+            <td style={tdLabel}><strong>Hora Extra ×1,5:</strong> <span style={{ color: "#1a1a1a" }}>{fmtE(vHoraEx)}</span></td>
             <td style={tdLabel}><strong>Festivo ×1,75:</strong> <span style={{ color: "#6a3a9a" }}>{fmtE(salarioDia * 1.75)}</span></td>
             <td style={tdLabel}><strong>Total H.Extra:</strong> {fmtE(totHx)} ({horasPorMes.reduce((s,v)=>s+(v||0),0)}h)</td>
           </tr>
@@ -2930,8 +2930,8 @@ function DocumentoImprimible({
                 <td style={tdCell({ textAlign: "right" })}>{fmt(d.base40)}</td>
                 <td style={tdCell({ textAlign: "right", color: d.vac40 === 0 ? "#bbb" : "#1a1a1a" })}>{d.vac40 === 0 ? "—" : fmt(d.vac40)}</td>
                 <td style={tdCell({ textAlign: "right", color: d.indem40 === 0 ? "#bbb" : "#1a1a1a" })}>{d.indem40 === 0 ? "—" : fmt(d.indem40)}</td>
-                <td style={tdCell({ textAlign: "right", color: "#3a6898" })}>{d.hMes}h</td>
-                <td style={tdCell({ textAlign: "right", color: "#3a6898" })}>{fmt(d.cobroHx)}</td>
+                <td style={tdCell({ textAlign: "right", color: "#1a1a1a" })}>{d.hMes}h</td>
+                <td style={tdCell({ textAlign: "right", color: "#1a1a1a" })}>{fmt(d.cobroHx)}</td>
                 {!es40h && <td style={tdCell({ textAlign: "right", color: d.plusAct > 0 ? "#b07030" : "#bbb", fontWeight: d.plusAct > 0 ? 600 : 400 })}>{d.plusAct > 0 ? fmt(d.plusAct) : "—"}</td>}
                 <td style={tdCell({ textAlign: "right", color: vd > 0 ? "#8a2a20" : "#bbb" })}>{vd > 0 ? `−${fmt(vd)}` : "—"}</td>
                 <td style={tdCell({ textAlign: "right", color: fest > 0 ? "#6a3a9a" : "#bbb" })}>{fest > 0 ? fmt(fest) : "—"}</td>
@@ -2949,13 +2949,13 @@ function DocumentoImprimible({
             <td style={tdCell({ background: "#fdf8f0", textAlign: "right" })}>{fmt(totBase)}</td>
             <td style={tdCell({ background: "#fdf8f0", textAlign: "right" })}>{fmt(totVac)}</td>
             <td style={tdCell({ background: "#fdf8f0", textAlign: "right" })}>{fmt(totIndem)}</td>
-            <td style={tdCell({ background: "#fdf8f0", textAlign: "right", color: "#3a6898" })}>
+            <td style={tdCell({ background: "#fdf8f0", textAlign: "right", color: "#1a1a1a" })}>
               {horasPorMes.reduce((s, v, i) => {
                 if (v === undefined || v === null || v === "") return s + Math.round((p?.desglose[i]?.semanasLaborables || 0) * 5);
                 return s + (v || 0);
               }, 0)}h
             </td>
-            <td style={tdCell({ background: "#fdf8f0", textAlign: "right", color: "#3a6898" })}>{fmt(totHx)}</td>
+            <td style={tdCell({ background: "#fdf8f0", textAlign: "right", color: "#1a1a1a" })}>{fmt(totHx)}</td>
             {!es40h && <td style={tdCell({ background: "#fdf8f0", textAlign: "right", color: totPlus > 0 ? "#b07030" : "#bbb" })}>{totPlus > 0 ? fmt(totPlus) : "—"}</td>}
             <td style={tdCell({ background: "#fdf8f0", textAlign: "right", color: totVd > 0 ? "#8a2a20" : "#bbb" })}>{totVd > 0 ? `−${fmt(totVd)}` : "—"}</td>
             <td style={tdCell({ background: "#fdf8f0", textAlign: "right", color: totalFestImport45 > 0 ? "#6a3a9a" : "#bbb" })}>{totalFestImport45 > 0 ? fmt(totalFestImport45) : "—"}</td>
@@ -3007,7 +3007,7 @@ function DocumentoImprimible({
           </tr>
           <tr>
             <td style={tdLabel}>+ Horas extra ({horasPorMes.reduce((s,v)=>s+(v||0),0)}h)</td>
-            <td style={{ ...tdValue, textAlign: "right", color: "#3a6898", fontWeight: 700 }}>+ {fmtE(totHx)}</td>
+            <td style={{ ...tdValue, textAlign: "right", color: "#1a1a1a", fontWeight: 700 }}>+ {fmtE(totHx)}</td>
           </tr>
           {totPlus > 0 && !es40h && (
             <tr>
@@ -3986,7 +3986,7 @@ ${docHTML}
     <div style={{ color:"#1a1a1a", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", padding:"32px 32px" }}>
 
       {/* v113: Header rediseñado con logo Bdprodtools + Payroll cost calculator + botones nueva estética */}
-      <div style={{ maxWidth:1700, margin:"0 auto 24px" }}>
+      <div style={{ maxWidth:1800, margin:"0 auto 24px" }}>
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center",
                       background:"#1a1a1a", borderRadius:10, padding:"24px 28px",
                       border: "1px solid rgba(255,255,255,0.05)" }}>
@@ -4132,7 +4132,7 @@ ${docHTML}
         </div>
       </div>
 
-      <div className="print-grid" style={{ maxWidth:1700, margin:"0 auto", display:"grid", gridTemplateColumns:"340px minmax(0, 1fr)", gap:20 }}>
+      <div className="print-grid" style={{ maxWidth:1800, margin:"0 auto", display:"grid", gridTemplateColumns:"340px minmax(0, 1fr)", gap:20 }}>
 
         {/* COLUMNA IZQUIERDA */}
         <div className="no-print">
@@ -4248,7 +4248,7 @@ ${docHTML}
                   borderRadius: 5,
                   border: `1px solid ${departamento ? "#d5d9dc" : "#c04040"}`,
                   background: departamento ? "#dfe4e8" : "#fff4f4",
-                  fontFamily: "'Courier Prime', 'Courier New', monospace",
+                  fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
                   fontSize: 12,
                   color: departamento ? "#1a1a1a" : "#c04040",
                   cursor: "pointer",
@@ -4275,10 +4275,10 @@ ${docHTML}
                 }}
               >
                 <div>
-                  <div style={{ fontSize: 11, color: esFijoDiscontinuo ? "#7a5a2a" : "#999", fontFamily: "'Courier Prime', 'Courier New', monospace", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 700 }}>
+                  <div style={{ fontSize: 11, color: esFijoDiscontinuo ? "#7a5a2a" : "#999", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 700 }}>
                     Fijo discontinuo
                   </div>
-                  <div style={{ fontSize: 9, color: "#777", marginTop: 2, fontFamily: "'Courier Prime', 'Courier New', monospace" }}>
+                  <div style={{ fontSize: 9, color: "#777", marginTop: 2, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>
                     {esFijoDiscontinuo ? "Indemnización × 1,6433333" : "Indemnización estándar × 0,98632"}
                   </div>
                 </div>
@@ -4303,10 +4303,10 @@ ${docHTML}
                 }}
               >
                 <div>
-                  <div style={{ fontSize: 11, color: hxPorRodaje40 ? "#7a5a2a" : "#999", fontFamily: "'Courier Prime', 'Courier New', monospace", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 700 }}>
+                  <div style={{ fontSize: 11, color: hxPorRodaje40 ? "#7a5a2a" : "#999", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 700 }}>
                     1 HX por día de rodaje
                   </div>
-                  <div style={{ fontSize: 9, color: "#777", marginTop: 2, fontFamily: "'Courier Prime', 'Courier New', monospace" }}>
+                  <div style={{ fontSize: 9, color: "#777", marginTop: 2, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>
                     {hxPorRodaje40 ? "Rellena horas extra desde el calendario (días de rodaje)" : "Las horas extra no se autorrellenan"}
                   </div>
                 </div>
@@ -4331,7 +4331,7 @@ ${docHTML}
                 <div style={{ width:"100%", height:"100%", borderRadius:9, background:modoInverso45?"#4ec9b8":"#ddd", transition:"background 0.25s" }} />
                 <div style={{ position:"absolute", top:2, left:modoInverso45?17:2, width:14, height:14, borderRadius:"50%", background:modoInverso45?"#f2f5f7":"#aaa", transition:"left 0.25s" }} />
               </div>
-              <span style={{ fontSize:10, color:modoInverso45?"#7a5a2a":"#999", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", letterSpacing:"0.1em", textTransform:"uppercase", fontWeight:700 }}>Cálculo inverso</span>
+              <span style={{ fontSize:10, color:modoInverso45?"#7a5a2a":"#999", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", letterSpacing:"0.1em", textTransform:"uppercase", fontWeight:700 }}>Cálculo inverso</span>
             </div>
 
             {!modoInverso45 ? (
@@ -4341,10 +4341,10 @@ ${docHTML}
                 <label style={LS}>Salario Pactado {es40h ? "40h" : "45h"}</label>
                 <div style={{ padding:"10px 14px", background:"#dfe4e8", borderRadius:4, border:"1px solid #c8963a", textAlign:"center", marginBottom:4 }}>
                   {p && p45Inverso
-                    ? <span style={{ fontSize:20, fontWeight:700, color:"#4ec9b8", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>{fmtE(p45Inverso)}</span>
+                    ? <span style={{ fontSize:20, fontWeight:700, color:"#4ec9b8", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>{fmtE(p45Inverso)}</span>
                     : <span style={{ fontSize:12, color:"#aaa" }}>— introduce fechas y horas —</span>}
                 </div>
-                <p style={{ margin:"0 0 8px", fontSize:9, color:"#888", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>Para {fmtE(objetivoSemanal45)}/semana</p>
+                <p style={{ margin:"0 0 8px", fontSize:9, color:"#888", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>Para {fmtE(objetivoSemanal45)}/semana</p>
                 <Field label="Objetivo €/semana" value={objetivoSemanal45} onChange={setObjetivoSemanal45} prefix="€" />
               </div>
             )}
@@ -4362,14 +4362,14 @@ ${docHTML}
                 ].map(it=>(
                   <div key={it.l} style={{ background:"#f2f5f7", borderRadius:4, padding:"7px", border:"1px solid #e8e4de", textAlign:"center" }}>
                     <div style={{ fontSize:8, color:"#666", textTransform:"uppercase", marginBottom:3 }}>{it.l}</div>
-                    <div style={{ fontSize:12, fontWeight:700, color:it.blue?"#3a6898":"#1a1a1a" }}>{fmt(it.v)} €</div>
+                    <div style={{ fontSize:12, fontWeight:700, color:it.blue?"#1a1a1a":"#1a1a1a" }}>{fmt(it.v)} €</div>
                     <div style={{ fontSize:8, color:"#888", marginTop:2 }}>{it.s}</div>
                   </div>
                 ))}
               </div>
               <div style={{ marginTop:8, display:"flex", justifyContent:"space-between", alignItems:"center", padding:"6px 10px", background:"#f2f5f7", borderRadius:4, border:"1px solid #d8d4ce" }}>
                 <span style={{ fontSize:9, color:"#666", textTransform:"uppercase", letterSpacing:"0.1em" }}>{es40h ? "TOTAL ≈ P40" : "TOTAL ≈ P45"}</span>
-                <span style={{ fontSize:15, fontWeight:700, color:"#4ec9b8", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>{fmt(es40h ? (baseRef + vacRef + indemRef) : sumaRef)} €</span>
+                <span style={{ fontSize:15, fontWeight:700, color:"#4ec9b8", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>{fmt(es40h ? (baseRef + vacRef + indemRef) : sumaRef)} €</span>
               </div>
             </div>
           </div>
@@ -4382,7 +4382,7 @@ ${docHTML}
                 <span style={{ fontSize: 14 }}>📅</span>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>Calendario del proyecto</div>
-                  <div style={{ marginTop: 2, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>
+                  <div style={{ marginTop: 2, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>
                     {proyectoActivoCtx.__calendario.fecha_inicio} → {proyectoActivoCtx.__calendario.fecha_fin}
                     {proyectoActivoCtx.__calendario.comunidad && (
                       <span style={{ marginLeft: 8, textTransform: "capitalize" }}>· {proyectoActivoCtx.__calendario.comunidad.replace("_", " ")}</span>
@@ -4398,7 +4398,7 @@ ${docHTML}
                       }
                     }}
                     title="El perfil cargado difiere del calendario. Pulsa para recalcular desde el calendario."
-                    style={{ background: "#4ec9b8", color: "#f2f5f7", border: "none", padding: "6px 10px", borderRadius: 3, cursor: "pointer", fontFamily: "'Courier Prime', 'Courier New', monospace", fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", flexShrink: 0 }}
+                    style={{ background: "#4ec9b8", color: "#f2f5f7", border: "none", padding: "6px 10px", borderRadius: 3, cursor: "pointer", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", flexShrink: 0 }}
                   >📅 Aplicar calendario</button>
                 )}
               </div>
@@ -4467,10 +4467,10 @@ ${docHTML}
                     <div style={ST}>▸ Festivos Calendario Laboral</div>
                     <button
                       onClick={() => setMostrarFestivosLegacy(true)}
-                      style={{ background:"transparent", color:"#4ec9b8", border:"1px solid #4ec9b8", padding:"3px 8px", borderRadius:3, cursor:"pointer", fontSize:9, fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontWeight:700, letterSpacing:"0.08em", textTransform:"uppercase" }}
+                      style={{ background:"transparent", color:"#4ec9b8", border:"1px solid #4ec9b8", padding:"3px 8px", borderRadius:3, cursor:"pointer", fontSize:9, fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontWeight:700, letterSpacing:"0.08em", textTransform:"uppercase" }}
                     >Ver festivos legacy</button>
                   </div>
-                  <div style={{ fontSize:10, color:"#888", padding:"10px 0 4px", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", lineHeight:1.5 }}>
+                  <div style={{ fontSize:10, color:"#888", padding:"10px 0 4px", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", lineHeight:1.5 }}>
                     Los festivos ya se gestionan desde el calendario del proyecto (marcados como trabajados). Este panel es solo para casos excepcionales.
                   </div>
                 </div>
@@ -4487,11 +4487,11 @@ ${docHTML}
                   {hayCalProy && (
                     <button
                       onClick={() => setMostrarFestivosLegacy(false)}
-                      style={{ background:"transparent", color:"#888", border:"1px solid #ccc", padding:"3px 8px", borderRadius:3, cursor:"pointer", fontSize:9, fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}
+                      style={{ background:"transparent", color:"#888", border:"1px solid #ccc", padding:"3px 8px", borderRadius:3, cursor:"pointer", fontSize:9, fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}
                     >Ocultar</button>
                   )}
                 </div>
-                <div style={{ fontSize:10, color:"#888", textAlign:"center", padding:"12px 0", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>
+                <div style={{ fontSize:10, color:"#888", textAlign:"center", padding:"12px 0", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>
                   No hay festivos oficiales en este período
                 </div>
               </div>
@@ -4503,11 +4503,11 @@ ${docHTML}
                   {hayCalProy && (
                     <button
                       onClick={() => setMostrarFestivosLegacy(false)}
-                      style={{ background:"transparent", color:"#888", border:"1px solid #ccc", padding:"3px 8px", borderRadius:3, cursor:"pointer", fontSize:9, fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}
+                      style={{ background:"transparent", color:"#888", border:"1px solid #ccc", padding:"3px 8px", borderRadius:3, cursor:"pointer", fontSize:9, fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}
                     >Ocultar</button>
                   )}
                 </div>
-                <div style={{ fontSize:9, color:"#888", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", marginBottom:10, lineHeight:1.4 }}>
+                <div style={{ fontSize:9, color:"#888", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", marginBottom:10, lineHeight:1.4 }}>
                   Activa sólo los festivos que el trabajador efectivamente trabajó. Cada activación suma +1 al contador del mes correspondiente.
                 </div>
                 {festsRango.map(f => {
@@ -4546,13 +4546,13 @@ ${docHTML}
                         {activo ? "✓" : ""}
                       </div>
                       <div style={{ flex:1, minWidth:0 }}>
-                        <div style={{ fontSize:10, fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", color: activo ? "#6a3a9a" : "#1a1a1a", fontWeight:600 }}>
+                        <div style={{ fontSize:10, fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", color: activo ? "#6a3a9a" : "#1a1a1a", fontWeight:600 }}>
                           {dow} {dia} {mes}
                           <span style={{ fontSize:8, marginLeft:6, padding:"1px 5px", borderRadius:2, background: f.tipo==="nacional"?"#e8e0d0":"#d8e8d8", color:"#555", letterSpacing:"0.05em", textTransform:"uppercase", fontWeight:700 }}>
                             {f.tipo==="nacional"?"Nac":"CCAA"}
                           </span>
                         </div>
-                        <div style={{ fontSize:9, color:"#777", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", marginTop:1 }}>
+                        <div style={{ fontSize:9, color:"#777", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", marginTop:1 }}>
                           {f.nombre}
                         </div>
                       </div>
@@ -4560,8 +4560,8 @@ ${docHTML}
                   );
                 })}
                 <div style={{ marginTop:8, padding:"6px 10px", background:"#dfe4e8", borderRadius:4, display:"flex", justifyContent:"space-between" }}>
-                  <span style={{ fontSize:9, color:"#888", textTransform:"uppercase", letterSpacing:"0.1em", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>Activos</span>
-                  <span style={{ fontSize:11, fontWeight:700, color:"#6a3a9a", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>
+                  <span style={{ fontSize:9, color:"#888", textTransform:"uppercase", letterSpacing:"0.1em", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>Activos</span>
+                  <span style={{ fontSize:11, fontWeight:700, color:"#6a3a9a", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>
                     {Object.keys(festivosActivos).filter(k=>festsRango.some(f=>f.fecha===k)).length} / {festsRango.length}
                   </span>
                 </div>
@@ -4573,7 +4573,7 @@ ${docHTML}
           {p && plusComida.importeDia > 0 && (
             <div style={P}>
               <div style={ST}>▸ Días de Comida por Mes</div>
-              <div style={{ fontSize:9, color:"#888", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", marginBottom:10 }}>
+              <div style={{ fontSize:9, color:"#888", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", marginBottom:10 }}>
                 Días calculados automáticamente (L-V). Edita si el trabajador no tiene comida algún día.
               </div>
               {p.desglose.map((d,i) => {
@@ -4582,7 +4582,7 @@ ${docHTML}
                 const isOverride = comidaDiasPorMes[i] !== null && comidaDiasPorMes[i] !== undefined && comidaDiasPorMes[i] !== auto;
                 return (
                   <div key={i} style={{ display:"grid", gridTemplateColumns:"1fr 60px 60px", gap:8, marginBottom:5, alignItems:"center" }}>
-                    <div style={{ fontSize:10, color:"#444", textTransform:"capitalize", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>
+                    <div style={{ fontSize:10, color:"#444", textTransform:"capitalize", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>
                       {d.mes}{!d.esCompleto&&<span style={{fontSize:8,color:"#aaa",marginLeft:4}}>{d.desde}–{d.hasta}</span>}
                     </div>
                     <div style={{ textAlign:"center", fontSize:10, color:"#888" }}>auto:{auto}d</div>
@@ -4594,7 +4594,7 @@ ${docHTML}
                         a[i] = isNaN(v) ? null : v;
                         setComidaDiasPorMes(a);
                       }}
-                      style={{ background: isOverride?"#fff8f0":"#dfe4e8", border:`1px solid ${isOverride?"#c8963a":"#d5d9dc"}`, borderRadius:4, color:"#1a1a1a", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize:12, padding:"5px 6px", outline:"none", textAlign:"center", colorScheme:"light", minWidth:0 }}
+                      style={{ background: isOverride?"#fff8f0":"#dfe4e8", border:`1px solid ${isOverride?"#c8963a":"#d5d9dc"}`, borderRadius:4, color:"#1a1a1a", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontSize:12, padding:"5px 6px", outline:"none", textAlign:"center", colorScheme:"light", minWidth:0 }}
                       onFocus={e=>e.target.style.borderColor="#4ec9b8"} onBlur={e=>e.target.style.borderColor=isOverride?"#c8963a":"#d5d9dc"} />
                   </div>
                 );
@@ -4604,7 +4604,7 @@ ${docHTML}
                 <span style={{ fontSize:12, fontWeight:700, color:"#4ec9b8" }}>{complementos45.reduce((s,c)=>s+c.diasComida,0)}d</span>
               </div>
               <button onClick={()=>setComidaDiasPorMes(p.desglose.map(()=>null))}
-                style={{ marginTop:8, width:"100%", padding:"6px", fontSize:9, fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", letterSpacing:"0.1em", textTransform:"uppercase", background:"transparent", border:"1px solid #d5d9dc", borderRadius:4, cursor:"pointer", color:"#888" }}>
+                style={{ marginTop:8, width:"100%", padding:"6px", fontSize:9, fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", letterSpacing:"0.1em", textTransform:"uppercase", background:"transparent", border:"1px solid #d5d9dc", borderRadius:4, cursor:"pointer", color:"#888" }}>
                 Restablecer automático
               </button>
             </div>
@@ -4615,7 +4615,7 @@ ${docHTML}
             <Toggle label="Vacaciones al final"    value={vacAcumulada}   onChange={(v)=>{ modosToggleadoManualRef.current.vac = true; setVacAcumulada(v); }}   sublabel={vacAcumulada?"Total vacaciones en última nómina":"Prorrateadas cada mes"} />
             <Toggle label="Indemnización al final" value={indemAcumulada || finiquitoAparte} onChange={(v)=>{ modosToggleadoManualRef.current.ind = true; setIndemAcumulada(v); }} sublabel={finiquitoAparte ? "Forzado por 'Finiquito aparte'" : (indemAcumulada?"Total indemnización en última nómina":"Prorrateada cada mes")} disabled={finiquitoAparte} />
             <Toggle label="Finiquito aparte del salario pactado" value={finiquitoAparte} onChange={setFiniquitoAparte} sublabel={finiquitoAparte?"Salario pactado NO incluye indemnización (se paga aparte)":"Salario pactado incluye indemnización prorrateada"} />
-            <div style={{ fontSize:9, color:"#888", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", marginTop:4, padding:"6px 10px", background:"#dfe4e8", borderRadius:4, border:"1px solid #d5d9dc" }}>
+            <div style={{ fontSize:9, color:"#888", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", marginTop:4, padding:"6px 10px", background:"#dfe4e8", borderRadius:4, border:"1px solid #d5d9dc" }}>
               ℹ Las horas extra siempre se cobran el mes que se generan
             </div>
           </div>
@@ -4633,7 +4633,7 @@ ${docHTML}
                   <div style={{ display:"flex", gap:3 }}>
                     {["mes","sem"].map(m=>(
                       <button key={m} onClick={()=>set(p=>({...p,modo:m}))}
-                        style={{ padding:"2px 7px", fontSize:9, fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", letterSpacing:"0.08em", textTransform:"uppercase", border:"1px solid #d5d9dc", borderRadius:3, cursor:"pointer", fontWeight:700, background:plus.modo===m?"#1a1a1a":"#f2f5f7", color:plus.modo===m?"#f2f5f7":"#888" }}>
+                        style={{ padding:"2px 7px", fontSize:9, fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", letterSpacing:"0.08em", textTransform:"uppercase", border:"1px solid #d5d9dc", borderRadius:3, cursor:"pointer", fontWeight:700, background:plus.modo===m?"#1a1a1a":"#f2f5f7", color:plus.modo===m?"#f2f5f7":"#888" }}>
                         {m==="mes"?"€/mes":"€/sem"}
                       </button>
                     ))}
@@ -4655,16 +4655,16 @@ ${docHTML}
           {/* Bloque legal */}
           <div style={{ ...P, background:"#fafaf7", border:"1px solid #e8e4de" }}>
             <div style={{ ...ST, color:"#888", marginBottom:10 }}>▸ Aviso Legal</div>
-            <div style={{ fontSize:10, fontWeight:700, color:"#1a1a1a", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", marginBottom:8, letterSpacing:"0.05em" }}>
+            <div style={{ fontSize:10, fontWeight:700, color:"#1a1a1a", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", marginBottom:8, letterSpacing:"0.05em" }}>
               BD PROD TOOLS
             </div>
-            <div style={{ fontSize:9, color:"#666", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", lineHeight:1.5, marginBottom:8 }}>
+            <div style={{ fontSize:9, color:"#666", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", lineHeight:1.5, marginBottom:8 }}>
               {DISCLAIMER_ES}
             </div>
-            <div style={{ fontSize:8, color:"#888", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", lineHeight:1.5, fontStyle:"italic", marginBottom:8 }}>
+            <div style={{ fontSize:8, color:"#888", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", lineHeight:1.5, fontStyle:"italic", marginBottom:8 }}>
               {DISCLAIMER_EN}
             </div>
-            <div style={{ fontSize:8, color:"#888", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", lineHeight:1.5, fontStyle:"italic" }}>
+            <div style={{ fontSize:8, color:"#888", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", lineHeight:1.5, fontStyle:"italic" }}>
               G &amp; G Enterprises LLC
             </div>
           </div>
@@ -4682,40 +4682,40 @@ ${docHTML}
                     { l:"Base 40h",     v:baseRef,  s:(es40h && esFijoDiscontinuo) ? "Salario ÷ 1,14190" : "× 0,89286" },
                     { l:"Vacaciones",   v:vacRef,   s:"Base ÷ 11,478" },
                     { l:"Indemnización",v:indemRef, s:(es40h && esFijoDiscontinuo) ? "(Base/30) × 1,6433" : "(Base/30) × 0,986" },
-                    ...(es40h ? [] : [{ l:`H.Extra (${horasRef}h)`, v:hxRef, s:`${horasRef}h × ${fmt(vHoraEx)}€`, blue:true }]),
+                    ...(es40h ? [] : [{ l:`H.Extra (${horasRef}h)`, v:hxRef, s:`${horasRef}h × ${fmt(vHoraEx)}€` }]),
                   ].map(it=>(
-                    <div key={it.l} style={{ background:"#dfe4e8", borderRadius:6, padding:"12px 10px", border:"1px solid #d5d9dc", textAlign:"center" }}>
-                      <div style={{ fontSize:9, color:"#666", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:6 }}>{it.l}</div>
-                      <div style={{ fontSize:15, fontWeight:700, color:it.blue?"#3a6898":"#1a1a1a" }}>{fmt(it.v)} €</div>
-                      <div style={{ fontSize:8, color:"#888", marginTop:4 }}>{it.s}</div>
+                    <div key={it.l} style={{ background:"#fff", borderRadius:8, padding:"14px 12px", border:"1px solid #d5d9dc", textAlign:"center" }}>
+                      <div style={{ fontSize:10, color:"#666", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:6, fontFamily:"'Inter', -apple-system, sans-serif", fontWeight: 600 }}>{it.l}</div>
+                      <div style={{ fontSize:20, fontWeight:700, color:"#1a1a1a", fontFamily:"'Inter', -apple-system, sans-serif", letterSpacing: "-0.01em" }}>{fmt(it.v)} €</div>
+                      <div style={{ fontSize:10, color:"#4ec9b8", marginTop:4, fontFamily:"'Inter', -apple-system, sans-serif", fontWeight: 500 }}>{it.s}</div>
                     </div>
                   ))}
                 </div>
                 {es40h ? (
                   <div style={{ marginTop:10, display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
-                    <div style={{ padding:"10px 14px", background:"rgba(184,134,74,0.08)", borderRadius:6, border:"1px solid #d5d9dc", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                      <span style={{ fontSize:9.5, color:"#7a5a2a", letterSpacing:"0.1em", textTransform:"uppercase", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>Total Mes 40h</span>
-                      <span style={{ fontSize:16, fontWeight:700, color:"#4ec9b8", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>{fmt(baseRef + vacRef + indemRef)} €</span>
+                    <div style={{ padding:"14px 18px", background:"#f2f5f7", borderRadius:8, border:"1px solid #d5d9dc", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                      <span style={{ fontSize:11, color:"#666", letterSpacing:"0.08em", textTransform:"uppercase", fontFamily:"'Inter', -apple-system, sans-serif", fontWeight: 600 }}>Total Mes 40h</span>
+                      <span style={{ fontSize:18, fontWeight:700, color:"#1a1a1a", fontFamily:"'Inter', -apple-system, sans-serif" }}>{fmt(baseRef + vacRef + indemRef)} €</span>
                     </div>
-                    <div style={{ padding:"10px 14px", background:"rgba(58,104,152,0.08)", borderRadius:6, border:"1px solid #b8cce0", display:"flex", flexDirection:"column" }}>
+                    <div style={{ padding:"14px 18px", background:"#f2f5f7", borderRadius:8, border:"1px solid #d5d9dc", display:"flex", flexDirection:"column" }}>
                       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                        <span style={{ fontSize:9.5, color:"#2a5a8a", letterSpacing:"0.1em", textTransform:"uppercase", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>Salario en Contrato</span>
-                        <span style={{ fontSize:16, fontWeight:700, color:"#3a6898", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>{fmt(vacAcumulada ? baseRef : (baseRef + vacRef))} €</span>
+                        <span style={{ fontSize:11, color:"#666", letterSpacing:"0.08em", textTransform:"uppercase", fontFamily:"'Inter', -apple-system, sans-serif", fontWeight: 600 }}>Salario en Contrato</span>
+                        <span style={{ fontSize:18, fontWeight:700, color:"#1a1a1a", fontFamily:"'Inter', -apple-system, sans-serif" }}>{fmt(vacAcumulada ? baseRef : (baseRef + vacRef))} €</span>
                       </div>
                       {vacAcumulada && (
-                        <div style={{ fontSize:8.5, color:"#5a7a9a", marginTop:2, textAlign:"right", letterSpacing:"0.05em", fontStyle:"italic", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>Base 40h · vacaciones al final</div>
+                        <div style={{ fontSize:10, color:"#4ec9b8", marginTop:4, textAlign:"right", letterSpacing:"0.05em", fontStyle:"italic", fontFamily:"'Inter', -apple-system, sans-serif", fontWeight: 500 }}>Base 40h · vacaciones al final</div>
                       )}
                     </div>
                   </div>
                 ) : (
                   <div style={{ marginTop:10, display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
-                    <div style={{ padding:"10px 14px", background:"rgba(184,134,74,0.08)", borderRadius:6, border:"1px solid #d5d9dc", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                      <span style={{ fontSize:9.5, color:"#7a5a2a", letterSpacing:"0.1em", textTransform:"uppercase", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>Total Mes 45h Todo Incluido</span>
-                      <span style={{ fontSize:16, fontWeight:700, color:"#4ec9b8", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>{fmt(sumaRef)} €</span>
+                    <div style={{ padding:"14px 18px", background:"#f2f5f7", borderRadius:8, border:"1px solid #d5d9dc", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                      <span style={{ fontSize:11, color:"#666", letterSpacing:"0.08em", textTransform:"uppercase", fontFamily:"'Inter', -apple-system, sans-serif", fontWeight: 600 }}>Total Mes 45h Todo Incluido</span>
+                      <span style={{ fontSize:18, fontWeight:700, color:"#1a1a1a", fontFamily:"'Inter', -apple-system, sans-serif" }}>{fmt(sumaRef)} €</span>
                     </div>
-                    <div style={{ padding:"10px 14px", background:"rgba(58,104,152,0.08)", borderRadius:6, border:"1px solid #b8cce0", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                      <span style={{ fontSize:9.5, color:"#2a5a8a", letterSpacing:"0.1em", textTransform:"uppercase", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>Salario en Contrato</span>
-                      <span style={{ fontSize:16, fontWeight:700, color:"#3a6898", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>{fmt(baseRef + vacRef)} €</span>
+                    <div style={{ padding:"14px 18px", background:"#f2f5f7", borderRadius:8, border:"1px solid #d5d9dc", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                      <span style={{ fontSize:11, color:"#666", letterSpacing:"0.08em", textTransform:"uppercase", fontFamily:"'Inter', -apple-system, sans-serif", fontWeight: 600 }}>Salario en Contrato</span>
+                      <span style={{ fontSize:18, fontWeight:700, color:"#1a1a1a", fontFamily:"'Inter', -apple-system, sans-serif" }}>{fmt(baseRef + vacRef)} €</span>
                     </div>
                   </div>
                 )}
@@ -4723,8 +4723,8 @@ ${docHTML}
 
               {/* Nota informativa. En 45H siempre se muestra. En 40H solo si vacaciones NO van al final */}
               {(!es40h || !vacAcumulada) && (
-                <div style={{ background:"#fafaf7", padding:"10px 14px", borderRadius:6, border:"1px solid #d5d9dc", marginBottom:20, fontSize:10, color:"#666", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", lineHeight:1.5, fontStyle:"italic" }}>
-                  <strong style={{ color:"#444", fontStyle:"normal" }}>Nota:</strong> {es40h
+                <div style={{ background:"rgba(78,201,184,0.08)", padding:"12px 16px", borderRadius:8, border:"1px solid rgba(78,201,184,0.25)", marginBottom:20, fontSize:12, color:"#1a1a1a", fontFamily:"'Inter', -apple-system, sans-serif", lineHeight:1.5 }}>
+                  <strong style={{ color:"#1a1a1a", fontWeight: 700 }}>Nota:</strong> {es40h
                     ? "Salario en contrato es la suma del salario base + las vacaciones."
                     : "El salario que figura en contrato es la suma del salario base 40h más las vacaciones."}
                 </div>
@@ -4737,13 +4737,13 @@ ${docHTML}
                     { l:"Salario / Día",    v: salarioDia,          s:"Base ÷ 30" },
                     { l:"Salario / Semana", v: salarioDia * 7,      s:"Día × 7" },
                     { l:"Valor Hora",       v: vHora,               s:"Semana ÷ 40h" },
-                    { l:"Hora Extra ×1,5",  v: vHoraEx,             s:"Hora × 1,5",   blue:true },
-                    { l:"Festivo ×1,75",    v: salarioDia * 1.75,   s:"Día × 1,75",   purple:true },
+                    { l:"Hora Extra ×1,5",  v: vHoraEx,             s:"Hora × 1,5" },
+                    { l:"Festivo ×1,75",    v: salarioDia * 1.75,   s:"Día × 1,75" },
                   ].map(it=>(
-                    <div key={it.l} style={{ background:"#dfe4e8", borderRadius:6, padding:"12px 10px", border:`1px solid ${it.purple?"#d0b8e8":it.blue?"#b8cce0":"#d5d9dc"}`, textAlign:"center" }}>
-                      <div style={{ fontSize:8, color:"#666", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:6 }}>{it.l}</div>
-                      <div style={{ fontSize:15, fontWeight:700, color:it.purple?"#6a3a9a":it.blue?"#3a6898":"#1a1a1a" }}>{fmt(it.v)} €</div>
-                      <div style={{ fontSize:8, color:"#888", marginTop:4 }}>{it.s}</div>
+                    <div key={it.l} style={{ background:"#fff", borderRadius:8, padding:"14px 10px", border:"1px solid #d5d9dc", textAlign:"center" }}>
+                      <div style={{ fontSize:10, color:"#666", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:6, fontFamily:"'Inter', -apple-system, sans-serif", fontWeight: 600 }}>{it.l}</div>
+                      <div style={{ fontSize:17, fontWeight:700, color:"#1a1a1a", fontFamily:"'Inter', -apple-system, sans-serif" }}>{fmt(it.v)} €</div>
+                      <div style={{ fontSize:10, color:"#4ec9b8", marginTop:4, fontFamily:"'Inter', -apple-system, sans-serif", fontWeight: 500 }}>{it.s}</div>
                     </div>
                   ))}
                 </div>
@@ -4761,24 +4761,24 @@ ${docHTML}
                   <table style={{ width:"100%", borderCollapse:"collapse", fontSize:11 }}>
                     <thead>
                       <tr>
-                        <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"left",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",borderBottom:"1px solid #d5d9dc",color:"#555"}}>Mes</th>
-                        <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",borderBottom:"1px solid #d5d9dc",color:"#555"}}>Fracc.</th>
-                        <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",borderBottom:"1px solid #d5d9dc",color:"#555"}}>Base 40h €</th>
-                        <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",borderBottom:"1px solid #d5d9dc",color:"#555"}}>Vac. €</th>
-                        <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",borderBottom:"1px solid #d5d9dc",color:"#555"}}>Indem. €</th>
-                        <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",borderBottom:"1px solid #d5d9dc",color:"#3a6898"}}>H.Ex h</th>
-                        <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",borderBottom:"1px solid #d5d9dc",color:"#3a6898"}}>H.Ex €</th>
-                        {!es40h && <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",borderBottom:"1px solid #d5d9dc",color:"#b07030"}}>Plus Act. €</th>}
-                        <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",borderBottom:"1px solid #d5d9dc",color:"#1a1a1a"}}>TOTAL MES €</th>
-                        <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",borderBottom:"1px solid #d5d9dc",color:"#8a1e4a"}} title="Jornadas especiales (por encima del salario pactado)">Jorn.Esp €</th>
-                        <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",borderBottom:"1px solid #d5d9dc",color:"#5a8a5a"}}>Compl. €</th>
-                        <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",borderBottom:"1px solid #d5d9dc",color:"#4ec9b8"}}>TOTAL MES + Compl. €</th>
+                        <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"left",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",borderBottom:"1px solid #d5d9dc",color:"#555"}}>Mes</th>
+                        <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",borderBottom:"1px solid #d5d9dc",color:"#555"}}>Fracc.</th>
+                        <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",borderBottom:"1px solid #d5d9dc",color:"#555"}}>Base 40h €</th>
+                        <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",borderBottom:"1px solid #d5d9dc",color:"#555"}}>Vac. €</th>
+                        <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",borderBottom:"1px solid #d5d9dc",color:"#555"}}>Indem. €</th>
+                        <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",borderBottom:"1px solid #d5d9dc",color:"#1a1a1a"}}>H.Ex h</th>
+                        <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",borderBottom:"1px solid #d5d9dc",color:"#1a1a1a"}}>H.Ex €</th>
+                        {!es40h && <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",borderBottom:"1px solid #d5d9dc",color:"#b07030"}}>Plus Act. €</th>}
+                        <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",borderBottom:"1px solid #d5d9dc",color:"#1a1a1a"}}>TOTAL MES €</th>
+                        <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",borderBottom:"1px solid #d5d9dc",color:"#8a1e4a"}} title="Jornadas especiales (por encima del salario pactado)">Jorn.Esp €</th>
+                        <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",borderBottom:"1px solid #d5d9dc",color:"#5a8a5a"}}>Compl. €</th>
+                        <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",borderBottom:"1px solid #d5d9dc",color:"#4ec9b8"}}>TOTAL MES + Compl. €</th>
                       </tr>
                     </thead>
                     <tbody>
                       {desglose45.map((d,i)=>(
                         <tr key={i} style={{ background:i%2===0?"transparent":"rgba(0,0,0,0.015)" }}>
-                          <td style={{padding:"6px 6px",fontSize:10.5,fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",color:"#1a1a1a",borderBottom:"1px solid #eae7e2",lineHeight:1.25,whiteSpace:"nowrap"}}>
+                          <td style={{padding:"6px 6px",fontSize:10.5,fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:"#1a1a1a",borderBottom:"1px solid #eae7e2",lineHeight:1.25,whiteSpace:"nowrap"}}>
                             {(() => {
                               const partes = d.mes.split(" de ");
                               const mesNom = partes[0] || d.mes;
@@ -4792,33 +4792,33 @@ ${docHTML}
                               );
                             })()}
                           </td>
-                          <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",color:"#888",borderBottom:"1px solid #eae7e2"}}>{fmtM(d.fraccion)}</td>
-                          <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",color:"#1a1a1a",borderBottom:"1px solid #eae7e2"}}>{fmt(d.base40)}</td>
-                          <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",color: d.vacMostrar === 0 ? "#ccc" : (d.vacMostrar < 0 ? "#c04040" : "#1a1a1a"),borderBottom:"1px solid #eae7e2"}}>{d.vacMostrar === 0 ? "—" : fmt(d.vacMostrar)}</td>
-                          <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",color:d.indem40===0?"#ccc":"#1a1a1a",borderBottom:"1px solid #eae7e2"}}>{d.indem40===0?"—":fmt(d.indem40)}</td>
-                          <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",color:"#3a6898",borderBottom:"1px solid #eae7e2"}}>{d.hMes}h</td>
-                          <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",color:"#3a6898",borderBottom:"1px solid #eae7e2"}}>{fmt(d.cobroHx)}</td>
-                          {!es40h && <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",color:d.plusAct>0?"#b07030":"#ccc",fontWeight:d.plusAct>0?600:400,borderBottom:"1px solid #eae7e2"}}>{d.plusAct>0?fmt(d.plusAct):"—"}</td>}
-                          <td style={{padding:"6px 6px",fontSize:13,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",color:"#1a1a1a",fontWeight:700,borderBottom:"1px solid #eae7e2"}}>{fmt(es40h ? (d.totalMes - (d.plusAct || 0) - (d.importeJE || 0)) : (d.totalMes - (d.importeJE || 0)))}</td>
-                          <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",color:(d.importeJE || 0) > 0 ? "#8a1e4a" : "#ccc",fontWeight:(d.importeJE || 0) > 0 ? 600 : 400,borderBottom:"1px solid #eae7e2"}} title={(d.totalJEDias || 0) > 0 ? `${d.totalJEDias} JE × (1 HX + ${IMPORTE_JORNADA_ESPECIAL}€)` : ""}>{(d.importeJE || 0) > 0 ? fmt(d.importeJE) : "—"}</td>
-                          <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",color:(complementos45[i]?.total || 0) > 0 ? "#5a8a5a" : "#ccc",fontWeight:(complementos45[i]?.total || 0) > 0 ? 600 : 400,borderBottom:"1px solid #eae7e2"}}>{(complementos45[i]?.total || 0) > 0 ? fmt(complementos45[i].total) : "—"}</td>
-                          <td style={{padding:"6px 6px",fontSize:13,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",color:"#4ec9b8",fontWeight:700,borderBottom:"1px solid #eae7e2"}}>{fmt((es40h ? (d.totalMes - (d.plusAct || 0)) : d.totalMes) + (complementos45[i]?.total || 0))}</td>
+                          <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:"#888",borderBottom:"1px solid #eae7e2"}}>{fmtM(d.fraccion)}</td>
+                          <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:"#1a1a1a",borderBottom:"1px solid #eae7e2"}}>{fmt(d.base40)}</td>
+                          <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color: d.vacMostrar === 0 ? "#ccc" : (d.vacMostrar < 0 ? "#c04040" : "#1a1a1a"),borderBottom:"1px solid #eae7e2"}}>{d.vacMostrar === 0 ? "—" : fmt(d.vacMostrar)}</td>
+                          <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:d.indem40===0?"#ccc":"#1a1a1a",borderBottom:"1px solid #eae7e2"}}>{d.indem40===0?"—":fmt(d.indem40)}</td>
+                          <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:"#1a1a1a",borderBottom:"1px solid #eae7e2"}}>{d.hMes}h</td>
+                          <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:"#1a1a1a",borderBottom:"1px solid #eae7e2"}}>{fmt(d.cobroHx)}</td>
+                          {!es40h && <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:d.plusAct>0?"#b07030":"#ccc",fontWeight:d.plusAct>0?600:400,borderBottom:"1px solid #eae7e2"}}>{d.plusAct>0?fmt(d.plusAct):"—"}</td>}
+                          <td style={{padding:"6px 6px",fontSize:13,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:"#1a1a1a",fontWeight:700,borderBottom:"1px solid #eae7e2"}}>{fmt(es40h ? (d.totalMes - (d.plusAct || 0) - (d.importeJE || 0)) : (d.totalMes - (d.importeJE || 0)))}</td>
+                          <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:(d.importeJE || 0) > 0 ? "#8a1e4a" : "#ccc",fontWeight:(d.importeJE || 0) > 0 ? 600 : 400,borderBottom:"1px solid #eae7e2"}} title={(d.totalJEDias || 0) > 0 ? `${d.totalJEDias} JE × (1 HX + ${IMPORTE_JORNADA_ESPECIAL}€)` : ""}>{(d.importeJE || 0) > 0 ? fmt(d.importeJE) : "—"}</td>
+                          <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:(complementos45[i]?.total || 0) > 0 ? "#5a8a5a" : "#ccc",fontWeight:(complementos45[i]?.total || 0) > 0 ? 600 : 400,borderBottom:"1px solid #eae7e2"}}>{(complementos45[i]?.total || 0) > 0 ? fmt(complementos45[i].total) : "—"}</td>
+                          <td style={{padding:"6px 6px",fontSize:13,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:"#1a1a1a",fontWeight:800,borderBottom:"1px solid #eae7e2"}}>{fmt((es40h ? (d.totalMes - (d.plusAct || 0)) : d.totalMes) + (complementos45[i]?.total || 0))}</td>
                         </tr>
                       ))}
                     </tbody>
                     <tfoot>
                       <tr style={{ background:"rgba(184,134,74,0.06)" }}>
-                        <td colSpan={2} style={{padding:"8px",fontSize:10,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",color:"#4ec9b8",borderTop:"1px solid #d8d4ce"}}>TOTAL</td>
-                        <td style={{padding:"8px",fontSize:11,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",color:"#666",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{fmt(totBase)}</td>
-                        <td style={{padding:"8px",fontSize:11,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",color: totVacMostrar < 0 ? "#c04040" : "#666",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{fmt(totVacMostrar)}</td>
-                        <td style={{padding:"8px",fontSize:11,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",color:"#666",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{fmt(totIndem)}</td>
-                        <td style={{padding:"8px",fontSize:11,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",color:"#3a6898",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{horasPorMes.reduce((s,v,i)=>{if (v === undefined || v === null || v === "") return s + Math.round((p.desglose[i]?.semanasLaborables||0)*5);return s + (v || 0);},0)}h</td>
-                        <td style={{padding:"8px",fontSize:11,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",color:"#3a6898",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{fmt(totHx)}</td>
-                        {!es40h && <td style={{padding:"8px",fontSize:11,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",color:totPlus>0?"#b07030":"#ccc",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{totPlus>0?fmt(totPlus):"—"}</td>}
-                        <td style={{padding:"8px",fontSize:13,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",color:"#1a1a1a",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{fmt(es40h ? (totFinal - (totPlus || 0) - totJEImporte) : (totFinal - totJEImporte))}</td>
-                        <td style={{padding:"8px",fontSize:11,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",color:totJEImporte > 0 ? "#8a1e4a" : "#ccc",fontWeight:700,borderTop:"1px solid #d8d4ce"}} title={totJEDias > 0 ? `${totJEDias} JE totales` : ""}>{totJEImporte > 0 ? fmt(totJEImporte) : "—"}</td>
-                        <td style={{padding:"8px",fontSize:11,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",color:totalCompl > 0 ? "#5a8a5a" : "#ccc",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{totalCompl > 0 ? fmt(totalCompl) : "—"}</td>
-                        <td style={{padding:"8px",fontSize:13,textAlign:"right",fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",color:"#4ec9b8",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{fmt((es40h ? (totFinal - (totPlus || 0)) : totFinal) + totalCompl)}</td>
+                        <td colSpan={2} style={{padding:"8px",fontSize:10,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:"#4ec9b8",borderTop:"1px solid #d8d4ce"}}>TOTAL</td>
+                        <td style={{padding:"8px",fontSize:11,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:"#666",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{fmt(totBase)}</td>
+                        <td style={{padding:"8px",fontSize:11,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color: totVacMostrar < 0 ? "#c04040" : "#666",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{fmt(totVacMostrar)}</td>
+                        <td style={{padding:"8px",fontSize:11,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:"#666",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{fmt(totIndem)}</td>
+                        <td style={{padding:"8px",fontSize:11,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:"#1a1a1a",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{horasPorMes.reduce((s,v,i)=>{if (v === undefined || v === null || v === "") return s + Math.round((p.desglose[i]?.semanasLaborables||0)*5);return s + (v || 0);},0)}h</td>
+                        <td style={{padding:"8px",fontSize:11,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:"#1a1a1a",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{fmt(totHx)}</td>
+                        {!es40h && <td style={{padding:"8px",fontSize:11,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:totPlus>0?"#b07030":"#ccc",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{totPlus>0?fmt(totPlus):"—"}</td>}
+                        <td style={{padding:"8px",fontSize:13,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:"#1a1a1a",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{fmt(es40h ? (totFinal - (totPlus || 0) - totJEImporte) : (totFinal - totJEImporte))}</td>
+                        <td style={{padding:"8px",fontSize:11,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:totJEImporte > 0 ? "#8a1e4a" : "#ccc",fontWeight:700,borderTop:"1px solid #d8d4ce"}} title={totJEDias > 0 ? `${totJEDias} JE totales` : ""}>{totJEImporte > 0 ? fmt(totJEImporte) : "—"}</td>
+                        <td style={{padding:"8px",fontSize:11,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:totalCompl > 0 ? "#5a8a5a" : "#ccc",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{totalCompl > 0 ? fmt(totalCompl) : "—"}</td>
+                        <td style={{padding:"8px",fontSize:13,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:"#1a1a1a",fontWeight:800,borderTop:"1px solid #d8d4ce"}}>{fmt((es40h ? (totFinal - (totPlus || 0)) : totFinal) + totalCompl)}</td>
                       </tr>
                     </tfoot>
                   </table>
@@ -4837,7 +4837,7 @@ ${docHTML}
                             <th key={hi} style={{ padding: "7px 10px", fontSize: 9, letterSpacing: "0.12em",
                               textTransform: "uppercase", color: "#555", fontWeight: 700,
                               textAlign: hi === 0 ? "left" : "right",
-                              fontFamily: "'Courier Prime', 'Courier New', monospace", borderBottom: "1px solid #d5d9dc" }}>
+                              fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", borderBottom: "1px solid #d5d9dc" }}>
                               {h}
                             </th>
                           ))}
@@ -4846,7 +4846,7 @@ ${docHTML}
                       <tbody>
                         {complementos45.map((c, i) => (
                           <tr key={i} style={{ background: i % 2 === 0 ? "transparent" : "rgba(0,0,0,0.015)" }}>
-                            <td style={{ padding: "8px 10px", fontSize: 11, fontFamily: "'Courier Prime', 'Courier New', monospace", color: "#1a1a1a", textTransform: "capitalize", borderBottom: "1px solid #eae7e2" }}>
+                            <td style={{ padding: "8px 10px", fontSize: 11, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", color: "#1a1a1a", textTransform: "capitalize", borderBottom: "1px solid #eae7e2" }}>
                               {p.desglose[i].mes}
                               {!p.desglose[i].esCompleto && <span style={{ fontSize: 9, color: "#888", marginLeft: 6 }}>{p.desglose[i].desde}–{p.desglose[i].hasta}</span>}
                             </td>
@@ -4859,41 +4859,41 @@ ${docHTML}
                               plusComida.importeDia   ? fmt(c.comida)      : "—",
                             ].map((v, vi) => (
                               <td key={vi} style={{ padding: "8px 10px", fontSize: 11, textAlign: "right",
-                                fontFamily: "'Courier Prime', 'Courier New', monospace", color: v === "—" ? "#ccc" : "#1a1a1a",
+                                fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", color: v === "—" ? "#ccc" : "#1a1a1a",
                                 borderBottom: "1px solid #eae7e2" }}>{v}</td>
                             ))}
                             <td style={{ padding: "8px 10px", fontSize: 12, textAlign: "right",
-                              fontFamily: "'Courier Prime', 'Courier New', monospace", color: "#4ec9b8", fontWeight: 700,
+                              fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", color: "#4ec9b8", fontWeight: 700,
                               borderBottom: "1px solid #eae7e2" }}>{fmt(c.total)}</td>
                           </tr>
                         ))}
                       </tbody>
                       <tfoot>
                         <tr style={{ background:"rgba(184,134,74,0.06)" }}>
-                          <td style={{ padding:"8px 10px", fontSize:10, letterSpacing:"0.1em", textTransform:"uppercase", fontWeight:700, fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", color:"#4ec9b8", borderTop:"1px solid #d8d4ce" }}>TOTAL</td>
-                          <td style={{ padding:"8px 10px", fontSize:11, textAlign:"right", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", color:"#666", fontWeight:700, borderTop:"1px solid #d8d4ce" }}>{plusHerramienta.importe ? fmt(complementos45.reduce((s,c)=>s+c.herramienta,0)) : "—"}</td>
-                          <td style={{ padding:"8px 10px", fontSize:11, textAlign:"right", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", color:"#666", fontWeight:700, borderTop:"1px solid #d8d4ce" }}>{plusCoche.importe ? fmt(complementos45.reduce((s,c)=>s+c.coche,0)) : "—"}</td>
-                          <td style={{ padding:"8px 10px", fontSize:11, textAlign:"right", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", color:"#666", fontWeight:700, borderTop:"1px solid #d8d4ce" }}>{plusVivienda.importe ? fmt(complementos45.reduce((s,c)=>s+c.vivienda,0)) : "—"}</td>
-                          <td style={{ padding:"8px 10px", fontSize:11, textAlign:"right", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", color:"#666", fontWeight:700, borderTop:"1px solid #d8d4ce" }}>{plusSeguroVida.importe ? fmt(complementos45.reduce((s,c)=>s+c.seguroVida,0)) : "—"}</td>
-                          <td style={{ padding:"8px 10px", fontSize:11, textAlign:"right", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", color:"#666", fontWeight:700, borderTop:"1px solid #d8d4ce" }}>{plusComida.importeDia ? `${complementos45.reduce((s,c)=>s+c.diasComida,0)}d` : "—"}</td>
-                          <td style={{ padding:"8px 10px", fontSize:11, textAlign:"right", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", color:"#666", fontWeight:700, borderTop:"1px solid #d8d4ce" }}>{plusComida.importeDia ? fmt(complementos45.reduce((s,c)=>s+c.comida,0)) : "—"}</td>
-                          <td style={{ padding:"8px 10px", fontSize:13, textAlign:"right", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", color:"#4ec9b8", fontWeight:700, borderTop:"1px solid #d8d4ce" }}>{fmt(totalCompl)}</td>
+                          <td style={{ padding:"8px 10px", fontSize:10, letterSpacing:"0.1em", textTransform:"uppercase", fontWeight:700, fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", color:"#4ec9b8", borderTop:"1px solid #d8d4ce" }}>TOTAL</td>
+                          <td style={{ padding:"8px 10px", fontSize:11, textAlign:"right", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", color:"#666", fontWeight:700, borderTop:"1px solid #d8d4ce" }}>{plusHerramienta.importe ? fmt(complementos45.reduce((s,c)=>s+c.herramienta,0)) : "—"}</td>
+                          <td style={{ padding:"8px 10px", fontSize:11, textAlign:"right", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", color:"#666", fontWeight:700, borderTop:"1px solid #d8d4ce" }}>{plusCoche.importe ? fmt(complementos45.reduce((s,c)=>s+c.coche,0)) : "—"}</td>
+                          <td style={{ padding:"8px 10px", fontSize:11, textAlign:"right", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", color:"#666", fontWeight:700, borderTop:"1px solid #d8d4ce" }}>{plusVivienda.importe ? fmt(complementos45.reduce((s,c)=>s+c.vivienda,0)) : "—"}</td>
+                          <td style={{ padding:"8px 10px", fontSize:11, textAlign:"right", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", color:"#666", fontWeight:700, borderTop:"1px solid #d8d4ce" }}>{plusSeguroVida.importe ? fmt(complementos45.reduce((s,c)=>s+c.seguroVida,0)) : "—"}</td>
+                          <td style={{ padding:"8px 10px", fontSize:11, textAlign:"right", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", color:"#666", fontWeight:700, borderTop:"1px solid #d8d4ce" }}>{plusComida.importeDia ? `${complementos45.reduce((s,c)=>s+c.diasComida,0)}d` : "—"}</td>
+                          <td style={{ padding:"8px 10px", fontSize:11, textAlign:"right", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", color:"#666", fontWeight:700, borderTop:"1px solid #d8d4ce" }}>{plusComida.importeDia ? fmt(complementos45.reduce((s,c)=>s+c.comida,0)) : "—"}</td>
+                          <td style={{ padding:"8px 10px", fontSize:13, textAlign:"right", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", color:"#4ec9b8", fontWeight:700, borderTop:"1px solid #d8d4ce" }}>{fmt(totalCompl)}</td>
                         </tr>
                       </tfoot>
                     </table>
                   </div>
 
-                  <div style={{ marginTop: 16, padding: "14px 16px", background: "rgba(184,134,74,0.06)",
-                    borderRadius: 6, border: "1px solid #d5d9dc", display: "flex",
+                  <div style={{ marginTop: 16, padding: "16px 20px", background: "#f2f5f7",
+                    borderRadius: 8, border: "1px solid #d5d9dc", display: "flex",
                     justifyContent: "space-between", alignItems: "center" }}>
                     <div>
-                      <div style={{ fontSize: 10, color: "#666", letterSpacing: "0.12em", textTransform: "uppercase",
-                        fontFamily: "'Courier Prime', 'Courier New', monospace", marginBottom: 4 }}>Total a percibir + complementos</div>
-                      <div style={{ fontSize: 10, color: "#999", fontFamily: "'Courier Prime', 'Courier New', monospace" }}>
+                      <div style={{ fontSize: 12, color: "#666", letterSpacing: "0.1em", textTransform: "uppercase",
+                        fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", marginBottom: 4, fontWeight: 600 }}>Total a percibir + complementos</div>
+                      <div style={{ fontSize: 11, color: "#888", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>
                         {fmtE(totFinal)} salario {totalFestDias45 > 0 && `+ ${fmtE(totalFestImport45)} festivos `}+ {fmtE(totalCompl)} complementos
                       </div>
                     </div>
-                    <div style={{ fontSize: 22, fontWeight: 700, color: "#4ec9b8", fontFamily: "'Courier Prime', 'Courier New', monospace" }}>
+                    <div style={{ fontSize: 26, fontWeight: 800, color: "#1a1a1a", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", letterSpacing: "-0.01em" }}>
                       {fmtE(totFinal + totalFestImport45 + totalCompl)}
                     </div>
                   </div>
@@ -4920,20 +4920,20 @@ ${docHTML}
                       <div style={{ fontSize:9, color:"#6a3a9a", letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:6 }}>Extras del período</div>
                       {totalFestDias45 > 0 && (
                         <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
-                          <span style={{ fontSize:11, color:"#6a3a9a", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>{totalFestDias45} festivo{totalFestDias45>1?"s":""} (incluido en total)</span>
-                          <span style={{ fontSize:12, fontWeight:700, color:"#6a3a9a", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>+ {fmtE(totalFestImport45)}</span>
+                          <span style={{ fontSize:11, color:"#6a3a9a", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>{totalFestDias45} festivo{totalFestDias45>1?"s":""} (incluido en total)</span>
+                          <span style={{ fontSize:12, fontWeight:700, color:"#6a3a9a", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>+ {fmtE(totalFestImport45)}</span>
                         </div>
                       )}
                       {totJEDias > 0 && (
                         <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
-                          <span style={{ fontSize:11, color:"#8a1e4a", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>{totJEDias} jornada{totJEDias>1?"s":""} especial{totJEDias>1?"es":""} (incluido en total)</span>
-                          <span style={{ fontSize:12, fontWeight:700, color:"#8a1e4a", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>+ {fmtE(totJEImporte)}</span>
+                          <span style={{ fontSize:11, color:"#8a1e4a", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>{totJEDias} jornada{totJEDias>1?"s":""} especial{totJEDias>1?"es":""} (incluido en total)</span>
+                          <span style={{ fontSize:12, fontWeight:700, color:"#8a1e4a", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>+ {fmtE(totJEImporte)}</span>
                         </div>
                       )}
                       {totalCompl > 0 && (
                         <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
-                          <span style={{ fontSize:11, color:"#5a8a5a", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>Complementos</span>
-                          <span style={{ fontSize:12, fontWeight:700, color:"#5a8a5a", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>+ {fmtE(totalCompl)}</span>
+                          <span style={{ fontSize:11, color:"#5a8a5a", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>Complementos</span>
+                          <span style={{ fontSize:12, fontWeight:700, color:"#5a8a5a", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>+ {fmtE(totalCompl)}</span>
                         </div>
                       )}
                     </div>
@@ -4981,25 +4981,25 @@ ${docHTML}
                   return (
                     <>
                       <Div />
-                      <details open style={{ padding:"12px 14px", background:"#f2f5f7", borderRadius:6, border:"1px solid #d5d9dc" }}>
-                        <summary style={{ cursor:"pointer", fontSize:10, color:"#4ec9b8", letterSpacing:"0.14em", textTransform:"uppercase", fontWeight:700, marginBottom:2, outline:"none" }}>
-                          ▸ Coste Empresa (vista rápida) <span style={{ fontSize:8, color:"#4ec9b8", marginLeft:6, letterSpacing:"0.08em" }}>solo admin · solo SS</span>
+                      <details open style={{ padding:"14px 18px", background:"#e3f2fd", borderRadius:8, border:"1px solid #90caf9" }}>
+                        <summary style={{ cursor:"pointer", fontSize:12, color:"#1a1a1a", letterSpacing:"0.12em", textTransform:"uppercase", fontWeight:800, marginBottom:2, outline:"none", fontFamily:"'Inter', -apple-system, sans-serif" }}>
+                          ▸ Coste Empresa (vista rápida) <span style={{ fontSize:10, color:"#1565c0", marginLeft:8, letterSpacing:"0.05em", fontWeight: 600 }}>solo admin · solo SS</span>
                         </summary>
-                        <div style={{ marginTop:10, display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:10 }}>
-                          <div style={{ padding:"10px 12px", background:"#f2f5f7", borderRadius:5, border:"1px solid #d5d9dc" }}>
-                            <div style={{ fontSize:9, color:"#4ec9b8", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:4 }}>Coste SS Empresa</div>
-                            <div style={{ fontSize:16, fontWeight:700, color:"#4ec9b8", fontFamily:"'Courier Prime', 'Courier New', monospace" }}>{fmtE(costeSSTotal)}</div>
+                        <div style={{ marginTop:12, display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:10 }}>
+                          <div style={{ padding:"14px 16px", background:"#fff", borderRadius:8, border:"1px solid #bbdefb" }}>
+                            <div style={{ fontSize:11, color:"#1a1a1a", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:6, fontFamily:"'Inter', -apple-system, sans-serif", fontWeight: 700 }}>Coste SS Empresa</div>
+                            <div style={{ fontSize:20, fontWeight:800, color:"#1a1a1a", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", letterSpacing: "-0.01em" }}>{fmtE(costeSSTotal)}</div>
                           </div>
-                          <div style={{ padding:"10px 12px", background:"#f2f5f7", borderRadius:5, border:"1px solid #d5d9dc" }}>
-                            <div style={{ fontSize:9, color:"#4ec9b8", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:4 }}>Coste Total</div>
-                            <div style={{ fontSize:16, fontWeight:700, color:"#4ec9b8", fontFamily:"'Courier Prime', 'Courier New', monospace" }}>{fmtE(costeTotal)}</div>
+                          <div style={{ padding:"14px 16px", background:"#fff", borderRadius:8, border:"1px solid #bbdefb" }}>
+                            <div style={{ fontSize:11, color:"#1a1a1a", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:6, fontFamily:"'Inter', -apple-system, sans-serif", fontWeight: 700 }}>Coste Total</div>
+                            <div style={{ fontSize:20, fontWeight:800, color:"#1a1a1a", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", letterSpacing: "-0.01em" }}>{fmtE(costeTotal)}</div>
                           </div>
-                          <div style={{ padding:"10px 12px", background:"#f2f5f7", borderRadius:5, border:"1px solid #d5d9dc" }}>
-                            <div style={{ fontSize:9, color:"#4ec9b8", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:4 }}>% s/Salario</div>
-                            <div style={{ fontSize:16, fontWeight:700, color:"#4ec9b8", fontFamily:"'Courier Prime', 'Courier New', monospace" }}>{pctSobre.toFixed(2)} %</div>
+                          <div style={{ padding:"14px 16px", background:"#fff", borderRadius:8, border:"1px solid #bbdefb" }}>
+                            <div style={{ fontSize:11, color:"#1a1a1a", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:6, fontFamily:"'Inter', -apple-system, sans-serif", fontWeight: 700 }}>% s/Salario</div>
+                            <div style={{ fontSize:20, fontWeight:800, color:"#1a1a1a", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", letterSpacing: "-0.01em" }}>{pctSobre.toFixed(2)} %</div>
                           </div>
                         </div>
-                        <div style={{ marginTop:8, fontSize:8.5, color:"#4ec9b8", fontStyle:"italic", letterSpacing:"0.02em" }}>
+                        <div style={{ marginTop:10, fontSize:10, color:"#1565c0", letterSpacing:"0.02em", fontFamily:"'Inter', sans-serif", fontWeight: 500 }}>
                           Incluye SS Principal, SS Vac, SS H.Extra, IMEI y Solidaridad. No incluye gestoría ni IRPF vivienda. Para desglose completo, ir a la pestaña Coste Empresa.
                         </div>
                       </details>
@@ -5045,9 +5045,9 @@ ${docHTML}
                         <div style={{ fontSize:9, color:"#6a3a9a", letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:8 }}>Días del calendario en el período</div>
                         <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(110px, 1fr))", gap:6 }}>
                           {cats.map(c => (
-                            <div key={c.label} style={{ background:c.bg, border:`1px solid ${c.border}`, borderRadius:4, padding:"6px 8px", textAlign:"center" }}>
-                              <div style={{ fontSize:18, fontWeight:700, color:c.color, fontFamily:"'Courier Prime', 'Courier New', monospace", lineHeight:1 }}>{c.n}</div>
-                              <div style={{ fontSize:8, color:c.color, marginTop:3, letterSpacing:"0.06em", textTransform:"uppercase", fontFamily:"'Courier Prime', 'Courier New', monospace", opacity: c.n === 0 ? 0.5 : 1 }}>{c.label}</div>
+                            <div key={c.label} style={{ background:c.bg, border:`1px solid ${c.border}`, borderRadius:6, padding:"8px 10px", textAlign:"center" }}>
+                              <div style={{ fontSize:22, fontWeight:800, color:c.color, fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", lineHeight:1, letterSpacing: "-0.02em" }}>{c.n}</div>
+                              <div style={{ fontSize:10, color:c.color, marginTop:5, letterSpacing:"0.08em", textTransform:"uppercase", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", opacity: c.n === 0 ? 0.5 : 1, fontWeight: 700 }}>{c.label}</div>
                             </div>
                           ))}
                         </div>
@@ -5056,7 +5056,7 @@ ${docHTML}
                   );
                 })()}
                 {/* Aviso orientativo */}
-                <div style={{ marginTop:16, paddingTop:12, borderTop:"1px solid #d5d9dc", fontSize:10, color:"#666", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", lineHeight:1.5, fontStyle:"italic", textAlign:"center" }}>
+                <div style={{ marginTop:16, paddingTop:12, borderTop:"1px solid #d5d9dc", fontSize:10, color:"#666", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", lineHeight:1.5, fontStyle:"italic", textAlign:"center" }}>
                   Cálculo orientativo del salario mensual bruto, que puede diferir ligeramente de la nómina real generada en cada periodo.
                 </div>
               </div>
@@ -5071,12 +5071,12 @@ ${docHTML}
       </div>
 
       {/* Botones de exportación al pie */}
-      <div className="no-print" style={{ maxWidth: 1700, margin: "20px auto 0", display: "flex", justifyContent: "center", gap: 10 }}>
+      <div className="no-print" style={{ maxWidth: 1800, margin: "20px auto 0", display: "flex", justifyContent: "center", gap: 10 }}>
         <button
           onClick={exportarCSV45}
           disabled={!p || desglose45.length === 0}
           style={{
-            padding: "10px 24px", fontSize: 11, fontFamily: "'Courier Prime', 'Courier New', monospace",
+            padding: "10px 24px", fontSize: 11, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
             letterSpacing: "0.15em", textTransform: "uppercase", borderRadius: 4,
             cursor: (p && desglose45.length) ? "pointer" : "not-allowed", fontWeight: 700,
             border: "1px solid #4ec9b8",
@@ -5091,7 +5091,7 @@ ${docHTML}
           onClick={exportarPDF45}
           disabled={!p || desglose45.length === 0}
           style={{
-            padding: "10px 24px", fontSize: 11, fontFamily: "'Courier Prime', 'Courier New', monospace",
+            padding: "10px 24px", fontSize: 11, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
             letterSpacing: "0.15em", textTransform: "uppercase", borderRadius: 4,
             cursor: (p && desglose45.length) ? "pointer" : "not-allowed", fontWeight: 700,
             border: "1px solid #4ec9b8",
@@ -5107,7 +5107,7 @@ ${docHTML}
           <button
             onClick={() => setMostrarExportarListado(true)}
             style={{
-              padding: "10px 24px", fontSize: 11, fontFamily: "'Courier Prime', 'Courier New', monospace",
+              padding: "10px 24px", fontSize: 11, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
               letterSpacing: "0.15em", textTransform: "uppercase", borderRadius: 4,
               cursor: "pointer", fontWeight: 700,
               border: "1px solid #5a8a5a",
@@ -5154,10 +5154,10 @@ ${docHTML}
       {/* v98: Modal Guardar perfil */}
       {mostrarModalGuardar && accionesPerfiles && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 100, display: "flex", justifyContent: "center", alignItems: "center", padding: 20 }} onClick={() => setMostrarModalGuardar(false)}>
-          <div style={{ background: "#e8ecef", borderRadius: 8, padding: 24, maxWidth: 500, width: "100%", fontFamily: "'Courier Prime', 'Courier New', monospace" }} onClick={e => e.stopPropagation()}>
+          <div style={{ background: "#e8ecef", borderRadius: 8, padding: 24, maxWidth: 500, width: "100%", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }} onClick={e => e.stopPropagation()}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, paddingBottom: 12, borderBottom: "2px solid #5a8a5a" }}>
               <h2 style={{ margin: 0, fontSize: 14, letterSpacing: "0.15em", textTransform: "uppercase", color: "#1a1a1a", fontWeight: 700 }}>💾 Guardar perfil</h2>
-              <button onClick={() => setMostrarModalGuardar(false)} style={{ background: "#f2f5f7", border: "1px solid #ccc", padding: "6px 12px", borderRadius: 4, cursor: "pointer", fontSize: 11, color: "#666", fontFamily: "'Courier Prime', 'Courier New', monospace", fontWeight: 700 }}>✕ Cerrar</button>
+              <button onClick={() => setMostrarModalGuardar(false)} style={{ background: "#f2f5f7", border: "1px solid #ccc", padding: "6px 12px", borderRadius: 4, cursor: "pointer", fontSize: 11, color: "#666", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontWeight: 700 }}>✕ Cerrar</button>
             </div>
             <label style={{ display: "block", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "#666", marginBottom: 6, fontWeight: 700 }}>Nombre del perfil</label>
             <input
@@ -5171,11 +5171,11 @@ ${docHTML}
                 }
               }}
               autoFocus
-              style={{ width: "100%", padding: "10px 12px", fontSize: 13, fontFamily: "'Courier Prime', 'Courier New', monospace", border: "1px solid #d5d9dc", borderRadius: 5, color: "#1a1a1a", background: "#f2f5f7", outline: "none", boxSizing: "border-box" }}
+              style={{ width: "100%", padding: "10px 12px", fontSize: 13, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", border: "1px solid #d5d9dc", borderRadius: 5, color: "#1a1a1a", background: "#f2f5f7", outline: "none", boxSizing: "border-box" }}
             />
             <div style={{ fontSize: 9, color: "#999", marginTop: 4, fontStyle: "italic" }}>Puedes editar el nombre sugerido. Escribir NO borra el texto (edítalo como quieras).</div>
             <div style={{ marginTop: 16, display: "flex", justifyContent: "flex-end", gap: 8 }}>
-              <button onClick={() => setMostrarModalGuardar(false)} style={{ background: "transparent", border: "1px solid #ccc", padding: "10px 18px", borderRadius: 5, cursor: "pointer", fontSize: 11, color: "#666", fontFamily: "'Courier Prime', 'Courier New', monospace", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>Cancelar</button>
+              <button onClick={() => setMostrarModalGuardar(false)} style={{ background: "transparent", border: "1px solid #ccc", padding: "10px 18px", borderRadius: 5, cursor: "pointer", fontSize: 11, color: "#666", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>Cancelar</button>
               <button
                 onClick={async () => {
                   if (!nombreGuardarModal.trim()) { alert("Escribe un nombre"); return; }
@@ -5183,7 +5183,7 @@ ${docHTML}
                   setMostrarModalGuardar(false);
                 }}
                 disabled={!nombreGuardarModal.trim()}
-                style={{ background: nombreGuardarModal.trim() ? "#5a8a5a" : "#ccc", color: "#f2f5f7", border: "none", padding: "10px 18px", borderRadius: 5, cursor: nombreGuardarModal.trim() ? "pointer" : "not-allowed", fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "'Courier Prime', 'Courier New', monospace" }}
+                style={{ background: nombreGuardarModal.trim() ? "#5a8a5a" : "#ccc", color: "#f2f5f7", border: "none", padding: "10px 18px", borderRadius: 5, cursor: nombreGuardarModal.trim() ? "pointer" : "not-allowed", fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}
               >💾 Guardar</button>
             </div>
           </div>
@@ -5193,20 +5193,20 @@ ${docHTML}
       {/* Banner de error/confirmación de exportación */}
       {exportError && (
         <div className="no-print" style={{
-          maxWidth: 1700, margin: "12px auto 0", padding: "10px 16px",
+          maxWidth: 1800, margin: "12px auto 0", padding: "10px 16px",
           background: exportError.tipo === "ok" ? "#e8f5e8" : "#fdf0f0",
           border: `1px solid ${exportError.tipo === "ok" ? "#c0e0c0" : "#e8c0c0"}`,
           borderRadius: 5, color: exportError.tipo === "ok" ? "#2a7a50" : "#b02020",
-          fontFamily: "'Courier Prime', 'Courier New', monospace", fontSize: 11, textAlign: "center",
+          fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontSize: 11, textAlign: "center",
         }}>
           {typeof exportError === "string" ? exportError : exportError.mensaje}
         </div>
       )}
 
-      <div style={{ maxWidth:1700, margin:"12px auto 0", textAlign:"center", fontSize:8, color:"#aaa", letterSpacing:"0.1em", textTransform:"uppercase" }}>
+      <div style={{ maxWidth:1800, margin:"12px auto 0", textAlign:"center", fontSize:8, color:"#aaa", letterSpacing:"0.1em", textTransform:"uppercase" }}>
         P40 = P45 ÷ (1 + 0,89286/30×7/40×1,5 × h) · Base = P40 × 0,89286 · Vac = Base ÷ 11,478452 · Plus Actividad = máx(0, P45×fracc − cobro)
       </div>
-      <div style={{ maxWidth: 1700, margin: "8px auto 0", textAlign: "center", fontSize: 7, color: "#bbb", letterSpacing: "0.05em" }}>
+      <div style={{ maxWidth: 1800, margin: "8px auto 0", textAlign: "center", fontSize: 7, color: "#bbb", letterSpacing: "0.05em" }}>
         {DISCLAIMER_PDF}
       </div>
 
@@ -7378,7 +7378,7 @@ function CosteEmpresa() {
 
   // Devuelve etiqueta "45H" o "40H" según tabId
   const tipoLabel = (tabId) => {
-    if (tabId === "tab40") return { txt: "40H", color: "#3a6898" };
+    if (tabId === "tab40") return { txt: "40H", color: "#1a1a1a" };
     return { txt: "45H", color: "#4ec9b8" }; // iruna45 o desconocido = 45H
   };
 
@@ -7710,7 +7710,7 @@ function CosteEmpresa() {
   td { padding: 3px 2px; border-bottom: 1px solid #eae7e2; word-wrap: break-word; }
   td.m { font-weight: 600; text-transform: capitalize; font-size: 7px; }
   td.n { text-align: right; }
-  td.b { color: #3a6898; }
+  td.b { color: #1a1a1a; }
   td.o { color: #b07030; }
   td.g { color: #5a8a5a; }
   td.p { color: #6a3a9a; }
@@ -8172,7 +8172,7 @@ function CosteEmpresa() {
             </button>
             <button
               onClick={guardarConfigCosteEmpresa}
-              style={{ background: "transparent", color: "#3a6898", border: "1px solid #3a6898", padding: "6px 12px", borderRadius: 4, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}
+              style={{ background: "transparent", color: "#1a1a1a", border: "1px solid #1a1a1a", padding: "6px 12px", borderRadius: 4, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}
               title="Guardar la configuración actual (IRPF, firma, baja) en el perfil"
             >
               💾 Guardar Config
@@ -8395,7 +8395,7 @@ function CosteEmpresa() {
                         <td style={{ padding: "7px 6px", textAlign: "right" }}>{fmt(mes.base40 || 0)}</td>
                         <td style={{ padding: "7px 6px", textAlign: "right", color: vacMostrar === 0 ? "#bbb" : (vacMostrar < 0 ? "#c04040" : "#1a1a1a") }} title={(mes.vdShow || 0) > 0 ? `Prorrateada ${fmt(mes.vac40 || 0)} − disfrutadas ${fmt(mes.vdShow || 0)}` : ""}>{vacMostrar === 0 ? "—" : fmt(vacMostrar)}</td>
                         <td style={{ padding: "7px 6px", textAlign: "right", color: (mes.indem40 || 0) === 0 ? "#bbb" : "#1a1a1a" }}>{(mes.indem40 || 0) === 0 ? "—" : fmt(mes.indem40)}</td>
-                        <td style={{ padding: "7px 6px", textAlign: "right", color: (mes.cobroHx || 0) === 0 ? "#bbb" : "#3a6898" }}>{(mes.cobroHx || 0) === 0 ? "—" : fmt(mes.cobroHx)}</td>
+                        <td style={{ padding: "7px 6px", textAlign: "right", color: (mes.cobroHx || 0) === 0 ? "#bbb" : "#1a1a1a" }}>{(mes.cobroHx || 0) === 0 ? "—" : fmt(mes.cobroHx)}</td>
                         <td style={{ padding: "7px 6px", textAlign: "right", color: plusAct === 0 ? "#bbb" : "#b07030" }}>{plusAct === 0 ? "—" : fmt(plusAct)}</td>
                         <td style={{ padding: "7px 6px", textAlign: "right", color: festImp === 0 ? "#bbb" : "#6a3a9a" }}>{festImp === 0 ? "—" : fmt(festImp)}</td>
                         <td style={{ padding: "7px 6px", textAlign: "right", color: jeImp === 0 ? "#bbb" : "#8a1e4a" }} title={jeImp > 0 ? `${mes.totalJEDias || 0} JE` : ""}>{jeImp === 0 ? "—" : fmt(jeImp)}</td>
@@ -8497,7 +8497,7 @@ function CosteEmpresa() {
                         <td style={{ padding: "7px 5px", fontWeight: 600, textTransform: "capitalize" }}>{f.mes}</td>
                         {cellNum(f.ssPrincipal)}
                         {cellNum(f.ssVacaciones)}
-                        {cellNum(f.ssHorasExtra, "#3a6898")}
+                        {cellNum(f.ssHorasExtra, "#1a1a1a")}
                         {cellNum(f.imei)}
                         {cellNum(f.solidaridad, "#6a3a9a")}
                         {cellNum(f.irpfVivienda, "#b07030")}
@@ -8511,7 +8511,7 @@ function CosteEmpresa() {
                       <td style={{ padding: "9px 5px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", fontSize: 9, color: "#6a2020" }}>TOTAL</td>
                       {cellNum(T.ssPrincipal)}
                       {cellNum(T.ssVacaciones)}
-                      {cellNum(T.ssHorasExtra, "#3a6898")}
+                      {cellNum(T.ssHorasExtra, "#1a1a1a")}
                       {cellNum(T.imei)}
                       {cellNum(T.solidaridad, "#6a3a9a")}
                       {cellNum(T.irpfVivienda, "#b07030")}
@@ -9209,7 +9209,7 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
         </div>
 
         {mensaje && (
-          <div style={{ padding: "10px 14px", marginBottom: 14, borderRadius: 4, background: mensaje.tipo === "ok" ? "#e6f4e6" : (mensaje.tipo === "info" ? "#e8eef7" : "#fce8e8"), color: mensaje.tipo === "ok" ? "#2a6e2a" : (mensaje.tipo === "info" ? "#2a5a8a" : "#c00"), fontSize: 11, border: `1px solid ${mensaje.tipo === "ok" ? "#a0d0a0" : (mensaje.tipo === "info" ? "#a0b8d8" : "#e0a0a0")}` }}>{mensaje.texto}</div>
+          <div style={{ padding: "10px 14px", marginBottom: 14, borderRadius: 4, background: mensaje.tipo === "ok" ? "#e6f4e6" : (mensaje.tipo === "info" ? "#e8eef7" : "#fce8e8"), color: mensaje.tipo === "ok" ? "#2a6e2a" : (mensaje.tipo === "info" ? "#1a1a1a" : "#c00"), fontSize: 11, border: `1px solid ${mensaje.tipo === "ok" ? "#a0d0a0" : (mensaje.tipo === "info" ? "#a0b8d8" : "#e0a0a0")}` }}>{mensaje.texto}</div>
         )}
         {error && (
           <div style={{ padding: "10px 14px", marginBottom: 14, borderRadius: 4, background: "#fce8e8", color: "#c00", fontSize: 11, border: "1px solid #e0a0a0" }}>⚠ {error}</div>
@@ -10628,7 +10628,7 @@ function PanelFestivos({ usuarioActual, onCerrar, onCambios }) {
   };
   const tipoColores = {
     nacional: "#8a3a3a",
-    autonomico: "#3a6898",
+    autonomico: "#1a1a1a",
     territorial: "#7a5a2a",
     local: "#5a7a3a",
   };
