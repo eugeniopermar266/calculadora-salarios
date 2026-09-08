@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v134";
+const APP_VERSION = "v136";
 
 // v97: Departamentos de un rodaje audiovisual (obligatorio en cada perfil)
 const DEPARTAMENTOS = [
@@ -8870,13 +8870,13 @@ function ModalCargarPerfil({ perfiles, cargando, onCerrar, onCargar, onBorrarSel
           <button onClick={onCerrar} style={{ background: "#f2f5f7", border: "1px solid #4ec9b8", padding: "6px 14px", borderRadius: 4, cursor: "pointer", fontSize: 11, color: "#4ec9b8", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontWeight: 700 }}>✕ Cerrar</button>
         </div>
 
-        {/* Filtros y acciones */}
-        <div style={{ display: "flex", gap: 12, marginBottom: 14, alignItems: "center", flexWrap: "wrap" }}>
+        {/* Filtros (fila 1) */}
+        <div style={{ display: "flex", gap: 12, marginBottom: 10, alignItems: "center", flexWrap: "wrap", padding: "10px 12px", background: "#f2f5f7", borderRadius: 6, border: "1px solid #d5d9dc" }}>
           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
             <span style={{ fontSize: 10, color: "#666", letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 700 }}>Tipo:</span>
             {["todos", "45h", "40h"].map(t => (
               <button key={t} onClick={() => setFiltroTipo(t)}
-                style={{ padding: "6px 14px", fontSize: 10, border: `1px solid ${filtroTipo === t ? "#4ec9b8" : "#ccc"}`, borderRadius: 4, background: filtroTipo === t ? "#4ec9b8" : "#f2f5f7", color: filtroTipo === t ? "#f2f5f7" : "#666", cursor: "pointer", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>
+                style={{ padding: "6px 14px", fontSize: 10, border: `1px solid ${filtroTipo === t ? "#4ec9b8" : "#ccc"}`, borderRadius: 4, background: filtroTipo === t ? "#4ec9b8" : "#fff", color: filtroTipo === t ? "#0a0a0a" : "#666", cursor: "pointer", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>
                 {t}
               </button>
             ))}
@@ -8884,17 +8884,17 @@ function ModalCargarPerfil({ perfiles, cargando, onCerrar, onCargar, onBorrarSel
           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
             <span style={{ fontSize: 10, color: "#666", letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 700 }}>Depto:</span>
             <select value={filtroDepto} onChange={(e) => setFiltroDepto(e.target.value)}
-              style={{ padding: "6px 10px", fontSize: 11, border: "1px solid #4ec9b8", borderRadius: 4, background: "#f2f5f7", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", color: "#1a1a1a", cursor: "pointer" }}>
+              style={{ padding: "6px 10px", fontSize: 11, border: "1px solid #4ec9b8", borderRadius: 4, background: "#fff", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", color: "#1a1a1a", cursor: "pointer" }}>
               <option value="__todos__">Todos</option>
               {conteoDeptos["__sin__"] > 0 && <option value="__sin__">— Sin depto — ({conteoDeptos["__sin__"]})</option>}
               {DEPARTAMENTOS.map(d => conteoDeptos[d] > 0 ? <option key={d} value={d}>{d} ({conteoDeptos[d]})</option> : null)}
             </select>
           </div>
           {/* v134: Ordenar */}
-          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-            <span style={{ fontSize: 10, color: "#666", letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 700 }}>Ordenar:</span>
+          <div style={{ display: "flex", gap: 6, alignItems: "center", marginLeft: "auto" }}>
+            <span style={{ fontSize: 10, color: "#4ec9b8", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 700 }}>⇅ Ordenar:</span>
             <select value={orden} onChange={(e) => setOrden(e.target.value)}
-              style={{ padding: "6px 10px", fontSize: 11, border: "1px solid #4ec9b8", borderRadius: 4, background: "#f2f5f7", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", color: "#1a1a1a", cursor: "pointer" }}>
+              style={{ padding: "6px 10px", fontSize: 11, border: "1px solid #4ec9b8", borderRadius: 4, background: "#fff", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", color: "#1a1a1a", cursor: "pointer", fontWeight: 600 }}>
               <option value="recientes">Más recientes primero</option>
               <option value="antiguos">Más antiguos primero</option>
               <option value="nombre_asc">Nombre A → Z</option>
@@ -8906,10 +8906,14 @@ function ModalCargarPerfil({ perfiles, cargando, onCerrar, onCargar, onBorrarSel
               <option value="alta">Fecha alta próxima</option>
             </select>
           </div>
-          <div style={{ flex: 1 }}></div>
+        </div>
+
+        {/* Acciones (fila 2) */}
+        <div style={{ display: "flex", gap: 8, marginBottom: 14, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
           {perfilesFiltrados.length > 0 && (
             <>
-              <button onClick={seleccionarTodos} style={{ fontSize: 10, padding: "5px 12px", border: "1px solid #4ec9b8", borderRadius: 4, background: "#f2f5f7", cursor: "pointer", color: "#4ec9b8", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontWeight: 700 }}>Todos</button>
+              <span style={{ fontSize: 10, color: "#999", marginRight: "auto", fontFamily: "'Inter', sans-serif" }}>{perfilesFiltrados.length} perfil{perfilesFiltrados.length !== 1 ? "es" : ""}</span>
+              <button onClick={seleccionarTodos} style={{ fontSize: 10, padding: "5px 12px", border: "1px solid #4ec9b8", borderRadius: 4, background: "#f2f5f7", cursor: "pointer", color: "#4ec9b8", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontWeight: 700 }}>Seleccionar todos</button>
               <button onClick={deseleccionarTodos} style={{ fontSize: 10, padding: "5px 12px", border: "1px solid #ccc", borderRadius: 4, background: "#f2f5f7", cursor: "pointer", color: "#666", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontWeight: 700 }}>Ninguno</button>
             </>
           )}
@@ -9118,6 +9122,7 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
   const [perfiles, setPerfiles] = useState([]);
   const [seleccionados, setSeleccionados] = useState(new Set());
   const [filtroDepto, setFiltroDepto] = useState("__todos__"); // v97: filtro por departamento
+  const [orden, setOrden] = useState("nombre_asc"); // v136: criterio de ordenación
   const [modoHojas, setModoHojas] = useState("una"); // v97: "una" o "por_depto"
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
@@ -9174,6 +9179,21 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
     if (filtroDepto === "__todos__") return true;
     if (filtroDepto === "__sin__") return !p.datos?.departamento;
     return (p.datos?.departamento || "") === filtroDepto;
+  }).sort((a, b) => {
+    // v136: ordenación
+    const colator = new Intl.Collator("es", { sensitivity: "base", numeric: true });
+    switch (orden) {
+      case "recientes":     return (b.timestamp || 0) - (a.timestamp || 0);
+      case "antiguos":      return (a.timestamp || 0) - (b.timestamp || 0);
+      case "nombre_asc":    return colator.compare(a.nombre || "", b.nombre || "");
+      case "nombre_desc":   return colator.compare(b.nombre || "", a.nombre || "");
+      case "salario_desc":  return (Number(b.datos?.salario45) || 0) - (Number(a.datos?.salario45) || 0);
+      case "salario_asc":   return (Number(a.datos?.salario45) || 0) - (Number(b.datos?.salario45) || 0);
+      case "codigo":        return colator.compare(a.datos?.codigoContable || "zzz", b.datos?.codigoContable || "zzz");
+      case "depto":         return colator.compare(a.datos?.departamento || "zzz", b.datos?.departamento || "zzz");
+      case "alta":          return String(a.datos?.fechaInicio || "9999").localeCompare(String(b.datos?.fechaInicio || "9999"));
+      default:              return 0;
+    }
   });
 
   const seleccionarTodos = () => setSeleccionados(new Set(perfilesFiltrados.map(p => p.id)));
@@ -9462,6 +9482,19 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
                         const count = perfiles.filter(p => (p.datos?.departamento || "") === d).length;
                         return count > 0 ? <option key={d} value={d}>{d} ({count})</option> : null;
                       })}
+                    </select>
+                    {/* v136: Ordenar */}
+                    <label style={{ fontSize: 10, color: "#4ec9b8", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 700, marginLeft: 10 }}>⇅ Ordenar:</label>
+                    <select value={orden} onChange={(e) => setOrden(e.target.value)} style={{ padding: "5px 10px", fontSize: 11, border: "1px solid #4ec9b8", borderRadius: 4, background: "#fff", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", cursor: "pointer", color: "#1a1a1a", fontWeight: 600 }}>
+                      <option value="nombre_asc">Nombre A → Z</option>
+                      <option value="nombre_desc">Nombre Z → A</option>
+                      <option value="recientes">Más recientes primero</option>
+                      <option value="antiguos">Más antiguos primero</option>
+                      <option value="salario_desc">Salario mayor → menor</option>
+                      <option value="salario_asc">Salario menor → mayor</option>
+                      <option value="codigo">Código contable A → Z</option>
+                      <option value="depto">Departamento A → Z</option>
+                      <option value="alta">Fecha alta próxima</option>
                     </select>
                     <span style={{ fontSize: 9, color: "#888" }}>{perfilesFiltrados.length} de {perfiles.length} mostrados</span>
                   </div>
