@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v101";
+const APP_VERSION = "v102";
 
 // v97: Departamentos de un rodaje audiovisual (obligatorio en cada perfil)
 const DEPARTAMENTOS = [
@@ -6198,139 +6198,188 @@ function PantallaLogin({ onAcierto }) {
   return (
     <div style={{
       minHeight: "100vh",
-      background: "linear-gradient(135deg, #1a1a1a 0%, #2a2520 100%)",
+      position: "relative",
       display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
       fontFamily: "'Courier Prime', 'Courier New', monospace",
+      overflow: "hidden",
     }}>
+      {/* v102: Fondo con imagen de rodaje + overlay oscuro */}
       <div style={{
-        background: "#f0ede8", borderRadius: 12, padding: "40px 36px",
-        maxWidth: 380, width: "100%",
-        boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
-        border: "1px solid #c8a96e",
-        animation: error ? "shake 0.4s" : "none",
+        position: "absolute", inset: 0,
+        backgroundImage: "url('/bg.jpg')",
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        filter: "brightness(0.55) saturate(0.9)",
+        zIndex: 0,
+      }} />
+      {/* Overlay gradiente para asegurar contraste */}
+      <div style={{
+        position: "absolute", inset: 0,
+        background: "linear-gradient(180deg, rgba(10,10,10,0.55) 0%, rgba(10,10,10,0.75) 100%)",
+        zIndex: 1,
+      }} />
+
+      <style>{`
+        @keyframes shake {
+          0%,100% { transform: translateX(0); }
+          25% { transform: translateX(-8px); }
+          75% { transform: translateX(8px); }
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .login-input::placeholder { color: #666; }
+        .login-input:focus { border-color: #4ec9b8 !important; box-shadow: 0 0 0 3px rgba(78,201,184,0.12); }
+        .login-select:focus { border-color: #4ec9b8 !important; box-shadow: 0 0 0 3px rgba(78,201,184,0.12); }
+      `}</style>
+
+      <div style={{
+        position: "relative", zIndex: 2,
+        width: "100%", maxWidth: 480,
+        animation: error ? "shake 0.4s" : "fadeIn 0.6s ease-out",
       }}>
-        <style>{`
-          @keyframes shake {
-            0%,100% { transform: translateX(0); }
-            25% { transform: translateX(-8px); }
-            75% { transform: translateX(8px); }
-          }
-        `}</style>
-        <div style={{ textAlign: "center", marginBottom: 28 }}>
-          <div style={{
-            display: "inline-block", width: 56, height: 56,
-            background: "#c8a96e", borderRadius: 12,
-            color: "#1a1a1a", fontSize: 28, fontWeight: 700,
-            lineHeight: "56px", marginBottom: 14,
-          }}>B</div>
-          <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", letterSpacing: "0.18em", textTransform: "uppercase" }}>
-            Calculadora Salarios
-          </div>
-          <div style={{ fontSize: 10, color: "#888", marginTop: 4, letterSpacing: "0.12em", textTransform: "uppercase" }}>
-            Acceso restringido
-          </div>
-          <div style={{ fontSize: 9, color: "#c8a96e", marginTop: 6, letterSpacing: "0.12em", fontWeight: 700, fontFamily: "'Courier Prime', 'Courier New', monospace" }} title="Versión de la app">
-            {APP_VERSION}
-          </div>
+        {/* Logo grande centrado */}
+        <div style={{ textAlign: "center", marginBottom: 40 }}>
+          <img src="/logo.png" alt="Bdprodtools" style={{ maxWidth: 380, width: "80%", height: "auto", filter: "drop-shadow(0 4px 20px rgba(0,0,0,0.5))" }} />
         </div>
 
         {cargando ? (
-          <div style={{ textAlign: "center", padding: 20, color: "#888", fontSize: 11 }}>
+          <div style={{ textAlign: "center", padding: 20, color: "#888", fontSize: 12, letterSpacing: "0.1em" }}>
             Cargando usuarios...
           </div>
         ) : errorCarga ? (
-          <div style={{ padding: 12, background: "rgba(160,69,69,0.1)", border: "1px solid #a04545", borderRadius: 6, color: "#a04545", fontSize: 11 }}>
+          <div style={{ padding: 14, background: "rgba(200,80,80,0.15)", border: "1px solid rgba(200,80,80,0.4)", borderRadius: 8, color: "#e88", fontSize: 11, textAlign: "center" }}>
             ✕ {errorCarga}
           </div>
         ) : (
           <>
-            <div style={{ marginBottom: 14 }}>
-              <label style={{ display: "block", fontSize: 9, color: "#666", letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 8 }}>
-                Usuario
-              </label>
+            {/* Usuario (dropdown) */}
+            <div style={{ marginBottom: 12, position: "relative" }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", pointerEvents: "none", zIndex: 2 }}>
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                <circle cx="12" cy="7" r="4"/>
+              </svg>
               <select
                 value={nombre}
                 onChange={e => setNombre(e.target.value)}
+                className="login-select"
                 style={{
-                  width: "100%", padding: "12px 14px", fontSize: 16,
-                  border: "1px solid #c0bcb5", borderRadius: 6, background: "#fff",
+                  width: "100%", padding: "16px 16px 16px 46px", fontSize: 14,
+                  border: "1px solid rgba(255,255,255,0.12)", borderRadius: 10,
+                  background: "rgba(20,20,20,0.7)",
                   boxSizing: "border-box", fontFamily: "'Courier Prime', 'Courier New', monospace",
-                  color: "#1a1a1a", outline: "none",
+                  color: nombre ? "#f0f0f0" : "#888", outline: "none",
+                  backdropFilter: "blur(8px)",
+                  WebkitBackdropFilter: "blur(8px)",
+                  cursor: "pointer",
+                  transition: "all 0.15s",
                 }}
               >
-                <option value="">— Selecciona tu usuario —</option>
-                {nombres.map(n => <option key={n} value={n}>{n}</option>)}
+                <option value="">Usuario</option>
+                {nombres.map(n => <option key={n} value={n} style={{ background: "#141414", color: "#f0f0f0" }}>{n}</option>)}
               </select>
             </div>
 
-            <div style={{ marginBottom: 16 }}>
-              <label style={{ display: "block", fontSize: 9, color: "#666", letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 8 }}>
-                PIN
-              </label>
-              <div style={{ position: "relative" }}>
-                <input
-                  type={mostrarPin ? "text" : "password"}
-                  value={pin}
-                  onChange={e => setPin(e.target.value)}
-                  onKeyDown={e => e.key === "Enter" && intentar()}
-                  inputMode="numeric"
-                  autoComplete="off"
-                  style={{
-                    width: "100%", padding: "12px 44px 12px 14px", fontSize: 16,
-                    border: `1px solid ${error ? "#a04545" : "#c0bcb5"}`,
-                    borderRadius: 6, background: "#fff", boxSizing: "border-box",
-                    fontFamily: "'Courier Prime', 'Courier New', monospace", color: "#1a1a1a",
-                    letterSpacing: mostrarPin ? "normal" : "0.2em", outline: "none",
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setMostrarPin(v => !v)}
-                  style={{
-                    position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)",
-                    background: "transparent", border: "none", cursor: "pointer",
-                    padding: 8, color: "#666",
-                  }}
-                >
-                  {mostrarPin ? (
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
-                      <line x1="1" y1="1" x2="23" y2="23"/>
-                    </svg>
-                  ) : (
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                      <circle cx="12" cy="12" r="3"/>
-                    </svg>
-                  )}
-                </button>
-              </div>
+            {/* PIN */}
+            <div style={{ marginBottom: 20, position: "relative" }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", pointerEvents: "none", zIndex: 2 }}>
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+              <input
+                type={mostrarPin ? "text" : "password"}
+                value={pin}
+                onChange={e => setPin(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && intentar()}
+                placeholder="PIN"
+                inputMode="numeric"
+                autoComplete="off"
+                className="login-input"
+                style={{
+                  width: "100%", padding: "16px 50px 16px 46px", fontSize: 14,
+                  border: `1px solid ${error ? "rgba(200,80,80,0.6)" : "rgba(255,255,255,0.12)"}`,
+                  borderRadius: 10,
+                  background: "rgba(20,20,20,0.7)",
+                  boxSizing: "border-box",
+                  fontFamily: "'Courier Prime', 'Courier New', monospace",
+                  color: "#f0f0f0",
+                  letterSpacing: mostrarPin ? "normal" : (pin ? "0.3em" : "normal"),
+                  outline: "none",
+                  backdropFilter: "blur(8px)",
+                  WebkitBackdropFilter: "blur(8px)",
+                  transition: "all 0.15s",
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => setMostrarPin(v => !v)}
+                style={{
+                  position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)",
+                  background: "transparent", border: "none", cursor: "pointer",
+                  padding: 8, color: "#888",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  zIndex: 2,
+                }}
+              >
+                {mostrarPin ? (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+                    <line x1="1" y1="1" x2="23" y2="23"/>
+                  </svg>
+                ) : (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                    <circle cx="12" cy="12" r="3"/>
+                  </svg>
+                )}
+              </button>
               {error && (
-                <div style={{ fontSize: 10, color: "#a04545", marginTop: 8, letterSpacing: "0.08em" }}>
+                <div style={{ fontSize: 11, color: "#e88", marginTop: 10, letterSpacing: "0.08em", paddingLeft: 4 }}>
                   ✕ Usuario o PIN incorrectos {intentos > 2 ? `(${intentos} intentos)` : ""}
                 </div>
               )}
             </div>
 
+            {/* Botón Log in */}
             <button
               onClick={intentar}
               disabled={verificando}
+              onMouseEnter={(e) => { if (!verificando) e.currentTarget.style.background = "#5ed9c8"; }}
+              onMouseLeave={(e) => { if (!verificando) e.currentTarget.style.background = "#4ec9b8"; }}
               style={{
-                width: "100%", padding: "12px 16px",
-                background: verificando ? "#666" : "#1a1a1a", color: "#f0ede8",
-                border: "none", borderRadius: 6, cursor: verificando ? "wait" : "pointer",
-                fontSize: 11, fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase",
+                width: "100%", padding: "16px 20px",
+                background: verificando ? "#3a3a3a" : "#4ec9b8",
+                color: verificando ? "#888" : "#0a0a0a",
+                border: "none", borderRadius: 10,
+                cursor: verificando ? "wait" : "pointer",
+                fontSize: 15, fontWeight: 700, letterSpacing: "0.05em",
                 fontFamily: "'Courier Prime', 'Courier New', monospace",
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+                transition: "background 0.15s",
+                boxShadow: "0 8px 24px rgba(78,201,184,0.2)",
               }}
             >
-              {verificando ? "Verificando..." : "Acceder"}
+              {verificando ? "Verificando..." : (
+                <>
+                  <span>Log in</span>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="5" y1="12" x2="19" y2="12"/>
+                    <polyline points="12 5 19 12 12 19"/>
+                  </svg>
+                </>
+              )}
             </button>
           </>
         )}
 
-        <div style={{ marginTop: 24, paddingTop: 16, borderTop: "1px solid #d8d4ce", textAlign: "center" }}>
-          <div style={{ fontSize: 9, color: "#aaa", letterSpacing: "0.1em" }}>
-            Si no tienes acceso, contacta con el administrador
+        {/* Versión (más grande) */}
+        <div style={{ textAlign: "center", marginTop: 32 }}>
+          <div style={{ fontSize: 13, color: "#4ec9b8", letterSpacing: "0.2em", fontWeight: 700 }}>{APP_VERSION}</div>
+          <div style={{ fontSize: 10, color: "#666", marginTop: 4, letterSpacing: "0.15em", textTransform: "uppercase" }}>
+            Calculadora Salarios
           </div>
         </div>
       </div>
