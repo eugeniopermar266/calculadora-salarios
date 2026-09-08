@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v111";
+const APP_VERSION = "v112";
 
 // v97: Departamentos de un rodaje audiovisual (obligatorio en cada perfil)
 const DEPARTAMENTOS = [
@@ -612,7 +612,7 @@ function PuestoSelector({ puesto, codigoContable, onPuesto, onCodigoContable }) 
           ref={listaRef}
           style={{
             position: "relative", zIndex: 100, marginTop: 4,
-            background: "#fff", border: "1px solid #c0bcb5", borderRadius: 6,
+            background: "#f2f5f7", border: "1px solid #c0bcb5", borderRadius: 6,
             maxHeight: 320, overflowY: "auto", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace",
             boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
           }}
@@ -624,7 +624,7 @@ function PuestoSelector({ puesto, codigoContable, onPuesto, onCodigoContable }) 
           ) : (
             Object.entries(grupos).map(([cat, items]) => (
               <div key={cat}>
-                <div style={{ padding: "6px 12px", background: "#f0ede8", fontSize: 9, color: "#7a5a2a", letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 700, borderBottom: "1px solid #e0ddd8", position: "sticky", top: 0 }}>
+                <div style={{ padding: "6px 12px", background: "#dfe4e8", fontSize: 9, color: "#7a5a2a", letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 700, borderBottom: "1px solid #e0ddd8", position: "sticky", top: 0 }}>
                   {cat} <span style={{ color: "#aaa", fontWeight: 400, marginLeft: 4 }}>({items.length})</span>
                 </div>
                 {items.map(p => (
@@ -633,7 +633,7 @@ function PuestoSelector({ puesto, codigoContable, onPuesto, onCodigoContable }) 
                     onClick={() => seleccionar(p)}
                     style={{
                       padding: "7px 14px", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center",
-                      borderBottom: "1px solid #f0ede8", fontSize: 11,
+                      borderBottom: "1px solid #dfe4e8", fontSize: 11,
                       background: p.nombre === puesto ? "rgba(184,134,74,0.1)" : "transparent",
                     }}
                     onMouseEnter={e => e.currentTarget.style.background = "rgba(184,134,74,0.15)"}
@@ -657,7 +657,7 @@ function PuestoSelector({ puesto, codigoContable, onPuesto, onCodigoContable }) 
           value={codigoContable || ""}
           readOnly
           placeholder="— se rellena automáticamente al elegir un puesto —"
-          style={{ ...inp, background: codigoContable ? "#f0ede8" : "#fafaf7", color: codigoContable ? "#1a1a1a" : "#aaa", fontWeight: codigoContable ? 700 : 400, cursor: "default" }}
+          style={{ ...inp, background: codigoContable ? "#dfe4e8" : "#fafaf7", color: codigoContable ? "#1a1a1a" : "#aaa", fontWeight: codigoContable ? 700 : 400, cursor: "default" }}
         />
         {!codigoContable && busqueda && (
           <div style={{ fontSize: 9, color: "#a07030", marginTop: 4, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontStyle: "italic" }}>
@@ -970,7 +970,7 @@ const BadgeBrutos = ({ size = "normal" }) => {
     <span style={{
       display: "inline-block",
       background: "#b8864a",
-      color: "#fff",
+      color: "#f2f5f7",
       fontWeight: 700,
       letterSpacing: "0.12em",
       textTransform: "uppercase",
@@ -1004,7 +1004,7 @@ function Field({ label, value, onChange, onBlur, type = "number", prefix, hint, 
           max={type === "date" ? (max || undefined) : undefined}
           style={{
             width: "100%",
-            background: readOnly ? "#e5e2dd" : "#f0ede8",
+            background: readOnly ? "#e5e2dd" : "#dfe4e8",
             border: `1px solid ${readOnly ? "#c8a96e" : "#d0ccc6"}`,
             borderRadius: 4,
             color: readOnly ? "#666" : "#1a1a1a",
@@ -1032,7 +1032,7 @@ function Toggle({ label, sublabel, value, onChange }) {
   return (
     <div onClick={() => onChange(!value)} style={{
       display: "flex", justifyContent: "space-between", alignItems: "center",
-      padding: "11px 13px", background: "#f0ede8", borderRadius: 6,
+      padding: "11px 13px", background: "#dfe4e8", borderRadius: 6,
       border: `1px solid ${value ? "#c8963a" : "#e0ddd8"}`, marginBottom: 10, cursor: "pointer",
     }}>
       <div>
@@ -1041,7 +1041,7 @@ function Toggle({ label, sublabel, value, onChange }) {
       </div>
       <div style={{ position: "relative", width: 38, height: 20, flexShrink: 0, marginLeft: 12 }}>
         <div style={{ width: "100%", height: "100%", borderRadius: 10, background: value ? "#c8a96e" : "#222", transition: "background 0.25s" }} />
-        <div style={{ position: "absolute", top: 3, left: value ? 19 : 3, width: 14, height: 14, borderRadius: "50%", background: value ? "#fff" : "#aaa", transition: "left 0.25s", boxShadow: "0 1px 3px rgba(0,0,0,0.5)" }} />
+        <div style={{ position: "absolute", top: 3, left: value ? 19 : 3, width: 14, height: 14, borderRadius: "50%", background: value ? "#f2f5f7" : "#aaa", transition: "left 0.25s", boxShadow: "0 1px 3px rgba(0,0,0,0.5)" }} />
       </div>
     </div>
   );
@@ -1159,7 +1159,7 @@ function ImportadorAntiguos({ usuarioActual, tabId, onCerrar, onImportado }) {
     display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100,
   };
   const modal = {
-    background: "#faf7f2", padding: 20, borderRadius: 6, maxWidth: 750, width: "92%",
+    background: "#e8ecef", padding: 20, borderRadius: 6, maxWidth: 750, width: "92%",
     maxHeight: "88vh", overflowY: "auto", color: "#1a1a1a",
     fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", border: "1px solid #b8864a",
   };
@@ -1197,7 +1197,7 @@ function ImportadorAntiguos({ usuarioActual, tabId, onCerrar, onImportado }) {
             {/* Tabla perfiles */}
             <div style={{ maxHeight: "50vh", overflowY: "auto", marginBottom: 12 }}>
               {locales.map(p => (
-                <div key={p.key} style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 8, padding: 10, background: "#fff", borderRadius: 4, marginBottom: 6, border: "1px solid #e8e4de", alignItems: "center" }}>
+                <div key={p.key} style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 8, padding: 10, background: "#f2f5f7", borderRadius: 4, marginBottom: 6, border: "1px solid #e8e4de", alignItems: "center" }}>
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a" }}>{p.nombre}</div>
                     <div style={{ fontSize: 9, color: "#888", marginTop: 2 }}>
@@ -1212,7 +1212,7 @@ function ImportadorAntiguos({ usuarioActual, tabId, onCerrar, onImportado }) {
                   <select
                     value={seleccion[p.key] || ""}
                     onChange={e => setSeleccion({ ...seleccion, [p.key]: e.target.value })}
-                    style={{ padding: "6px 8px", border: "1px solid #d0ccc6", borderRadius: 4, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize: 11, background: "#fff", color: "#1a1a1a", minWidth: 180 }}
+                    style={{ padding: "6px 8px", border: "1px solid #d0ccc6", borderRadius: 4, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize: 11, background: "#f2f5f7", color: "#1a1a1a", minWidth: 180 }}
                   >
                     <option value="">— No importar —</option>
                     {proyectos.map(pr => (
@@ -1232,7 +1232,7 @@ function ImportadorAntiguos({ usuarioActual, tabId, onCerrar, onImportado }) {
               <button
                 onClick={importarSeleccionados}
                 disabled={importando}
-                style={{ background: "#b8864a", color: "#fff", border: "none", padding: "8px 16px", borderRadius: 4, cursor: importando ? "wait" : "pointer", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}
+                style={{ background: "#b8864a", color: "#f2f5f7", border: "none", padding: "8px 16px", borderRadius: 4, cursor: importando ? "wait" : "pointer", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}
               >{importando ? "Importando..." : "Importar seleccionados"}</button>
             </div>
           </>
@@ -1752,7 +1752,7 @@ function GestorPerfiles({ tabId, datosActuales, onCargarPerfil, onRegistrarAccio
   }, [onRegistrarAcciones]);
 
   return (
-    <div style={{ background:"#fff", border:"1px solid #e0ddd8", borderRadius:8, padding:"12px 14px", marginBottom:20 }}>
+    <div style={{ background:"#f2f5f7", border:"1px solid #e0ddd8", borderRadius:8, padding:"12px 14px", marginBottom:20 }}>
       <div style={{ fontSize:10, letterSpacing:"0.2em", color:"#b8864a", textTransform:"uppercase", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
         <span>▸ Perfiles Guardados {perfiles.length > 0 && <span style={{ color:"#888", marginLeft:4 }}>({perfiles.length})</span>}{cargando && <span style={{ color:"#888", marginLeft:6, fontSize:8 }}>· cargando…</span>}</span>
         <span style={{ fontSize:8, color:"#999", fontStyle:"italic", letterSpacing:"0.05em", textTransform:"none" }}>usa la barra superior ↑</span>
@@ -1792,7 +1792,7 @@ function GestorPerfiles({ tabId, datosActuales, onCargarPerfil, onRegistrarAccio
       )}
 
       {mostrarGuardar && (
-        <div style={{ marginTop:10, padding:10, background:"#f0ede8", borderRadius:5, border:"1px solid #e0ddd8" }}>
+        <div style={{ marginTop:10, padding:10, background:"#dfe4e8", borderRadius:5, border:"1px solid #e0ddd8" }}>
           <div style={{ fontSize:9, color:"#777", textTransform:"uppercase", letterSpacing:"0.1em", marginBottom:6, fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>Nombre del perfil</div>
           <div style={{ display:"flex", gap:6 }}>
             <input
@@ -1802,7 +1802,7 @@ function GestorPerfiles({ tabId, datosActuales, onCargarPerfil, onRegistrarAccio
               onChange={e => setNombrePerfil(e.target.value)}
               onKeyDown={e => e.key === "Enter" && guardarPerfil()}
               autoFocus
-              style={{ flex:1, background:"#fff", border:"1px solid #d0ccc6", borderRadius:4, color:"#1a1a1a", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize:12, padding:"7px 10px", outline:"none", colorScheme:"light" }}
+              style={{ flex:1, background:"#f2f5f7", border:"1px solid #d0ccc6", borderRadius:4, color:"#1a1a1a", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize:12, padding:"7px 10px", outline:"none", colorScheme:"light" }}
             />
             <button onClick={guardarPerfil} style={{ ...btnStyle("#fff", "#b8864a"), border:"1px solid #b8864a" }}>Guardar</button>
           </div>
@@ -1810,7 +1810,7 @@ function GestorPerfiles({ tabId, datosActuales, onCargarPerfil, onRegistrarAccio
       )}
 
       {mostrarLista && (
-        <div style={{ marginTop:10, padding:10, background:"#f0ede8", borderRadius:5, border:"1px solid #e0ddd8", maxHeight:340, overflowY:"auto" }}>
+        <div style={{ marginTop:10, padding:10, background:"#dfe4e8", borderRadius:5, border:"1px solid #e0ddd8", maxHeight:340, overflowY:"auto" }}>
           {/* v46+v53: barra superior con controles */}
           {(esAdmin || perfilEnEdicion) && (
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8, paddingBottom:8, borderBottom:"1px solid #e0ddd8", gap:8, flexWrap:"wrap" }}>
@@ -1831,7 +1831,7 @@ function GestorPerfiles({ tabId, datosActuales, onCargarPerfil, onRegistrarAccio
                   <button
                     onClick={modificarPerfil}
                     title={`Sobrescribir "${perfilEnEdicion.nombre}"`}
-                    style={{ background:"#b8864a", color:"#fff", border:"1px solid #b8864a", padding:"3px 8px", borderRadius:3, cursor:"pointer", fontSize:9, fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontWeight:700, letterSpacing:"0.1em", textTransform:"uppercase" }}
+                    style={{ background:"#b8864a", color:"#f2f5f7", border:"1px solid #b8864a", padding:"3px 8px", borderRadius:3, cursor:"pointer", fontSize:9, fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontWeight:700, letterSpacing:"0.1em", textTransform:"uppercase" }}
                   >🔄 Modificar</button>
                 )}
                 {esAdmin && (
@@ -1873,7 +1873,7 @@ function GestorPerfiles({ tabId, datosActuales, onCargarPerfil, onRegistrarAccio
                   alert(`Migración: ${ok} OK, ${err} errores.\n\nLos perfiles locales originales siguen ahí, puedes borrarlos con el otro botón cuando confirmes que todo bien.`);
                   recargar();
                 }}
-                  style={{ fontSize: 9, padding: "4px 8px", border: "1px solid #7a5a2a", borderRadius: 3, background: "#fff", color: "#7a5a2a", cursor: "pointer", fontWeight: 700, fontFamily: "'Courier Prime', 'Courier New', monospace", letterSpacing: "0.05em" }}
+                  style={{ fontSize: 9, padding: "4px 8px", border: "1px solid #7a5a2a", borderRadius: 3, background: "#f2f5f7", color: "#7a5a2a", cursor: "pointer", fontWeight: 700, fontFamily: "'Courier Prime', 'Courier New', monospace", letterSpacing: "0.05em" }}
                 >📤 Migrar a Supabase</button>
                 <button onClick={async () => {
                   if (!confirm(`¿Borrar ${huerfanosLocalState.length} perfiles solo del navegador local?\n\nEsto NO afecta a Supabase. Solo se limpian los duplicados que estaban en tu navegador.`)) return;
@@ -1884,7 +1884,7 @@ function GestorPerfiles({ tabId, datosActuales, onCargarPerfil, onRegistrarAccio
                   alert(`Borrados ${ok} perfiles del local.`);
                   recargar();
                 }}
-                  style={{ fontSize: 9, padding: "4px 8px", border: "1px solid #c04040", borderRadius: 3, background: "#fff", color: "#c04040", cursor: "pointer", fontWeight: 700, fontFamily: "'Courier Prime', 'Courier New', monospace", letterSpacing: "0.05em" }}
+                  style={{ fontSize: 9, padding: "4px 8px", border: "1px solid #c04040", borderRadius: 3, background: "#f2f5f7", color: "#c04040", cursor: "pointer", fontWeight: 700, fontFamily: "'Courier Prime', 'Courier New', monospace", letterSpacing: "0.05em" }}
                 >🗑 Borrar solo local</button>
               </div>
             </div>
@@ -1896,10 +1896,10 @@ function GestorPerfiles({ tabId, datosActuales, onCargarPerfil, onRegistrarAccio
           ) : perfiles.map(perfil => (
             <div key={perfil.key} onClick={() => cargarPerfil(perfil)}
               style={{ display:"flex", justifyContent:"space-between", alignItems:"center",
-                padding:"8px 10px", marginBottom:4, background:"#fff", borderRadius:4,
+                padding:"8px 10px", marginBottom:4, background:"#f2f5f7", borderRadius:4,
                 border:"1px solid #e8e4de", cursor:"pointer", transition:"all 0.15s" }}
               onMouseEnter={e => { e.currentTarget.style.borderColor = "#b8864a"; e.currentTarget.style.background = "#fdf8f0"; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = "#e8e4de"; e.currentTarget.style.background = "#fff"; }}>
+              onMouseLeave={e => { e.currentTarget.style.borderColor = "#e8e4de"; e.currentTarget.style.background = "#f2f5f7"; }}>
               <div style={{ flex:1, minWidth:0 }}>
                 <div style={{ fontSize:11, fontWeight:700, color:"#1a1a1a", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", marginBottom:2, display:"flex", alignItems:"center", gap:6 }}>
                   {perfil.nombre}
@@ -2145,7 +2145,7 @@ function InputsPorMes({ desglose, horasPorMes, setHorasPorMes, vacDiasPorMes, se
                     setHorasPorMes(a);
                   }}
                   title={`Estimado L-V: ${autoH}h (puedes modificarlo)`}
-                  style={{ background: esEstimadoOriginal?"#eef3f8":"#f0ede8", border:`1px solid ${esEstimadoOriginal?"#b8cce0":"#4a6a9a"}`, borderRadius:4, color:"#2a5a8a", fontFamily:"'Courier Prime', 'Courier New', monospace", fontSize:11, padding:"4px 4px", outline:"none", textAlign:"center", colorScheme:"light", minWidth:0, width:"100%", boxSizing:"border-box" }}
+                  style={{ background: esEstimadoOriginal?"#eef3f8":"#dfe4e8", border:`1px solid ${esEstimadoOriginal?"#b8cce0":"#4a6a9a"}`, borderRadius:4, color:"#2a5a8a", fontFamily:"'Courier Prime', 'Courier New', monospace", fontSize:11, padding:"4px 4px", outline:"none", textAlign:"center", colorScheme:"light", minWidth:0, width:"100%", boxSizing:"border-box" }}
                   onFocus={e=>e.target.style.borderColor="#4a6a9a"} onBlur={e=>e.target.style.borderColor=esEstimadoOriginal?"#b8cce0":"#4a6a9a"} />
               </div>
             );
@@ -2162,14 +2162,14 @@ function InputsPorMes({ desglose, horasPorMes, setHorasPorMes, vacDiasPorMes, se
             <div style={{ fontSize:8, lineHeight:1, marginBottom:2, visibility:"hidden" }}>·</div>
             <input type="number" min="0" step="1" value={vacDiasPorMes[i]||""} placeholder="0"
               onChange={e=>setV(i,parseFloat(e.target.value)||0)}
-              style={{ background:"#f0ede8", border:"1px solid #e0c8b0", borderRadius:4, color:"#8a2a20", fontFamily:"'Courier Prime', 'Courier New', monospace", fontSize:11, padding:"4px 4px", outline:"none", textAlign:"center", colorScheme:"light", minWidth:0, width:"100%", boxSizing:"border-box" }}
+              style={{ background:"#dfe4e8", border:"1px solid #e0c8b0", borderRadius:4, color:"#8a2a20", fontFamily:"'Courier Prime', 'Courier New', monospace", fontSize:11, padding:"4px 4px", outline:"none", textAlign:"center", colorScheme:"light", minWidth:0, width:"100%", boxSizing:"border-box" }}
               onFocus={e=>e.target.style.borderColor="#8a5030"} onBlur={e=>e.target.style.borderColor="#e0c8b0"} />
           </div>
           {hasFest && <div>
             <div style={{ fontSize:8, lineHeight:1, marginBottom:2, visibility:"hidden" }}>·</div>
             <input type="number" min="0" step="1" value={(festivosPorMes||[])[i]||""} placeholder="0"
               onChange={e=>setF(i,parseFloat(e.target.value)||0)}
-              style={{ background:"#f0ede8", border:"1px solid #c8b0d8", borderRadius:4, color:"#6a3a9a", fontFamily:"'Courier Prime', 'Courier New', monospace", fontSize:11, padding:"4px 4px", outline:"none", textAlign:"center", colorScheme:"light", minWidth:0, width:"100%", boxSizing:"border-box" }}
+              style={{ background:"#dfe4e8", border:"1px solid #c8b0d8", borderRadius:4, color:"#6a3a9a", fontFamily:"'Courier Prime', 'Courier New', monospace", fontSize:11, padding:"4px 4px", outline:"none", textAlign:"center", colorScheme:"light", minWidth:0, width:"100%", boxSizing:"border-box" }}
               onFocus={e=>e.target.style.borderColor="#8a5aaa"} onBlur={e=>e.target.style.borderColor="#c8b0d8"} />
           </div>}
         </div>
@@ -2259,7 +2259,7 @@ function ModalCSV({ contenido, filename, onClose }) {
       <div
         onClick={e => e.stopPropagation()}
         style={{
-          background: "#fff", borderRadius: 8,
+          background: "#f2f5f7", borderRadius: 8,
           maxWidth: 900, width: "100%", maxHeight: "90vh",
           display: "flex", flexDirection: "column",
           fontFamily: "'Courier Prime', 'Courier New', monospace",
@@ -2299,14 +2299,14 @@ function ModalCSV({ contenido, filename, onClose }) {
         {/* botones de acción */}
         <div style={{ padding: "10px 20px", borderBottom: "1px solid #e0ddd8", display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           <button onClick={descargar}
-            style={{ padding: "8px 16px", background: descargado ? "#2a7a50" : "#b8864a", color: "#fff",
+            style={{ padding: "8px 16px", background: descargado ? "#2a7a50" : "#b8864a", color: "#f2f5f7",
               border: "none", borderRadius: 3, cursor: "pointer", fontFamily: "'Courier Prime', 'Courier New', monospace",
               fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 700,
               transition: "background 0.2s" }}>
             {descargado ? "✓ Descargado" : "⬇ Descargar archivo"}
           </button>
           <button onClick={copiar}
-            style={{ padding: "8px 16px", background: copiado ? "#2a7a50" : "transparent", color: copiado ? "#fff" : "#b8864a",
+            style={{ padding: "8px 16px", background: copiado ? "#2a7a50" : "transparent", color: copiado ? "#f2f5f7" : "#b8864a",
               border: "1px solid #b8864a", borderRadius: 3, cursor: "pointer", fontFamily: "'Courier Prime', 'Courier New', monospace",
               fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 700,
               transition: "background 0.2s" }}>
@@ -2543,7 +2543,7 @@ function ModalPDF({ contenidoPrint, onClose, filename = "calculadora_45h.pdf" })
             style={{
               padding: "8px 16px",
               background: ocupado || estado === "error" ? "#444" : "#b8864a",
-              color: "#fff", border: "none", borderRadius: 3,
+              color: "#f2f5f7", border: "none", borderRadius: 3,
               cursor: ocupado ? "wait" : (estado === "error" ? "not-allowed" : "pointer"),
               fontFamily: "'Courier Prime', 'Courier New', monospace", fontSize: 11,
               letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 700,
@@ -2607,7 +2607,7 @@ function ModalPDF({ contenidoPrint, onClose, filename = "calculadora_45h.pdf" })
         <div
           id="pdf-doc-content"
           style={{
-            background: "#fff",
+            background: "#f2f5f7",
             maxWidth: "210mm",
             margin: "0 auto",
             padding: "15mm",
@@ -2658,7 +2658,7 @@ function DocumentoImprimible({
   const tdHead = {
     padding: "5px 6px", fontSize: 7,
     letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 700,
-    color: "#666", background: "#fff",
+    color: "#666", background: "#f2f5f7",
     border: "1px solid #d8d4ce",
   };
   const tdCell = (extra = {}) => ({
@@ -2748,7 +2748,7 @@ function DocumentoImprimible({
                 CALCULADORA DE SALARIOS
               </div>
               <div style={{ fontSize: 9, color: "#b8864a", letterSpacing: "0.05em" }}>
-                <span style={{ background: "#b8864a", color: "#fff", padding: "1px 4px", marginRight: 4, fontSize: 7 }}>📁</span>
+                <span style={{ background: "#b8864a", color: "#f2f5f7", padding: "1px 4px", marginRight: 4, fontSize: 7 }}>📁</span>
                 {(proyecto || "—") + " · " + (productora || "—")}
               </div>
             </td>
@@ -2782,7 +2782,7 @@ function DocumentoImprimible({
                   display: "inline-block",
                   padding: "2px 8px",
                   background: "#c8963a",
-                  color: "#fff",
+                  color: "#f2f5f7",
                   fontSize: 9,
                   fontWeight: 700,
                   letterSpacing: "0.12em",
@@ -2826,10 +2826,10 @@ function DocumentoImprimible({
             <tbody>
               <tr>
                 <td style={{ background: "#fdf8f0", border: "1px solid #e8d4a8", padding: "7px 10px", textAlign: "center", fontSize: 10, fontWeight: 700, color: "#1a1a1a", letterSpacing: "0.04em", width: "50%" }}>
-                  TOTAL MES 40H · <span style={{ color: "#b8864a", fontSize: 12 }}>{fmt(baseRef + vacRef + indemRef)} €</span> <span style={{ display: "inline-block", background: "#b8864a", color: "#fff", fontSize: 8, fontWeight: 700, letterSpacing: "0.1em", padding: "1px 5px", borderRadius: 3, marginLeft: 4, verticalAlign: "middle" }}>BRUTOS</span>
+                  TOTAL MES 40H · <span style={{ color: "#b8864a", fontSize: 12 }}>{fmt(baseRef + vacRef + indemRef)} €</span> <span style={{ display: "inline-block", background: "#b8864a", color: "#f2f5f7", fontSize: 8, fontWeight: 700, letterSpacing: "0.1em", padding: "1px 5px", borderRadius: 3, marginLeft: 4, verticalAlign: "middle" }}>BRUTOS</span>
                 </td>
                 <td style={{ background: "#f0f6fc", border: "1px solid #c8d8e8", padding: "7px 10px", textAlign: "center", fontSize: 10, fontWeight: 700, color: "#1a1a1a", letterSpacing: "0.04em", width: "50%" }}>
-                  SALARIO EN CONTRATO · <span style={{ color: "#3a6898", fontSize: 12 }}>{fmt(vacAcumulada ? baseRef : (baseRef + vacRef))} €</span> <span style={{ display: "inline-block", background: "#3a6898", color: "#fff", fontSize: 8, fontWeight: 700, letterSpacing: "0.1em", padding: "1px 5px", borderRadius: 3, marginLeft: 4, verticalAlign: "middle" }}>BRUTOS</span>
+                  SALARIO EN CONTRATO · <span style={{ color: "#3a6898", fontSize: 12 }}>{fmt(vacAcumulada ? baseRef : (baseRef + vacRef))} €</span> <span style={{ display: "inline-block", background: "#3a6898", color: "#f2f5f7", fontSize: 8, fontWeight: 700, letterSpacing: "0.1em", padding: "1px 5px", borderRadius: 3, marginLeft: 4, verticalAlign: "middle" }}>BRUTOS</span>
                   {vacAcumulada && <div style={{ fontSize: 7.5, color: "#5a7a9a", marginTop: 2, letterSpacing: "0.05em", fontStyle: "italic", fontWeight: 400 }}>Base 40h · vacaciones al final</div>}
                 </td>
               </tr>
@@ -2847,10 +2847,10 @@ function DocumentoImprimible({
             <tbody>
               <tr>
                 <td style={{ background: "#fdf8f0", border: "1px solid #e8d4a8", padding: "7px 10px", textAlign: "center", fontSize: 10, fontWeight: 700, color: "#1a1a1a", letterSpacing: "0.04em", width: "50%" }}>
-                  TOTAL MES 45H TODO INCLUIDO · <span style={{ color: "#b8864a", fontSize: 12 }}>{fmt(sumaRef)} €</span> <span style={{ display: "inline-block", background: "#b8864a", color: "#fff", fontSize: 8, fontWeight: 700, letterSpacing: "0.1em", padding: "1px 5px", borderRadius: 3, marginLeft: 4, verticalAlign: "middle" }}>BRUTOS</span>
+                  TOTAL MES 45H TODO INCLUIDO · <span style={{ color: "#b8864a", fontSize: 12 }}>{fmt(sumaRef)} €</span> <span style={{ display: "inline-block", background: "#b8864a", color: "#f2f5f7", fontSize: 8, fontWeight: 700, letterSpacing: "0.1em", padding: "1px 5px", borderRadius: 3, marginLeft: 4, verticalAlign: "middle" }}>BRUTOS</span>
                 </td>
                 <td style={{ background: "#f0f6fc", border: "1px solid #c8d8e8", padding: "7px 10px", textAlign: "center", fontSize: 10, fontWeight: 700, color: "#1a1a1a", letterSpacing: "0.04em", width: "50%" }}>
-                  SALARIO EN CONTRATO · <span style={{ color: "#3a6898", fontSize: 12 }}>{fmt(baseRef + vacRef)} €</span> <span style={{ display: "inline-block", background: "#3a6898", color: "#fff", fontSize: 8, fontWeight: 700, letterSpacing: "0.1em", padding: "1px 5px", borderRadius: 3, marginLeft: 4, verticalAlign: "middle" }}>BRUTOS</span>
+                  SALARIO EN CONTRATO · <span style={{ color: "#3a6898", fontSize: 12 }}>{fmt(baseRef + vacRef)} €</span> <span style={{ display: "inline-block", background: "#3a6898", color: "#f2f5f7", fontSize: 8, fontWeight: 700, letterSpacing: "0.1em", padding: "1px 5px", borderRadius: 3, marginLeft: 4, verticalAlign: "middle" }}>BRUTOS</span>
                 </td>
               </tr>
             </tbody>
@@ -2879,7 +2879,7 @@ function DocumentoImprimible({
       </table>
 
       {/* ═══ NÓMINA 45H POR MES TRABAJADO ═══ */}
-      <div style={sectionTitle}>▸ NÓMINA {es40h ? "40H" : "45H"} POR MES TRABAJADO <span style={{ display: "inline-block", background: "#b8864a", color: "#fff", fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", padding: "2px 7px", borderRadius: 3, marginLeft: 8, verticalAlign: "middle", textTransform: "uppercase" }}>Importes Brutos</span></div>
+      <div style={sectionTitle}>▸ NÓMINA {es40h ? "40H" : "45H"} POR MES TRABAJADO <span style={{ display: "inline-block", background: "#b8864a", color: "#f2f5f7", fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", padding: "2px 7px", borderRadius: 3, marginLeft: 8, verticalAlign: "middle", textTransform: "uppercase" }}>Importes Brutos</span></div>
       <table style={{ width: "100%", borderCollapse: "collapse" }}>
         <thead>
           <tr>
@@ -2903,7 +2903,7 @@ function DocumentoImprimible({
                 padding: "5px 4px", fontSize: 7,
                 textAlign: h.a, letterSpacing: "0.05em", textTransform: "uppercase", fontWeight: 700,
                 color: h.gold ? "#b8864a" : "#666",
-                background: "#fff",
+                background: "#f2f5f7",
                 border: "1px solid #d8d4ce",
               }}>{h.l}</th>
             ))}
@@ -2921,7 +2921,7 @@ function DocumentoImprimible({
             // En 40H restamos el plusAct del totalMes porque esa columna se elimina
             const totalRow = (es40h ? (d.totalMes - (d.plusAct || 0)) : d.totalMes) + fest + (c.total || 0);
             return (
-              <tr key={i} style={{ background: i % 2 === 0 ? "#fff" : "#fafaf7" }}>
+              <tr key={i} style={{ background: i % 2 === 0 ? "#f2f5f7" : "#fafaf7" }}>
                 <td style={tdCell({ textTransform: "capitalize", fontWeight: 700 })}>
                   {d.mes}
                   {!d.esCompleto && <span style={{ fontSize: 7, color: "#888", marginLeft: 3 }}>({d.desde}-{d.hasta})</span>}
@@ -2990,7 +2990,7 @@ function DocumentoImprimible({
       )}
 
       {/* ═══ RESUMEN DEL PERÍODO ═══ */}
-      <div style={sectionTitle}>▸ RESUMEN DEL PERÍODO <span style={{ display: "inline-block", background: "#b8864a", color: "#fff", fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", padding: "2px 7px", borderRadius: 3, marginLeft: 8, verticalAlign: "middle", textTransform: "uppercase" }}>Importes Brutos</span></div>
+      <div style={sectionTitle}>▸ RESUMEN DEL PERÍODO <span style={{ display: "inline-block", background: "#b8864a", color: "#f2f5f7", fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", padding: "2px 7px", borderRadius: 3, marginLeft: 8, verticalAlign: "middle", textTransform: "uppercase" }}>Importes Brutos</span></div>
       <table style={{ width: "100%", borderCollapse: "collapse" }}>
         <tbody>
           <tr>
@@ -3035,7 +3035,7 @@ function DocumentoImprimible({
           )}
           <tr style={{ background: "#fdf8f0" }}>
             <td style={{ ...tdLabel, background: "#fdf8f0", color: "#b8864a", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", fontSize: 10, padding: "8px 8px" }}>
-              TOTAL A PERCIBIR ({es40h ? "40h" : "45h"}) {tieneCompl ? "(sin extras)" : ""} <span style={{ display: "inline-block", background: "#b8864a", color: "#fff", fontSize: 8, fontWeight: 700, letterSpacing: "0.12em", padding: "1px 6px", borderRadius: 3, marginLeft: 6, verticalAlign: "middle", textTransform: "uppercase" }}>Importe Bruto</span>
+              TOTAL A PERCIBIR ({es40h ? "40h" : "45h"}) {tieneCompl ? "(sin extras)" : ""} <span style={{ display: "inline-block", background: "#b8864a", color: "#f2f5f7", fontSize: 8, fontWeight: 700, letterSpacing: "0.12em", padding: "1px 6px", borderRadius: 3, marginLeft: 6, verticalAlign: "middle", textTransform: "uppercase" }}>Importe Bruto</span>
             </td>
             <td style={{ ...tdValue, background: "#fdf8f0", textAlign: "right", fontSize: 13, fontWeight: 700, color: "#b8864a", padding: "8px 8px" }}>
               {fmtE((es40h ? (totFinal - (totPlus || 0)) : totFinal) + (totalFestImport45 || 0))}
@@ -4004,7 +4004,7 @@ ${docHTML}
               {/* v98: 5 botones de perfiles */}
               <button
                 onClick={() => { setMostrarModalCargar(true); if (accionesPerfiles?.recargar) accionesPerfiles.recargar(); }}
-                style={{ padding: "6px 10px", fontSize: 9, fontFamily: "'Courier Prime', 'Courier New', monospace", letterSpacing: "0.08em", textTransform: "uppercase", borderRadius: 3, cursor: "pointer", fontWeight: 700, border: "1px solid #5a8a5a", background: "#5a8a5a", color: "#fff" }}
+                style={{ padding: "6px 10px", fontSize: 9, fontFamily: "'Courier Prime', 'Courier New', monospace", letterSpacing: "0.08em", textTransform: "uppercase", borderRadius: 3, cursor: "pointer", fontWeight: 700, border: "1px solid #5a8a5a", background: "#5a8a5a", color: "#f2f5f7" }}
                 title="Cargar un perfil guardado"
               >📂 Cargar</button>
               <button
@@ -4050,7 +4050,7 @@ ${docHTML}
                   cursor: (p && desglose45.length) ? "pointer" : "not-allowed", fontWeight: 700,
                   border: "1px solid #b8864a",
                   background: (p && desglose45.length) ? "#b8864a" : "transparent",
-                  color: (p && desglose45.length) ? "#fff" : "#666",
+                  color: (p && desglose45.length) ? "#f2f5f7" : "#666",
                   opacity: (p && desglose45.length) ? 1 : 0.5,
                 }}
                 title="Descargar nómina como CSV (Excel)"
@@ -4064,7 +4064,7 @@ ${docHTML}
                   cursor: (p && desglose45.length) ? "pointer" : "not-allowed", fontWeight: 700,
                   border: "1px solid #b8864a",
                   background: (p && desglose45.length) ? "#b8864a" : "transparent",
-                  color: (p && desglose45.length) ? "#fff" : "#666",
+                  color: (p && desglose45.length) ? "#f2f5f7" : "#666",
                   opacity: (p && desglose45.length) ? 1 : 0.5,
                 }}
                 title="Abrir vista de PDF (Guardar HTML / Imprimir / Cerrar)"
@@ -4079,7 +4079,7 @@ ${docHTML}
                     cursor: "pointer", fontWeight: 700,
                     border: "1px solid #5a8a5a",
                     background: "#5a8a5a",
-                    color: "#fff",
+                    color: "#f2f5f7",
                   }}
                   title="Exportar listado de perfiles del proyecto a Excel/CSV"
                 >📊 Listado</button>
@@ -4204,7 +4204,7 @@ ${docHTML}
                   padding: "9px 11px",
                   borderRadius: 5,
                   border: `1px solid ${departamento ? "#d0ccc6" : "#c04040"}`,
-                  background: departamento ? "#f0ede8" : "#fff4f4",
+                  background: departamento ? "#dfe4e8" : "#fff4f4",
                   fontFamily: "'Courier Prime', 'Courier New', monospace",
                   fontSize: 12,
                   color: departamento ? "#1a1a1a" : "#c04040",
@@ -4225,7 +4225,7 @@ ${docHTML}
                 style={{
                   display: "flex", justifyContent: "space-between", alignItems: "center",
                   padding: "11px 13px",
-                  background: esFijoDiscontinuo ? "#faf1e0" : "#f0ede8",
+                  background: esFijoDiscontinuo ? "#faf1e0" : "#dfe4e8",
                   borderRadius: 6,
                   border: `1px solid ${esFijoDiscontinuo ? "#c8963a" : "#e0ddd8"}`,
                   marginTop: 10, cursor: "pointer",
@@ -4241,7 +4241,7 @@ ${docHTML}
                 </div>
                 <div style={{ position: "relative", width: 38, height: 20, flexShrink: 0, marginLeft: 12 }}>
                   <div style={{ width: "100%", height: "100%", borderRadius: 10, background: esFijoDiscontinuo ? "#c8a96e" : "#222", transition: "background 0.25s" }} />
-                  <div style={{ position: "absolute", top: 3, left: esFijoDiscontinuo ? 19 : 3, width: 14, height: 14, borderRadius: "50%", background: esFijoDiscontinuo ? "#fff" : "#aaa", transition: "left 0.25s", boxShadow: "0 1px 3px rgba(0,0,0,0.5)" }} />
+                  <div style={{ position: "absolute", top: 3, left: esFijoDiscontinuo ? 19 : 3, width: 14, height: 14, borderRadius: "50%", background: esFijoDiscontinuo ? "#f2f5f7" : "#aaa", transition: "left 0.25s", boxShadow: "0 1px 3px rgba(0,0,0,0.5)" }} />
                 </div>
               </div>
             )}
@@ -4253,7 +4253,7 @@ ${docHTML}
                 style={{
                   display: "flex", justifyContent: "space-between", alignItems: "center",
                   padding: "11px 13px",
-                  background: hxPorRodaje40 ? "#faf1e0" : "#f0ede8",
+                  background: hxPorRodaje40 ? "#faf1e0" : "#dfe4e8",
                   borderRadius: 6,
                   border: `1px solid ${hxPorRodaje40 ? "#c8963a" : "#e0ddd8"}`,
                   marginTop: 10, cursor: "pointer",
@@ -4269,7 +4269,7 @@ ${docHTML}
                 </div>
                 <div style={{ position: "relative", width: 38, height: 20, flexShrink: 0, marginLeft: 12 }}>
                   <div style={{ width: "100%", height: "100%", borderRadius: 10, background: hxPorRodaje40 ? "#c8a96e" : "#222", transition: "background 0.25s" }} />
-                  <div style={{ position: "absolute", top: 3, left: hxPorRodaje40 ? 19 : 3, width: 14, height: 14, borderRadius: "50%", background: hxPorRodaje40 ? "#fff" : "#aaa", transition: "left 0.25s", boxShadow: "0 1px 3px rgba(0,0,0,0.5)" }} />
+                  <div style={{ position: "absolute", top: 3, left: hxPorRodaje40 ? 19 : 3, width: 14, height: 14, borderRadius: "50%", background: hxPorRodaje40 ? "#f2f5f7" : "#aaa", transition: "left 0.25s", boxShadow: "0 1px 3px rgba(0,0,0,0.5)" }} />
                 </div>
               </div>
             )}
@@ -4286,7 +4286,7 @@ ${docHTML}
             }}>
               <div style={{ position:"relative", width:34, height:18, flexShrink:0 }}>
                 <div style={{ width:"100%", height:"100%", borderRadius:9, background:modoInverso45?"#b8864a":"#ddd", transition:"background 0.25s" }} />
-                <div style={{ position:"absolute", top:2, left:modoInverso45?17:2, width:14, height:14, borderRadius:"50%", background:modoInverso45?"#fff":"#aaa", transition:"left 0.25s" }} />
+                <div style={{ position:"absolute", top:2, left:modoInverso45?17:2, width:14, height:14, borderRadius:"50%", background:modoInverso45?"#f2f5f7":"#aaa", transition:"left 0.25s" }} />
               </div>
               <span style={{ fontSize:10, color:modoInverso45?"#7a5a2a":"#999", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", letterSpacing:"0.1em", textTransform:"uppercase", fontWeight:700 }}>Cálculo inverso</span>
             </div>
@@ -4296,7 +4296,7 @@ ${docHTML}
             ) : (
               <div style={{ marginBottom:14 }}>
                 <label style={LS}>Salario Pactado {es40h ? "40h" : "45h"}</label>
-                <div style={{ padding:"10px 14px", background:"#f0ede8", borderRadius:4, border:"1px solid #c8963a", textAlign:"center", marginBottom:4 }}>
+                <div style={{ padding:"10px 14px", background:"#dfe4e8", borderRadius:4, border:"1px solid #c8963a", textAlign:"center", marginBottom:4 }}>
                   {p && p45Inverso
                     ? <span style={{ fontSize:20, fontWeight:700, color:"#b8864a", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>{fmtE(p45Inverso)}</span>
                     : <span style={{ fontSize:12, color:"#aaa" }}>— introduce fechas y horas —</span>}
@@ -4308,7 +4308,7 @@ ${docHTML}
 
             {!es40h && <Field label="Horas de referencia / mes" value={horasRef} onChange={setHorasRef} hint="Nº horas extra del mes tipo (ej. 22)" />}
 
-            <div style={{ padding:12, background:"#f0ede8", borderRadius:6, border:"1px solid #e0ddd8" }}>
+            <div style={{ padding:12, background:"#dfe4e8", borderRadius:6, border:"1px solid #e0ddd8" }}>
               <div style={{ fontSize:9, color:"#666", letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:8 }}>Desglose mensual referencia</div>
               <div style={{ display:"grid", gridTemplateColumns: es40h ? "1fr 1fr 1fr" : "1fr 1fr", gap:6 }}>
                 {[
@@ -4317,14 +4317,14 @@ ${docHTML}
                   { l:"Indemnización",v:indemRef, s:(es40h && esFijoDiscontinuo) ? "(Base/30)×1,6433" : "(Base/30)×0,986" },
                   ...(es40h ? [] : [{ l:`H.Extra (${horasRef}h)`,v:hxRef,s:`${horasRef}h×${fmt(vHoraEx)}€`, blue:true }]),
                 ].map(it=>(
-                  <div key={it.l} style={{ background:"#fff", borderRadius:4, padding:"7px", border:"1px solid #e8e4de", textAlign:"center" }}>
+                  <div key={it.l} style={{ background:"#f2f5f7", borderRadius:4, padding:"7px", border:"1px solid #e8e4de", textAlign:"center" }}>
                     <div style={{ fontSize:8, color:"#666", textTransform:"uppercase", marginBottom:3 }}>{it.l}</div>
                     <div style={{ fontSize:12, fontWeight:700, color:it.blue?"#3a6898":"#1a1a1a" }}>{fmt(it.v)} €</div>
                     <div style={{ fontSize:8, color:"#888", marginTop:2 }}>{it.s}</div>
                   </div>
                 ))}
               </div>
-              <div style={{ marginTop:8, display:"flex", justifyContent:"space-between", alignItems:"center", padding:"6px 10px", background:"#fff", borderRadius:4, border:"1px solid #d8d4ce" }}>
+              <div style={{ marginTop:8, display:"flex", justifyContent:"space-between", alignItems:"center", padding:"6px 10px", background:"#f2f5f7", borderRadius:4, border:"1px solid #d8d4ce" }}>
                 <span style={{ fontSize:9, color:"#666", textTransform:"uppercase", letterSpacing:"0.1em" }}>{es40h ? "TOTAL ≈ P40" : "TOTAL ≈ P45"}</span>
                 <span style={{ fontSize:15, fontWeight:700, color:"#b8864a", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>{fmt(es40h ? (baseRef + vacRef + indemRef) : sumaRef)} €</span>
               </div>
@@ -4355,7 +4355,7 @@ ${docHTML}
                       }
                     }}
                     title="El perfil cargado difiere del calendario. Pulsa para recalcular desde el calendario."
-                    style={{ background: "#b8864a", color: "#fff", border: "none", padding: "6px 10px", borderRadius: 3, cursor: "pointer", fontFamily: "'Courier Prime', 'Courier New', monospace", fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", flexShrink: 0 }}
+                    style={{ background: "#b8864a", color: "#f2f5f7", border: "none", padding: "6px 10px", borderRadius: 3, cursor: "pointer", fontFamily: "'Courier Prime', 'Courier New', monospace", fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", flexShrink: 0 }}
                   >📅 Aplicar calendario</button>
                 )}
               </div>
@@ -4373,14 +4373,14 @@ ${docHTML}
               />
             </div>
             {p ? (
-              <div style={{ marginTop:8, padding:12, background:"#f0ede8", borderRadius:6, border:"1px solid #e0ddd8" }}>
+              <div style={{ marginTop:8, padding:12, background:"#dfe4e8", borderRadius:6, border:"1px solid #e0ddd8" }}>
                 <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:6, marginBottom:8 }}>
                   {[
                     { l:"Días",     v:p.diasNormalizados, d:0 },
                     { l:"Meses",    v:p.mesesTotales,     d:4 },
                     { l:"Sem. L-V", v:p.semanasTotales,   d:1 },
                   ].map(it=>(
-                    <div key={it.l} style={{ textAlign:"center", padding:"6px 4px", background:"#fff", borderRadius:4 }}>
+                    <div key={it.l} style={{ textAlign:"center", padding:"6px 4px", background:"#f2f5f7", borderRadius:4 }}>
                       <div style={{ fontSize:8, color:"#666", textTransform:"uppercase", marginBottom:3 }}>{it.l}</div>
                       <div style={{ fontSize:13, fontWeight:700, color:"#b8864a" }}>{it.d===0?it.v:it.d===1?fmt(it.v,1):fmtM(it.v)}</div>
                     </div>
@@ -4489,16 +4489,16 @@ ${docHTML}
                       }}
                       style={{
                         display:"flex", alignItems:"center", gap:8, padding:"7px 10px", marginBottom:4,
-                        background: activo ? "rgba(106,58,154,0.08)" : "#f0ede8",
+                        background: activo ? "rgba(106,58,154,0.08)" : "#dfe4e8",
                         border: `1px solid ${activo ? "#8a5aaa" : "#e0ddd8"}`,
                         borderRadius:5, cursor:"pointer",
                       }}>
                       <div style={{
                         width:16, height:16, borderRadius:3, flexShrink:0,
                         border:`1.5px solid ${activo ? "#6a3a9a" : "#bbb"}`,
-                        background: activo ? "#6a3a9a" : "#fff",
+                        background: activo ? "#6a3a9a" : "#f2f5f7",
                         display:"flex", alignItems:"center", justifyContent:"center",
-                        color:"#fff", fontSize:11, fontWeight:700,
+                        color:"#f2f5f7", fontSize:11, fontWeight:700,
                       }}>
                         {activo ? "✓" : ""}
                       </div>
@@ -4516,7 +4516,7 @@ ${docHTML}
                     </div>
                   );
                 })}
-                <div style={{ marginTop:8, padding:"6px 10px", background:"#f0ede8", borderRadius:4, display:"flex", justifyContent:"space-between" }}>
+                <div style={{ marginTop:8, padding:"6px 10px", background:"#dfe4e8", borderRadius:4, display:"flex", justifyContent:"space-between" }}>
                   <span style={{ fontSize:9, color:"#888", textTransform:"uppercase", letterSpacing:"0.1em", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>Activos</span>
                   <span style={{ fontSize:11, fontWeight:700, color:"#6a3a9a", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>
                     {Object.keys(festivosActivos).filter(k=>festsRango.some(f=>f.fecha===k)).length} / {festsRango.length}
@@ -4551,12 +4551,12 @@ ${docHTML}
                         a[i] = isNaN(v) ? null : v;
                         setComidaDiasPorMes(a);
                       }}
-                      style={{ background: isOverride?"#fff8f0":"#f0ede8", border:`1px solid ${isOverride?"#c8963a":"#d0ccc6"}`, borderRadius:4, color:"#1a1a1a", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize:12, padding:"5px 6px", outline:"none", textAlign:"center", colorScheme:"light", minWidth:0 }}
+                      style={{ background: isOverride?"#fff8f0":"#dfe4e8", border:`1px solid ${isOverride?"#c8963a":"#d0ccc6"}`, borderRadius:4, color:"#1a1a1a", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize:12, padding:"5px 6px", outline:"none", textAlign:"center", colorScheme:"light", minWidth:0 }}
                       onFocus={e=>e.target.style.borderColor="#b8864a"} onBlur={e=>e.target.style.borderColor=isOverride?"#c8963a":"#d0ccc6"} />
                   </div>
                 );
               })}
-              <div style={{ marginTop:8, padding:"6px 10px", background:"#f0ede8", borderRadius:4, display:"flex", justifyContent:"space-between" }}>
+              <div style={{ marginTop:8, padding:"6px 10px", background:"#dfe4e8", borderRadius:4, display:"flex", justifyContent:"space-between" }}>
                 <span style={{ fontSize:9, color:"#888", textTransform:"uppercase", letterSpacing:"0.1em" }}>Total días comida</span>
                 <span style={{ fontSize:12, fontWeight:700, color:"#b8864a" }}>{complementos45.reduce((s,c)=>s+c.diasComida,0)}d</span>
               </div>
@@ -4572,7 +4572,7 @@ ${docHTML}
             <Toggle label="Vacaciones al final"    value={vacAcumulada}   onChange={(v)=>{ modosToggleadoManualRef.current.vac = true; setVacAcumulada(v); }}   sublabel={vacAcumulada?"Total vacaciones en última nómina":"Prorrateadas cada mes"} />
             <Toggle label="Indemnización al final" value={indemAcumulada || finiquitoAparte} onChange={(v)=>{ modosToggleadoManualRef.current.ind = true; setIndemAcumulada(v); }} sublabel={finiquitoAparte ? "Forzado por 'Finiquito aparte'" : (indemAcumulada?"Total indemnización en última nómina":"Prorrateada cada mes")} disabled={finiquitoAparte} />
             <Toggle label="Finiquito aparte del salario pactado" value={finiquitoAparte} onChange={setFiniquitoAparte} sublabel={finiquitoAparte?"Salario pactado NO incluye indemnización (se paga aparte)":"Salario pactado incluye indemnización prorrateada"} />
-            <div style={{ fontSize:9, color:"#888", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", marginTop:4, padding:"6px 10px", background:"#f0ede8", borderRadius:4, border:"1px solid #e0ddd8" }}>
+            <div style={{ fontSize:9, color:"#888", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", marginTop:4, padding:"6px 10px", background:"#dfe4e8", borderRadius:4, border:"1px solid #e0ddd8" }}>
               ℹ Las horas extra siempre se cobran el mes que se generan
             </div>
           </div>
@@ -4590,7 +4590,7 @@ ${docHTML}
                   <div style={{ display:"flex", gap:3 }}>
                     {["mes","sem"].map(m=>(
                       <button key={m} onClick={()=>set(p=>({...p,modo:m}))}
-                        style={{ padding:"2px 7px", fontSize:9, fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", letterSpacing:"0.08em", textTransform:"uppercase", border:"1px solid #d0ccc6", borderRadius:3, cursor:"pointer", fontWeight:700, background:plus.modo===m?"#1a1a1a":"#fff", color:plus.modo===m?"#fff":"#888" }}>
+                        style={{ padding:"2px 7px", fontSize:9, fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", letterSpacing:"0.08em", textTransform:"uppercase", border:"1px solid #d0ccc6", borderRadius:3, cursor:"pointer", fontWeight:700, background:plus.modo===m?"#1a1a1a":"#f2f5f7", color:plus.modo===m?"#f2f5f7":"#888" }}>
                         {m==="mes"?"€/mes":"€/sem"}
                       </button>
                     ))}
@@ -4641,7 +4641,7 @@ ${docHTML}
                     { l:"Indemnización",v:indemRef, s:(es40h && esFijoDiscontinuo) ? "(Base/30) × 1,6433" : "(Base/30) × 0,986" },
                     ...(es40h ? [] : [{ l:`H.Extra (${horasRef}h)`, v:hxRef, s:`${horasRef}h × ${fmt(vHoraEx)}€`, blue:true }]),
                   ].map(it=>(
-                    <div key={it.l} style={{ background:"#f0ede8", borderRadius:6, padding:"12px 10px", border:"1px solid #e0ddd8", textAlign:"center" }}>
+                    <div key={it.l} style={{ background:"#dfe4e8", borderRadius:6, padding:"12px 10px", border:"1px solid #e0ddd8", textAlign:"center" }}>
                       <div style={{ fontSize:9, color:"#666", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:6 }}>{it.l}</div>
                       <div style={{ fontSize:15, fontWeight:700, color:it.blue?"#3a6898":"#1a1a1a" }}>{fmt(it.v)} €</div>
                       <div style={{ fontSize:8, color:"#888", marginTop:4 }}>{it.s}</div>
@@ -4697,7 +4697,7 @@ ${docHTML}
                     { l:"Hora Extra ×1,5",  v: vHoraEx,             s:"Hora × 1,5",   blue:true },
                     { l:"Festivo ×1,75",    v: salarioDia * 1.75,   s:"Día × 1,75",   purple:true },
                   ].map(it=>(
-                    <div key={it.l} style={{ background:"#f0ede8", borderRadius:6, padding:"12px 10px", border:`1px solid ${it.purple?"#d0b8e8":it.blue?"#b8cce0":"#e0ddd8"}`, textAlign:"center" }}>
+                    <div key={it.l} style={{ background:"#dfe4e8", borderRadius:6, padding:"12px 10px", border:`1px solid ${it.purple?"#d0b8e8":it.blue?"#b8cce0":"#e0ddd8"}`, textAlign:"center" }}>
                       <div style={{ fontSize:8, color:"#666", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:6 }}>{it.l}</div>
                       <div style={{ fontSize:15, fontWeight:700, color:it.purple?"#6a3a9a":it.blue?"#3a6898":"#1a1a1a" }}>{fmt(it.v)} €</div>
                       <div style={{ fontSize:8, color:"#888", marginTop:4 }}>{it.s}</div>
@@ -4943,15 +4943,15 @@ ${docHTML}
                           ▸ Coste Empresa (vista rápida) <span style={{ fontSize:8, color:"#b8864a", marginLeft:6, letterSpacing:"0.08em" }}>solo admin · solo SS</span>
                         </summary>
                         <div style={{ marginTop:10, display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:10 }}>
-                          <div style={{ padding:"10px 12px", background:"#fff", borderRadius:5, border:"1px solid #e0d4b8" }}>
+                          <div style={{ padding:"10px 12px", background:"#f2f5f7", borderRadius:5, border:"1px solid #e0d4b8" }}>
                             <div style={{ fontSize:9, color:"#8a5030", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:4 }}>Coste SS Empresa</div>
                             <div style={{ fontSize:16, fontWeight:700, color:"#8a5030", fontFamily:"'Courier Prime', 'Courier New', monospace" }}>{fmtE(costeSSTotal)}</div>
                           </div>
-                          <div style={{ padding:"10px 12px", background:"#fff", borderRadius:5, border:"1px solid #e0d4b8" }}>
+                          <div style={{ padding:"10px 12px", background:"#f2f5f7", borderRadius:5, border:"1px solid #e0d4b8" }}>
                             <div style={{ fontSize:9, color:"#8a5030", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:4 }}>Coste Total</div>
                             <div style={{ fontSize:16, fontWeight:700, color:"#8a5030", fontFamily:"'Courier Prime', 'Courier New', monospace" }}>{fmtE(costeTotal)}</div>
                           </div>
-                          <div style={{ padding:"10px 12px", background:"#fff", borderRadius:5, border:"1px solid #e0d4b8" }}>
+                          <div style={{ padding:"10px 12px", background:"#f2f5f7", borderRadius:5, border:"1px solid #e0d4b8" }}>
                             <div style={{ fontSize:9, color:"#8a5030", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:4 }}>% s/Salario</div>
                             <div style={{ fontSize:16, fontWeight:700, color:"#8a5030", fontFamily:"'Courier Prime', 'Courier New', monospace" }}>{pctSobre.toFixed(2)} %</div>
                           </div>
@@ -5038,7 +5038,7 @@ ${docHTML}
             cursor: (p && desglose45.length) ? "pointer" : "not-allowed", fontWeight: 700,
             border: "1px solid #b8864a",
             background: (p && desglose45.length) ? "#b8864a" : "transparent",
-            color: (p && desglose45.length) ? "#fff" : "#666",
+            color: (p && desglose45.length) ? "#f2f5f7" : "#666",
             opacity: (p && desglose45.length) ? 1 : 0.5,
             transition: "all 0.15s",
           }}
@@ -5053,7 +5053,7 @@ ${docHTML}
             cursor: (p && desglose45.length) ? "pointer" : "not-allowed", fontWeight: 700,
             border: "1px solid #b8864a",
             background: (p && desglose45.length) ? "#b8864a" : "transparent",
-            color: (p && desglose45.length) ? "#fff" : "#666",
+            color: (p && desglose45.length) ? "#f2f5f7" : "#666",
             opacity: (p && desglose45.length) ? 1 : 0.5,
             transition: "all 0.15s",
           }}
@@ -5069,7 +5069,7 @@ ${docHTML}
               cursor: "pointer", fontWeight: 700,
               border: "1px solid #5a8a5a",
               background: "#5a8a5a",
-              color: "#fff",
+              color: "#f2f5f7",
               transition: "all 0.15s",
             }}
             title="Exportar listado de perfiles del proyecto a Excel/CSV"
@@ -5111,10 +5111,10 @@ ${docHTML}
       {/* v98: Modal Guardar perfil */}
       {mostrarModalGuardar && accionesPerfiles && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 100, display: "flex", justifyContent: "center", alignItems: "center", padding: 20 }} onClick={() => setMostrarModalGuardar(false)}>
-          <div style={{ background: "#faf7f2", borderRadius: 8, padding: 24, maxWidth: 500, width: "100%", fontFamily: "'Courier Prime', 'Courier New', monospace" }} onClick={e => e.stopPropagation()}>
+          <div style={{ background: "#e8ecef", borderRadius: 8, padding: 24, maxWidth: 500, width: "100%", fontFamily: "'Courier Prime', 'Courier New', monospace" }} onClick={e => e.stopPropagation()}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, paddingBottom: 12, borderBottom: "2px solid #5a8a5a" }}>
               <h2 style={{ margin: 0, fontSize: 14, letterSpacing: "0.15em", textTransform: "uppercase", color: "#1a1a1a", fontWeight: 700 }}>💾 Guardar perfil</h2>
-              <button onClick={() => setMostrarModalGuardar(false)} style={{ background: "#fff", border: "1px solid #ccc", padding: "6px 12px", borderRadius: 4, cursor: "pointer", fontSize: 11, color: "#666", fontFamily: "'Courier Prime', 'Courier New', monospace", fontWeight: 700 }}>✕ Cerrar</button>
+              <button onClick={() => setMostrarModalGuardar(false)} style={{ background: "#f2f5f7", border: "1px solid #ccc", padding: "6px 12px", borderRadius: 4, cursor: "pointer", fontSize: 11, color: "#666", fontFamily: "'Courier Prime', 'Courier New', monospace", fontWeight: 700 }}>✕ Cerrar</button>
             </div>
             <label style={{ display: "block", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "#666", marginBottom: 6, fontWeight: 700 }}>Nombre del perfil</label>
             <input
@@ -5128,7 +5128,7 @@ ${docHTML}
                 }
               }}
               autoFocus
-              style={{ width: "100%", padding: "10px 12px", fontSize: 13, fontFamily: "'Courier Prime', 'Courier New', monospace", border: "1px solid #d0ccc6", borderRadius: 5, color: "#1a1a1a", background: "#fff", outline: "none", boxSizing: "border-box" }}
+              style={{ width: "100%", padding: "10px 12px", fontSize: 13, fontFamily: "'Courier Prime', 'Courier New', monospace", border: "1px solid #d0ccc6", borderRadius: 5, color: "#1a1a1a", background: "#f2f5f7", outline: "none", boxSizing: "border-box" }}
             />
             <div style={{ fontSize: 9, color: "#999", marginTop: 4, fontStyle: "italic" }}>Puedes editar el nombre sugerido. Escribir NO borra el texto (edítalo como quieras).</div>
             <div style={{ marginTop: 16, display: "flex", justifyContent: "flex-end", gap: 8 }}>
@@ -5140,7 +5140,7 @@ ${docHTML}
                   setMostrarModalGuardar(false);
                 }}
                 disabled={!nombreGuardarModal.trim()}
-                style={{ background: nombreGuardarModal.trim() ? "#5a8a5a" : "#ccc", color: "#fff", border: "none", padding: "10px 18px", borderRadius: 5, cursor: nombreGuardarModal.trim() ? "pointer" : "not-allowed", fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "'Courier Prime', 'Courier New', monospace" }}
+                style={{ background: nombreGuardarModal.trim() ? "#5a8a5a" : "#ccc", color: "#f2f5f7", border: "none", padding: "10px 18px", borderRadius: 5, cursor: nombreGuardarModal.trim() ? "pointer" : "not-allowed", fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "'Courier Prime', 'Courier New', monospace" }}
               >💾 Guardar</button>
             </div>
           </div>
@@ -6575,7 +6575,7 @@ function PanelAdmin({ usuarioActual, onCerrar }) {
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 1000, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: 20, overflowY: "auto" }}>
-      <div style={{ background: "#f0ede8", borderRadius: 10, padding: 24, maxWidth: 900, width: "100%", marginTop: 40, boxShadow: "0 20px 60px rgba(0,0,0,0.5)" }}>
+      <div style={{ background: "#dfe4e8", borderRadius: 10, padding: 24, maxWidth: 900, width: "100%", marginTop: 40, boxShadow: "0 20px 60px rgba(0,0,0,0.5)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
           <h2 style={{ margin: 0, fontSize: 14, letterSpacing: "0.15em", textTransform: "uppercase", color: "#1a1a1a", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>⚙ Gestión de Usuarios</h2>
           <button onClick={onCerrar} style={btn("#1a1a1a")}>✕ Cerrar</button>
@@ -6587,7 +6587,7 @@ function PanelAdmin({ usuarioActual, onCerrar }) {
           {!mostrarNuevo ? (
             <button onClick={() => setMostrarNuevo(true)} style={btn("#5a8a5a")}>+ Añadir usuario</button>
           ) : (
-            <div style={{ padding: 12, background: "#fff", borderRadius: 6, border: "1px solid #d0ccc6", display: "grid", gridTemplateColumns: "1fr 100px auto auto auto", gap: 8, alignItems: "center" }}>
+            <div style={{ padding: 12, background: "#f2f5f7", borderRadius: 6, border: "1px solid #d0ccc6", display: "grid", gridTemplateColumns: "1fr 100px auto auto auto", gap: 8, alignItems: "center" }}>
               <input style={inp} placeholder="Nombre" value={nuevoForm.nombre} onChange={e => setNuevoForm({ ...nuevoForm, nombre: e.target.value })} />
               <input style={inp} placeholder="PIN" value={nuevoForm.pin} onChange={e => setNuevoForm({ ...nuevoForm, pin: e.target.value })} />
               <label style={{ fontSize: 10, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", display: "flex", alignItems: "center", gap: 4 }}>
@@ -6602,7 +6602,7 @@ function PanelAdmin({ usuarioActual, onCerrar }) {
         {cargando ? (
           <div style={{ padding: 20, textAlign: "center", color: "#888", fontSize: 11 }}>Cargando...</div>
         ) : (
-          <div style={{ background: "#fff", borderRadius: 6, overflow: "hidden", border: "1px solid #d0ccc6" }}>
+          <div style={{ background: "#f2f5f7", borderRadius: 6, overflow: "hidden", border: "1px solid #d0ccc6" }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead><tr>
                 <th style={TH}>Nombre</th>
@@ -6759,7 +6759,7 @@ function PanelLogs({ usuarioActual, onCerrar }) {
 
   const C = { padding: "7px 10px", fontSize: 10.5, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", borderBottom: "1px solid #eae7e2", verticalAlign: "top" };
   const TH = { ...C, fontSize: 9, letterSpacing: "0.12em", textTransform: "uppercase", color: "#666", fontWeight: 700, textAlign: "left", borderBottom: "1px solid #d0ccc6", whiteSpace: "nowrap" };
-  const inp = { padding: "6px 8px", fontSize: 11, border: "1px solid #c0bcb5", borderRadius: 4, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", background: "#fff" };
+  const inp = { padding: "6px 8px", fontSize: 11, border: "1px solid #c0bcb5", borderRadius: 4, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", background: "#f2f5f7" };
   const btn = (bg, color = "#fff") => ({ padding: "6px 12px", fontSize: 10, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", background: bg, color, border: "none", borderRadius: 4, cursor: "pointer" });
 
   // Lista de usuarios únicos para el dropdown
@@ -6767,7 +6767,7 @@ function PanelLogs({ usuarioActual, onCerrar }) {
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 1000, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: 20, overflowY: "auto" }}>
-      <div style={{ background: "#f0ede8", borderRadius: 10, padding: 24, maxWidth: 1000, width: "100%", marginTop: 40, boxShadow: "0 20px 60px rgba(0,0,0,0.5)" }}>
+      <div style={{ background: "#dfe4e8", borderRadius: 10, padding: 24, maxWidth: 1000, width: "100%", marginTop: 40, boxShadow: "0 20px 60px rgba(0,0,0,0.5)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
           <h2 style={{ margin: 0, fontSize: 14, letterSpacing: "0.15em", textTransform: "uppercase", color: "#1a1a1a", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>📊 Logs de Actividad</h2>
           <button onClick={onCerrar} style={btn("#1a1a1a")}>✕ Cerrar</button>
@@ -6801,11 +6801,11 @@ function PanelLogs({ usuarioActual, onCerrar }) {
         {cargando ? (
           <div style={{ padding: 20, textAlign: "center", color: "#888", fontSize: 11 }}>Cargando logs...</div>
         ) : logs.length === 0 ? (
-          <div style={{ padding: 30, textAlign: "center", color: "#888", fontSize: 11, background: "#fff", borderRadius: 6, border: "1px solid #d0ccc6" }}>No hay logs con los filtros seleccionados</div>
+          <div style={{ padding: 30, textAlign: "center", color: "#888", fontSize: 11, background: "#f2f5f7", borderRadius: 6, border: "1px solid #d0ccc6" }}>No hay logs con los filtros seleccionados</div>
         ) : (
-          <div style={{ background: "#fff", borderRadius: 6, overflow: "hidden", border: "1px solid #d0ccc6", maxHeight: "60vh", overflowY: "auto" }}>
+          <div style={{ background: "#f2f5f7", borderRadius: 6, overflow: "hidden", border: "1px solid #d0ccc6", maxHeight: "60vh", overflowY: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead style={{ position: "sticky", top: 0, background: "#f0ede8", zIndex: 1 }}>
+              <thead style={{ position: "sticky", top: 0, background: "#dfe4e8", zIndex: 1 }}>
                 <tr>
                   <th style={TH}>Fecha</th>
                   <th style={TH}>Usuario</th>
@@ -7031,7 +7031,7 @@ function PanelPuestos({ usuarioActual, onCerrar }) {
     alignItems: "flex-start", justifyContent: "center", padding: "30px 16px", overflowY: "auto",
   };
   const modalStyle = {
-    background: "#f0ede8", borderRadius: 8, maxWidth: 1100, width: "100%",
+    background: "#dfe4e8", borderRadius: 8, maxWidth: 1100, width: "100%",
     fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", color: "#1a1a1a",
     boxShadow: "0 10px 40px rgba(0,0,0,0.5)",
   };
@@ -7050,7 +7050,7 @@ function PanelPuestos({ usuarioActual, onCerrar }) {
   const btnOk = { ...btnStyle, color: "#5a8a5a", borderColor: "#5a8a5a" };
   const inp = {
     padding: "7px 10px", border: "1px solid #c0bcb5", borderRadius: 4,
-    fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize: 11, background: "#fff",
+    fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize: 11, background: "#f2f5f7",
   };
 
   return (
@@ -7078,7 +7078,7 @@ function PanelPuestos({ usuarioActual, onCerrar }) {
                 Esto <strong style={{ color: "#a04545" }}>BORRARÁ los {puestos.length} puestos actuales</strong> y los reemplazará por los nuevos del Excel.
               </div>
               {previewImport.avisos.length > 0 && (
-                <div style={{ background: "#fff", padding: "8px 10px", borderRadius: 4, marginBottom: 10, fontSize: 10, maxHeight: 100, overflowY: "auto" }}>
+                <div style={{ background: "#f2f5f7", padding: "8px 10px", borderRadius: 4, marginBottom: 10, fontSize: 10, maxHeight: 100, overflowY: "auto" }}>
                   <strong>Avisos:</strong>
                   <ul style={{ margin: "4px 0 0 16px", padding: 0 }}>
                     {previewImport.avisos.map((a, i) => <li key={i}>{a}</li>)}
@@ -7121,7 +7121,7 @@ function PanelPuestos({ usuarioActual, onCerrar }) {
 
           {/* Formulario nuevo */}
           {mostrarFormNuevo && (
-            <div style={{ background: "#fff", border: "1px solid #c8a96e", borderRadius: 6, padding: 14, marginBottom: 14 }}>
+            <div style={{ background: "#f2f5f7", border: "1px solid #c8a96e", borderRadius: 6, padding: 14, marginBottom: 14 }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: "#7a5a2a", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 8 }}>Nuevo puesto</div>
               <div style={{ display: "grid", gridTemplateColumns: "150px 1fr 1fr auto", gap: 8 }}>
                 <input type="text" placeholder="Código" value={formNuevo.codigo} onChange={e => setFormNuevo({ ...formNuevo, codigo: e.target.value })} style={inp} />
@@ -7139,8 +7139,8 @@ function PanelPuestos({ usuarioActual, onCerrar }) {
           {cargando ? (
             <div style={{ textAlign: "center", padding: 30, color: "#888", fontSize: 11 }}>Cargando puestos...</div>
           ) : (
-            <div style={{ background: "#fff", border: "1px solid #e0ddd8", borderRadius: 6, maxHeight: 500, overflowY: "auto" }}>
-              <div style={{ display: "grid", gridTemplateColumns: "130px 1fr 1fr 110px", gap: 8, padding: "8px 12px", background: "#f0ede8", borderBottom: "1px solid #d0ccc6", fontSize: 9, letterSpacing: "0.1em", textTransform: "uppercase", color: "#666", fontWeight: 700, position: "sticky", top: 0 }}>
+            <div style={{ background: "#f2f5f7", border: "1px solid #e0ddd8", borderRadius: 6, maxHeight: 500, overflowY: "auto" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "130px 1fr 1fr 110px", gap: 8, padding: "8px 12px", background: "#dfe4e8", borderBottom: "1px solid #d0ccc6", fontSize: 9, letterSpacing: "0.1em", textTransform: "uppercase", color: "#666", fontWeight: 700, position: "sticky", top: 0 }}>
                 <div>Código</div><div>Nombre</div><div>Categoría</div><div style={{ textAlign: "right" }}>Acciones</div>
               </div>
               {puestosFiltrados.length === 0 ? (
@@ -7657,7 +7657,7 @@ function CosteEmpresa() {
   .datos .l { font-size: 6.5px; color: #888; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 2px; }
   .datos .v { font-size: 9px; font-weight: 700; }
   table { width: 100%; border-collapse: collapse; font-size: 7px; table-layout: fixed; }
-  th { background: #f0ede8; color: #666; font-size: 6.5px; letter-spacing: 0.03em; text-transform: uppercase; font-weight: 700; padding: 4px 2px; border-bottom: 1px solid #d0ccc6; text-align: right; word-wrap: break-word; }
+  th { background: #dfe4e8; color: #666; font-size: 6.5px; letter-spacing: 0.03em; text-transform: uppercase; font-weight: 700; padding: 4px 2px; border-bottom: 1px solid #d0ccc6; text-align: right; word-wrap: break-word; }
   th.first { text-align: left; }
   th.gold { color: #b8864a; }
   th.red { color: #a04545; }
@@ -7680,7 +7680,7 @@ function CosteEmpresa() {
   tr.total td.first { color: #6a2020; text-transform: uppercase; letter-spacing: 0.08em; font-size: 7px; }
   .ce table tr.total td { background: #fdf0f0; }
   .resumen { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-top: 8px; }
-  .resumen > div { background: #f0ede8; border: 1px solid #e0ddd8; border-radius: 3px; padding: 6px; text-align: center; }
+  .resumen > div { background: #dfe4e8; border: 1px solid #e0ddd8; border-radius: 3px; padding: 6px; text-align: center; }
   .resumen .l { font-size: 6.5px; color: #666; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 3px; }
   .resumen .v { font-size: 10px; font-weight: 700; }
   .resumen .vL { font-size: 12px; font-weight: 700; }
@@ -8014,12 +8014,12 @@ function CosteEmpresa() {
                 placeholder="🔍 Buscar perfil, trabajador o proyecto..."
                 value={busqueda}
                 onChange={e => setBusqueda(e.target.value)}
-                style={{ flex: 1, minWidth: 200, padding: "8px 12px", border: "1px solid #c0bcb5", borderRadius: 4, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize: 11, background: "#f0ede8" }}
+                style={{ flex: 1, minWidth: 200, padding: "8px 12px", border: "1px solid #c0bcb5", borderRadius: 4, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize: 11, background: "#dfe4e8" }}
               />
               <select
                 value={filtroTipo}
                 onChange={e => setFiltroTipo(e.target.value)}
-                style={{ padding: "8px 12px", border: "1px solid #c0bcb5", borderRadius: 4, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize: 11, background: "#f0ede8" }}
+                style={{ padding: "8px 12px", border: "1px solid #c0bcb5", borderRadius: 4, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize: 11, background: "#dfe4e8" }}
               >
                 <option value="todos">Todos los tipos</option>
                 <option value="45h">Solo 45H</option>
@@ -8045,7 +8045,7 @@ function CosteEmpresa() {
                       onClick={() => cargarPerfil(p)}>
                       <div style={{ minWidth: 0, flex: 1 }}>
                         <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a" }}>
-                          {p.nombre} <span style={{ background: t.color, color: "#fff", padding: "1px 6px", borderRadius: 3, fontSize: 8, marginLeft: 4, letterSpacing: "0.05em" }}>{t.txt}</span>
+                          {p.nombre} <span style={{ background: t.color, color: "#f2f5f7", padding: "1px 6px", borderRadius: 3, fontSize: 8, marginLeft: 4, letterSpacing: "0.05em" }}>{t.txt}</span>
                         </div>
                         <div style={{ fontSize: 9.5, color: "#888", marginTop: 2 }}>
                           {trabajador} · {puesto} · {fmtFecha(p.timestamp)} · por {autor}
@@ -8068,7 +8068,7 @@ function CosteEmpresa() {
             </div>
           </div>
 
-          <div style={{ textAlign: "center", padding: 30, color: "#aaa", fontStyle: "italic", fontSize: 11, background: "#fff", borderRadius: 8, border: "1px dashed #d0ccc6" }}>
+          <div style={{ textAlign: "center", padding: 30, color: "#aaa", fontStyle: "italic", fontSize: 11, background: "#f2f5f7", borderRadius: 8, border: "1px dashed #d0ccc6" }}>
             ⬆ Carga un perfil para empezar a calcular el coste empresa
           </div>
         </div>
@@ -8098,7 +8098,7 @@ function CosteEmpresa() {
             <div>
               <div style={{ fontSize: 9, color: "#c8a96e", letterSpacing: "0.2em", textTransform: "uppercase" }}>Perfil cargado</div>
               <div style={{ fontSize: 13, fontWeight: 700, marginTop: 2 }}>
-                {perfilCargado.nombre} <span style={{ background: tipo.color, color: "#fff", padding: "1px 6px", borderRadius: 3, fontSize: 8, marginLeft: 4, letterSpacing: "0.05em" }}>{tipo.txt}</span>
+                {perfilCargado.nombre} <span style={{ background: tipo.color, color: "#f2f5f7", padding: "1px 6px", borderRadius: 3, fontSize: 8, marginLeft: 4, letterSpacing: "0.05em" }}>{tipo.txt}</span>
               </div>
               <div style={{ fontSize: 9.5, color: "#aaa", marginTop: 2 }}>
                 {d.nombre || "—"} · {d.puesto || "—"} · {fmtFecha(perfilCargado.timestamp)}
@@ -8158,7 +8158,7 @@ function CosteEmpresa() {
               { l: "Salario pactado", v: d.salario45 ? `${fmt(Number(d.salario45))} €` : "—" },
               { l: "Período", v: (d.fechaInicio && d.fechaFin) ? `${d.fechaInicio} → ${d.fechaFin}` : "—" },
             ].map(it => (
-              <div key={it.l} style={{ background: "#f0ede8", borderRadius: 6, padding: "10px 12px", border: "1px solid #e0ddd8" }}>
+              <div key={it.l} style={{ background: "#dfe4e8", borderRadius: 6, padding: "10px 12px", border: "1px solid #e0ddd8" }}>
                 <div style={{ fontSize: 9, color: "#666", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 4 }}>{it.l}</div>
                 <div style={{ fontSize: 12, fontWeight: 700 }}>{it.v || "—"}</div>
               </div>
@@ -8169,7 +8169,7 @@ function CosteEmpresa() {
           <div style={{ background: "#faf6ee", border: "1px solid #d8c8a0", borderRadius: 6, padding: "10px 14px", marginTop: 12, display: "flex", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
             <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", flex: "0 0 auto" }}>
               <span style={{ position: "relative", display: "inline-block", width: 38, height: 20, background: irpfActivo ? "#2a6e2a" : "#bbb", borderRadius: 10, transition: "background 0.15s" }}>
-                <span style={{ position: "absolute", top: 2, left: irpfActivo ? 20 : 2, width: 16, height: 16, background: "#fff", borderRadius: "50%", transition: "left 0.15s" }} />
+                <span style={{ position: "absolute", top: 2, left: irpfActivo ? 20 : 2, width: 16, height: 16, background: "#f2f5f7", borderRadius: "50%", transition: "left 0.15s" }} />
               </span>
               <input type="checkbox" checked={irpfActivo} onChange={e => setIrpfActivo(e.target.checked)} style={{ display: "none" }} />
               <span style={{ fontSize: 11, fontWeight: 700, color: "#555", letterSpacing: "0.05em" }}>
@@ -8201,7 +8201,7 @@ function CosteEmpresa() {
             <div style={{ background: "#f0f5ee", border: "1px solid #c8d8b8", borderRadius: 6, padding: "10px 14px", display: "flex", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
               <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", flex: "0 0 auto" }}>
                 <span style={{ position: "relative", display: "inline-block", width: 38, height: 20, background: firmaContrato ? "#2a6e2a" : "#bbb", borderRadius: 10, transition: "background 0.15s" }}>
-                  <span style={{ position: "absolute", top: 2, left: firmaContrato ? 20 : 2, width: 16, height: 16, background: "#fff", borderRadius: "50%", transition: "left 0.15s" }} />
+                  <span style={{ position: "absolute", top: 2, left: firmaContrato ? 20 : 2, width: 16, height: 16, background: "#f2f5f7", borderRadius: "50%", transition: "left 0.15s" }} />
                 </span>
                 <input type="checkbox" checked={firmaContrato} onChange={e => setFirmaContrato(e.target.checked)} style={{ display: "none" }} />
                 <span style={{ fontSize: 11, fontWeight: 700, color: "#555", letterSpacing: "0.05em" }}>
@@ -8217,7 +8217,7 @@ function CosteEmpresa() {
             <div style={{ background: incluirGestoria ? "#f0f5ee" : "#f5f4f0", border: `1px solid ${incluirGestoria ? "#c8d8b8" : "#d8d4ce"}`, borderRadius: 6, padding: "10px 14px", display: "flex", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
               <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", flex: "0 0 auto" }}>
                 <span style={{ position: "relative", display: "inline-block", width: 38, height: 20, background: incluirGestoria ? "#2a6e2a" : "#bbb", borderRadius: 10, transition: "background 0.15s" }}>
-                  <span style={{ position: "absolute", top: 2, left: incluirGestoria ? 20 : 2, width: 16, height: 16, background: "#fff", borderRadius: "50%", transition: "left 0.15s" }} />
+                  <span style={{ position: "absolute", top: 2, left: incluirGestoria ? 20 : 2, width: 16, height: 16, background: "#f2f5f7", borderRadius: "50%", transition: "left 0.15s" }} />
                 </span>
                 <input type="checkbox" checked={incluirGestoria} onChange={e => setIncluirGestoria(e.target.checked)} style={{ display: "none" }} />
                 <span style={{ fontSize: 11, fontWeight: 700, color: "#555", letterSpacing: "0.05em" }}>
@@ -8236,7 +8236,7 @@ function CosteEmpresa() {
             <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
               <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", flex: "0 0 auto" }}>
                 <span style={{ position: "relative", display: "inline-block", width: 38, height: 20, background: bajaActiva ? "#a04545" : "#bbb", borderRadius: 10, transition: "background 0.15s" }}>
-                  <span style={{ position: "absolute", top: 2, left: bajaActiva ? 20 : 2, width: 16, height: 16, background: "#fff", borderRadius: "50%", transition: "left 0.15s" }} />
+                  <span style={{ position: "absolute", top: 2, left: bajaActiva ? 20 : 2, width: 16, height: 16, background: "#f2f5f7", borderRadius: "50%", transition: "left 0.15s" }} />
                 </span>
                 <input type="checkbox" checked={bajaActiva} onChange={e => setBajaActiva(e.target.checked)} style={{ display: "none" }} />
                 <span style={{ fontSize: 11, fontWeight: 700, color: "#555", letterSpacing: "0.05em" }}>
@@ -8279,8 +8279,8 @@ function CosteEmpresa() {
                         <label key={clave} style={{
                           display: "inline-flex", alignItems: "center", gap: 5,
                           padding: "5px 10px", borderRadius: 4, cursor: "pointer",
-                          background: activo ? "#a04545" : "#fff",
-                          color: activo ? "#fff" : "#555",
+                          background: activo ? "#a04545" : "#f2f5f7",
+                          color: activo ? "#f2f5f7" : "#555",
                           border: `1px solid ${activo ? "#a04545" : "#d0ccc6"}`,
                           fontSize: 10, fontWeight: 700, letterSpacing: "0.05em",
                           textTransform: "capitalize",
@@ -8321,7 +8321,7 @@ function CosteEmpresa() {
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 10.5 }}>
                 <thead>
-                  <tr style={{ background: "#f0ede8" }}>
+                  <tr style={{ background: "#dfe4e8" }}>
                     {["Mes", "Salario Base", "Vacaciones", "Indemnización", "H.Extra €", "Plus Act.", "Festivos €", "Jorn.Esp €", "Coche", "Vivienda", "Seguro Vida", "Comida", "Exento", "TOTAL"].map(h => (
                       <th key={h} style={{ padding: "8px 6px", fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 700, textAlign: h === "Mes" ? "left" : "right", color: h === "TOTAL" ? "#b8864a" : (h === "Exento" ? "#a04545" : (h === "Festivos €" ? "#6a3a9a" : (h === "Jorn.Esp €" ? "#8a1e4a" : "#666"))), borderBottom: "1px solid #d0ccc6", whiteSpace: "nowrap" }}>{h}</th>
                     ))}
@@ -8508,7 +8508,7 @@ function CosteEmpresa() {
                     { l: "Coste total", v: fmt(totalConCE) + " €", color: "#b8864a", bold: true },
                     { l: "% s/salario", v: pctSobreSalario.toFixed(2) + " %", color: "#6a3a9a" },
                   ].map(it => (
-                    <div key={it.l} style={{ background: "#f0ede8", borderRadius: 6, padding: "10px 14px", border: "1px solid #e0ddd8", textAlign: "center" }}>
+                    <div key={it.l} style={{ background: "#dfe4e8", borderRadius: 6, padding: "10px 14px", border: "1px solid #e0ddd8", textAlign: "center" }}>
                       <div style={{ fontSize: 9, color: "#666", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 4 }}>{it.l}</div>
                       <div style={{ fontSize: it.bold ? 16 : 14, fontWeight: 700, color: it.color, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>{it.v}</div>
                     </div>
@@ -8543,7 +8543,7 @@ function CosteEmpresa() {
           onClick={(e) => { if (e.target === e.currentTarget && !procesandoMaster) setMostrarExportMaster(false); }}
           style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 1000, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "40px 16px", overflowY: "auto" }}
         >
-          <div style={{ background: "#f0ede8", borderRadius: 8, maxWidth: 600, width: "100%", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", color: "#1a1a1a", boxShadow: "0 10px 40px rgba(0,0,0,0.5)" }}>
+          <div style={{ background: "#dfe4e8", borderRadius: 8, maxWidth: 600, width: "100%", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", color: "#1a1a1a", boxShadow: "0 10px 40px rgba(0,0,0,0.5)" }}>
             <div style={{ background: "#1a1a1a", color: "#f0e6d0", padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", borderRadius: "8px 8px 0 0" }}>
               <div>
                 <div style={{ fontSize: 9, color: "#c8a96e", letterSpacing: "0.2em", textTransform: "uppercase" }}>Coste empresa</div>
@@ -8570,7 +8570,7 @@ function CosteEmpresa() {
               )}
 
               {/* Paso 1: Seleccionar archivo */}
-              <div style={{ background: "#fff", border: "1px solid #e0ddd8", borderRadius: 6, padding: 14, marginBottom: 14 }}>
+              <div style={{ background: "#f2f5f7", border: "1px solid #e0ddd8", borderRadius: 6, padding: 14, marginBottom: 14 }}>
                 <div style={{ fontSize: 10, color: "#7a5a2a", letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 700, marginBottom: 8 }}>1. Excel Master original</div>
                 <input
                   ref={inputMasterRef}
@@ -8594,7 +8594,7 @@ function CosteEmpresa() {
               </div>
 
               {/* Paso 2: Fila destino */}
-              <div style={{ background: "#fff", border: "1px solid #e0ddd8", borderRadius: 6, padding: 14, marginBottom: 14 }}>
+              <div style={{ background: "#f2f5f7", border: "1px solid #e0ddd8", borderRadius: 6, padding: 14, marginBottom: 14 }}>
                 <div style={{ fontSize: 10, color: "#7a5a2a", letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 700, marginBottom: 8 }}>2. Fila destino</div>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <input
@@ -8688,11 +8688,11 @@ function ModalCargarPerfil({ perfiles, cargando, onCerrar, onCargar, onBorrarSel
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 100, display: "flex", justifyContent: "center", alignItems: "flex-start", padding: 20, overflow: "auto" }} onClick={onCerrar}>
-      <div style={{ background: "#faf7f2", borderRadius: 8, padding: 24, maxWidth: 1100, width: "100%", maxHeight: "90vh", overflow: "auto", fontFamily: "'Courier Prime', 'Courier New', monospace" }} onClick={e => e.stopPropagation()}>
+      <div style={{ background: "#e8ecef", borderRadius: 8, padding: 24, maxWidth: 1100, width: "100%", maxHeight: "90vh", overflow: "auto", fontFamily: "'Courier Prime', 'Courier New', monospace" }} onClick={e => e.stopPropagation()}>
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, paddingBottom: 12, borderBottom: "2px solid #b8864a" }}>
           <h2 style={{ margin: 0, fontSize: 15, letterSpacing: "0.15em", textTransform: "uppercase", color: "#1a1a1a", fontWeight: 700 }}>📂 Cargar perfil</h2>
-          <button onClick={onCerrar} style={{ background: "#fff", border: "1px solid #b8864a", padding: "6px 14px", borderRadius: 4, cursor: "pointer", fontSize: 11, color: "#8a5030", fontFamily: "'Courier Prime', 'Courier New', monospace", fontWeight: 700 }}>✕ Cerrar</button>
+          <button onClick={onCerrar} style={{ background: "#f2f5f7", border: "1px solid #b8864a", padding: "6px 14px", borderRadius: 4, cursor: "pointer", fontSize: 11, color: "#8a5030", fontFamily: "'Courier Prime', 'Courier New', monospace", fontWeight: 700 }}>✕ Cerrar</button>
         </div>
 
         {/* Filtros y acciones */}
@@ -8701,7 +8701,7 @@ function ModalCargarPerfil({ perfiles, cargando, onCerrar, onCargar, onBorrarSel
             <span style={{ fontSize: 10, color: "#666", letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 700 }}>Tipo:</span>
             {["todos", "45h", "40h"].map(t => (
               <button key={t} onClick={() => setFiltroTipo(t)}
-                style={{ padding: "6px 14px", fontSize: 10, border: `1px solid ${filtroTipo === t ? "#b8864a" : "#ccc"}`, borderRadius: 4, background: filtroTipo === t ? "#b8864a" : "#fff", color: filtroTipo === t ? "#fff" : "#666", cursor: "pointer", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", fontFamily: "'Courier Prime', 'Courier New', monospace" }}>
+                style={{ padding: "6px 14px", fontSize: 10, border: `1px solid ${filtroTipo === t ? "#b8864a" : "#ccc"}`, borderRadius: 4, background: filtroTipo === t ? "#b8864a" : "#f2f5f7", color: filtroTipo === t ? "#f2f5f7" : "#666", cursor: "pointer", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", fontFamily: "'Courier Prime', 'Courier New', monospace" }}>
                 {t}
               </button>
             ))}
@@ -8709,7 +8709,7 @@ function ModalCargarPerfil({ perfiles, cargando, onCerrar, onCargar, onBorrarSel
           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
             <span style={{ fontSize: 10, color: "#666", letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 700 }}>Depto:</span>
             <select value={filtroDepto} onChange={(e) => setFiltroDepto(e.target.value)}
-              style={{ padding: "6px 10px", fontSize: 11, border: "1px solid #b8864a", borderRadius: 4, background: "#fff", fontFamily: "'Courier Prime', 'Courier New', monospace", color: "#1a1a1a", cursor: "pointer" }}>
+              style={{ padding: "6px 10px", fontSize: 11, border: "1px solid #b8864a", borderRadius: 4, background: "#f2f5f7", fontFamily: "'Courier Prime', 'Courier New', monospace", color: "#1a1a1a", cursor: "pointer" }}>
               <option value="__todos__">Todos</option>
               {conteoDeptos["__sin__"] > 0 && <option value="__sin__">— Sin depto — ({conteoDeptos["__sin__"]})</option>}
               {DEPARTAMENTOS.map(d => conteoDeptos[d] > 0 ? <option key={d} value={d}>{d} ({conteoDeptos[d]})</option> : null)}
@@ -8718,13 +8718,13 @@ function ModalCargarPerfil({ perfiles, cargando, onCerrar, onCargar, onBorrarSel
           <div style={{ flex: 1 }}></div>
           {perfilesFiltrados.length > 0 && (
             <>
-              <button onClick={seleccionarTodos} style={{ fontSize: 10, padding: "5px 12px", border: "1px solid #b8864a", borderRadius: 4, background: "#fff", cursor: "pointer", color: "#8a5030", fontFamily: "'Courier Prime', 'Courier New', monospace", fontWeight: 700 }}>Todos</button>
-              <button onClick={deseleccionarTodos} style={{ fontSize: 10, padding: "5px 12px", border: "1px solid #ccc", borderRadius: 4, background: "#fff", cursor: "pointer", color: "#666", fontFamily: "'Courier Prime', 'Courier New', monospace", fontWeight: 700 }}>Ninguno</button>
+              <button onClick={seleccionarTodos} style={{ fontSize: 10, padding: "5px 12px", border: "1px solid #b8864a", borderRadius: 4, background: "#f2f5f7", cursor: "pointer", color: "#8a5030", fontFamily: "'Courier Prime', 'Courier New', monospace", fontWeight: 700 }}>Todos</button>
+              <button onClick={deseleccionarTodos} style={{ fontSize: 10, padding: "5px 12px", border: "1px solid #ccc", borderRadius: 4, background: "#f2f5f7", cursor: "pointer", color: "#666", fontFamily: "'Courier Prime', 'Courier New', monospace", fontWeight: 700 }}>Ninguno</button>
             </>
           )}
           {seleccionados.size > 0 && (
             <button onClick={borrarSeleccionados} disabled={borrando}
-              style={{ padding: "8px 14px", fontSize: 10, border: "1px solid #c04040", borderRadius: 4, background: "#c04040", color: "#fff", cursor: borrando ? "wait" : "pointer", fontWeight: 700, letterSpacing: "0.08em", fontFamily: "'Courier Prime', 'Courier New', monospace" }}>
+              style={{ padding: "8px 14px", fontSize: 10, border: "1px solid #c04040", borderRadius: 4, background: "#c04040", color: "#f2f5f7", cursor: borrando ? "wait" : "pointer", fontWeight: 700, letterSpacing: "0.08em", fontFamily: "'Courier Prime', 'Courier New', monospace" }}>
               🗑 Borrar {seleccionados.size}
             </button>
           )}
@@ -8745,10 +8745,10 @@ function ModalCargarPerfil({ perfiles, cargando, onCerrar, onCargar, onBorrarSel
               const fecha = p.timestamp ? new Date(p.timestamp).toLocaleDateString("es-ES") : "";
               return (
                 <div key={id}
-                  style={{ background: sel ? "#faf6ee" : "#fff", border: sel ? "2px solid #b8864a" : "1px solid #d0ccc6", borderRadius: 6, padding: 12, transition: "all 0.15s", position: "relative" }}>
+                  style={{ background: sel ? "#faf6ee" : "#f2f5f7", border: sel ? "2px solid #b8864a" : "1px solid #d0ccc6", borderRadius: 6, padding: 12, transition: "all 0.15s", position: "relative" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
                     <input type="checkbox" checked={sel} onChange={() => toggleSel(id)} style={{ cursor: "pointer", marginTop: 2 }} />
-                    <span style={{ background: es40 ? "#6a3a9a" : "#b8864a", color: "#fff", fontSize: 8, padding: "2px 6px", borderRadius: 2, letterSpacing: "0.08em", fontWeight: 700 }}>
+                    <span style={{ background: es40 ? "#6a3a9a" : "#b8864a", color: "#f2f5f7", fontSize: 8, padding: "2px 6px", borderRadius: 2, letterSpacing: "0.08em", fontWeight: 700 }}>
                       {es40 ? "40H" : "45H"}
                     </span>
                   </div>
@@ -8780,7 +8780,7 @@ function ModalCargarPerfil({ perfiles, cargando, onCerrar, onCargar, onBorrarSel
                     >📋 Duplicar</button>
                     <button
                       onClick={() => onCargar(p)}
-                      style={{ background: "#5a8a5a", color: "#fff", border: "none", padding: "6px 4px", borderRadius: 3, fontSize: 9, fontWeight: 700, cursor: "pointer", fontFamily: "'Courier Prime', 'Courier New', monospace" }}
+                      style={{ background: "#5a8a5a", color: "#f2f5f7", border: "none", padding: "6px 4px", borderRadius: 3, fontSize: 9, fontWeight: 700, cursor: "pointer", fontFamily: "'Courier Prime', 'Courier New', monospace" }}
                       title="Cargar este perfil en el formulario"
                     >📂 Cargar</button>
                   </div>
@@ -9159,10 +9159,10 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 100, display: "flex", justifyContent: "center", alignItems: "flex-start", padding: 20, overflow: "auto" }}>
-      <div style={{ background: "#faf7f2", borderRadius: 8, padding: 24, maxWidth: 900, width: "100%", maxHeight: "90vh", overflow: "auto", fontFamily: "'Courier Prime', 'Courier New', monospace" }}>
+      <div style={{ background: "#e8ecef", borderRadius: 8, padding: 24, maxWidth: 900, width: "100%", maxHeight: "90vh", overflow: "auto", fontFamily: "'Courier Prime', 'Courier New', monospace" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, paddingBottom: 12, borderBottom: "2px solid #b8864a" }}>
           <h2 style={{ margin: 0, fontSize: 14, letterSpacing: "0.15em", textTransform: "uppercase", color: "#1a1a1a", fontWeight: 700 }}>📊 Exportar listado de perfiles</h2>
-          <button onClick={onCerrar} style={{ background: "#fff", border: "1px solid #b8864a", padding: "6px 14px", borderRadius: 4, cursor: "pointer", fontSize: 11, color: "#8a5030", fontFamily: "'Courier Prime', 'Courier New', monospace", fontWeight: 700 }}>✕ Cerrar</button>
+          <button onClick={onCerrar} style={{ background: "#f2f5f7", border: "1px solid #b8864a", padding: "6px 14px", borderRadius: 4, cursor: "pointer", fontSize: 11, color: "#8a5030", fontFamily: "'Courier Prime', 'Courier New', monospace", fontWeight: 700 }}>✕ Cerrar</button>
         </div>
 
         {mensaje && (
@@ -9182,9 +9182,9 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
                 {proyectos.length === 0 && <div style={{ fontSize: 11, color: "#888", padding: 20, textAlign: "center" }}>No hay proyectos disponibles.</div>}
                 {proyectos.map(p => (
                   <button key={p.id} onClick={() => cargarPerfiles(p)}
-                    style={{ background: "#fff", border: "1px solid #d0ccc6", borderRadius: 5, padding: "12px 16px", cursor: "pointer", textAlign: "left", fontFamily: "'Courier Prime', 'Courier New', monospace", transition: "all 0.15s", display: "flex", justifyContent: "space-between", alignItems: "center" }}
+                    style={{ background: "#f2f5f7", border: "1px solid #d0ccc6", borderRadius: 5, padding: "12px 16px", cursor: "pointer", textAlign: "left", fontFamily: "'Courier Prime', 'Courier New', monospace", transition: "all 0.15s", display: "flex", justifyContent: "space-between", alignItems: "center" }}
                     onMouseEnter={e => { e.currentTarget.style.borderColor = "#b8864a"; e.currentTarget.style.background = "#faf6ee"; }}
-                    onMouseLeave={e => { e.currentTarget.style.borderColor = "#d0ccc6"; e.currentTarget.style.background = "#fff"; }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = "#d0ccc6"; e.currentTarget.style.background = "#f2f5f7"; }}
                   >
                     <div>
                       <div style={{ fontSize: 9, color: "#888", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 2 }}>Proyecto</div>
@@ -9207,7 +9207,7 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
                   <strong>{perfiles.length}</strong> perfil{perfiles.length !== 1 ? "es" : ""} · <strong>{seleccionados.size}</strong> seleccionado{seleccionados.size !== 1 ? "s" : ""}
                 </div>
               </div>
-              <button onClick={() => { setProyectoSel(null); setPerfiles([]); setSeleccionados(new Set()); setMensaje(null); setError(null); }} style={{ background: "#fff", border: "1px solid #ccc", padding: "6px 12px", borderRadius: 4, cursor: "pointer", fontSize: 10, fontFamily: "'Courier Prime', 'Courier New', monospace", color: "#666", fontWeight: 700 }}>← Cambiar proyecto</button>
+              <button onClick={() => { setProyectoSel(null); setPerfiles([]); setSeleccionados(new Set()); setMensaje(null); setError(null); }} style={{ background: "#f2f5f7", border: "1px solid #ccc", padding: "6px 12px", borderRadius: 4, cursor: "pointer", fontSize: 10, fontFamily: "'Courier Prime', 'Courier New', monospace", color: "#666", fontWeight: 700 }}>← Cambiar proyecto</button>
             </div>
 
             {cargando ? <div style={{ padding: 20, textAlign: "center", color: "#888" }}>Cargando perfiles…</div> : (
@@ -9215,9 +9215,9 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
                 {perfiles.length > 0 && (
                   <div style={{ display: "flex", gap: 6, marginBottom: 10, alignItems: "center", flexWrap: "wrap" }}>
                     <span style={{ fontSize: 10, color: "#666", letterSpacing: "0.05em", marginRight: 4 }}>Selección:</span>
-                    <button onClick={seleccionarTodos} style={{ fontSize: 10, padding: "5px 12px", border: "1px solid #b8864a", borderRadius: 4, background: "#fff", cursor: "pointer", color: "#8a5030", fontFamily: "'Courier Prime', 'Courier New', monospace", fontWeight: 700 }}>Todos</button>
-                    <button onClick={deseleccionarTodos} style={{ fontSize: 10, padding: "5px 12px", border: "1px solid #ccc", borderRadius: 4, background: "#fff", cursor: "pointer", color: "#666", fontFamily: "'Courier Prime', 'Courier New', monospace", fontWeight: 700 }}>Ninguno</button>
-                    <button onClick={invertirSeleccion} style={{ fontSize: 10, padding: "5px 12px", border: "1px solid #ccc", borderRadius: 4, background: "#fff", cursor: "pointer", color: "#666", fontFamily: "'Courier Prime', 'Courier New', monospace", fontWeight: 700 }}>Invertir</button>
+                    <button onClick={seleccionarTodos} style={{ fontSize: 10, padding: "5px 12px", border: "1px solid #b8864a", borderRadius: 4, background: "#f2f5f7", cursor: "pointer", color: "#8a5030", fontFamily: "'Courier Prime', 'Courier New', monospace", fontWeight: 700 }}>Todos</button>
+                    <button onClick={deseleccionarTodos} style={{ fontSize: 10, padding: "5px 12px", border: "1px solid #ccc", borderRadius: 4, background: "#f2f5f7", cursor: "pointer", color: "#666", fontFamily: "'Courier Prime', 'Courier New', monospace", fontWeight: 700 }}>Ninguno</button>
+                    <button onClick={invertirSeleccion} style={{ fontSize: 10, padding: "5px 12px", border: "1px solid #ccc", borderRadius: 4, background: "#f2f5f7", cursor: "pointer", color: "#666", fontFamily: "'Courier Prime', 'Courier New', monospace", fontWeight: 700 }}>Invertir</button>
                     <span style={{ fontSize: 9, color: "#999", marginLeft: 8, fontStyle: "italic" }}>Los ya exportados están en gris.</span>
                   </div>
                 )}
@@ -9226,7 +9226,7 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
                 {perfiles.length > 0 && (
                   <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 10, flexWrap: "wrap" }}>
                     <label style={{ fontSize: 10, color: "#666", letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 700 }}>Filtrar:</label>
-                    <select value={filtroDepto} onChange={(e) => setFiltroDepto(e.target.value)} style={{ padding: "5px 10px", fontSize: 11, border: "1px solid #b8864a", borderRadius: 4, background: "#fff", fontFamily: "'Courier Prime', 'Courier New', monospace", cursor: "pointer", color: "#1a1a1a" }}>
+                    <select value={filtroDepto} onChange={(e) => setFiltroDepto(e.target.value)} style={{ padding: "5px 10px", fontSize: 11, border: "1px solid #b8864a", borderRadius: 4, background: "#f2f5f7", fontFamily: "'Courier Prime', 'Courier New', monospace", cursor: "pointer", color: "#1a1a1a" }}>
                       <option value="__todos__">Todos los departamentos</option>
                       <option value="__sin__">— Sin departamento —</option>
                       {DEPARTAMENTOS.map(d => {
@@ -9238,9 +9238,9 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
                   </div>
                 )}
 
-                <div style={{ background: "#fff", border: "1px solid #d0ccc6", borderRadius: 5, maxHeight: 400, overflow: "auto" }}>
+                <div style={{ background: "#f2f5f7", border: "1px solid #d0ccc6", borderRadius: 5, maxHeight: 400, overflow: "auto" }}>
                   <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11, fontFamily: "'Courier Prime', 'Courier New', monospace" }}>
-                    <thead style={{ position: "sticky", top: 0, background: "#f0ede8", zIndex: 1 }}>
+                    <thead style={{ position: "sticky", top: 0, background: "#dfe4e8", zIndex: 1 }}>
                       <tr>
                         <th style={{ padding: "10px 6px", textAlign: "center", width: 32, borderBottom: "1px solid #d0ccc6", fontSize: 9 }}>✓</th>
                         <th style={{ padding: "10px 6px", textAlign: "left", borderBottom: "1px solid #d0ccc6", fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", color: "#666", fontWeight: 700 }}>Perfil</th>
@@ -9260,7 +9260,7 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
                         const sel = seleccionados.has(p.id);
                         const depto = p.datos?.departamento || "";
                         return (
-                          <tr key={p.id} style={{ borderBottom: "1px solid #f0ede8", background: yaExp ? "#f5f4f0" : (sel ? "#faf6ee" : "transparent"), color: yaExp ? "#999" : "#1a1a1a", cursor: "pointer" }} onClick={() => toggleSel(p.id)}>
+                          <tr key={p.id} style={{ borderBottom: "1px solid #dfe4e8", background: yaExp ? "#f5f4f0" : (sel ? "#faf6ee" : "transparent"), color: yaExp ? "#999" : "#1a1a1a", cursor: "pointer" }} onClick={() => toggleSel(p.id)}>
                             <td style={{ padding: "8px 6px", textAlign: "center" }}>
                               <input type="checkbox" checked={sel} onChange={() => toggleSel(p.id)} onClick={e => e.stopPropagation()} style={{ cursor: "pointer" }} />
                             </td>
@@ -9301,7 +9301,7 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
                       </div>
                     </div>
                     <button onClick={exportar} disabled={seleccionados.size === 0}
-                      style={{ background: seleccionados.size === 0 ? "#ccc" : "#5a8a5a", color: "#fff", border: "none", padding: "12px 24px", borderRadius: 5, cursor: seleccionados.size === 0 ? "not-allowed" : "pointer", fontFamily: "'Courier Prime', 'Courier New', monospace", fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>
+                      style={{ background: seleccionados.size === 0 ? "#ccc" : "#5a8a5a", color: "#f2f5f7", border: "none", padding: "12px 24px", borderRadius: 5, cursor: seleccionados.size === 0 ? "not-allowed" : "pointer", fontFamily: "'Courier Prime', 'Courier New', monospace", fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>
                       📥 Exportar {seleccionados.size} perfil{seleccionados.size !== 1 ? "es" : ""}
                     </button>
                   </div>
@@ -10226,15 +10226,15 @@ function PanelCalendarioProyecto({ proyecto, usuarioActual, onCerrar }) {
                             // { texto, color, lineas: 1|2 }
                             let etiqueta = null;
                             if (esFestivo && info.festivo_trabajado) {
-                              etiqueta = { texto: "RODAJE FESTIVO", color: "#fff", dosLineas: ["RODAJE", "FESTIVO"] };
+                              etiqueta = { texto: "RODAJE FESTIVO", color: "#f2f5f7", dosLineas: ["RODAJE", "FESTIVO"] };
                             } else if (esFestivo) {
-                              etiqueta = { texto: (nombreFestivo || "FESTIVO").toUpperCase(), color: "#fff" };
+                              etiqueta = { texto: (nombreFestivo || "FESTIVO").toUpperCase(), color: "#f2f5f7" };
                             } else if (info.vacaciones) {
                               etiqueta = { texto: "VACACIONES", color: "#000" };
                             } else if (info.descanso) {
                               etiqueta = { texto: "DESCANSO", color: "#000" };
                             } else if (info.especial) {
-                              etiqueta = { texto: "JORNADA ESPECIAL", color: "#fff", dosLineas: ["JORNADA", "ESPECIAL"] };
+                              etiqueta = { texto: "JORNADA ESPECIAL", color: "#f2f5f7", dosLineas: ["JORNADA", "ESPECIAL"] };
                             } else if (info.rodaje) {
                               etiqueta = { texto: "RODAJE", color: "#000" };
                             }
@@ -10562,12 +10562,12 @@ function PanelFestivos({ usuarioActual, onCerrar, onCambios }) {
     display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000,
   };
   const modal = {
-    background: "#faf7f2", padding: 20, borderRadius: 6, maxWidth: 900, width: "92%",
+    background: "#e8ecef", padding: 20, borderRadius: 6, maxWidth: 900, width: "92%",
     maxHeight: "88vh", overflowY: "auto", color: "#1a1a1a",
     fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", border: "1px solid #b8864a",
   };
   const btnGold = {
-    background: "#b8864a", color: "#fff", border: "none",
+    background: "#b8864a", color: "#f2f5f7", border: "none",
     padding: "6px 12px", borderRadius: 4, cursor: "pointer",
     fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize: 11, fontWeight: 700,
     letterSpacing: "0.1em", textTransform: "uppercase",
@@ -10580,7 +10580,7 @@ function PanelFestivos({ usuarioActual, onCerrar, onCambios }) {
   };
   const inp = {
     padding: "6px 8px", border: "1px solid #d0ccc6", borderRadius: 4,
-    fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize: 12, background: "#fff",
+    fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize: 12, background: "#f2f5f7",
     color: "#1a1a1a", colorScheme: "light",
   };
   const tipoColores = {
@@ -10619,7 +10619,7 @@ function PanelFestivos({ usuarioActual, onCerrar, onCambios }) {
                 style={{
                   flex: 1,
                   background: activo ? "#b8864a" : "transparent",
-                  color: activo ? "#fff" : "#666",
+                  color: activo ? "#f2f5f7" : "#666",
                   border: "none",
                   padding: "6px 10px",
                   borderRadius: 3,
@@ -10639,9 +10639,9 @@ function PanelFestivos({ usuarioActual, onCerrar, onCambios }) {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 8 }}>
           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
             <span style={{ fontSize: 10, color: "#666", textTransform: "uppercase", letterSpacing: "0.08em" }}>Año:</span>
-            <button onClick={() => setFiltroAnio("")} style={{ ...btnGhost, background: filtroAnio === "" ? "#b8864a" : "transparent", color: filtroAnio === "" ? "#fff" : "#b8864a", padding: "3px 8px", fontSize: 9 }}>Todos</button>
+            <button onClick={() => setFiltroAnio("")} style={{ ...btnGhost, background: filtroAnio === "" ? "#b8864a" : "transparent", color: filtroAnio === "" ? "#f2f5f7" : "#b8864a", padding: "3px 8px", fontSize: 9 }}>Todos</button>
             {anios.map(a => (
-              <button key={a} onClick={() => setFiltroAnio(a)} style={{ ...btnGhost, background: filtroAnio === a ? "#b8864a" : "transparent", color: filtroAnio === a ? "#fff" : "#b8864a", padding: "3px 8px", fontSize: 9 }}>{a}</button>
+              <button key={a} onClick={() => setFiltroAnio(a)} style={{ ...btnGhost, background: filtroAnio === a ? "#b8864a" : "transparent", color: filtroAnio === a ? "#f2f5f7" : "#b8864a", padding: "3px 8px", fontSize: 9 }}>{a}</button>
             ))}
           </div>
           {!mostrarNuevo && (
@@ -10651,7 +10651,7 @@ function PanelFestivos({ usuarioActual, onCerrar, onCambios }) {
 
         {/* Formulario nuevo */}
         {mostrarNuevo && (
-          <div style={{ background: "#fff", padding: 12, borderRadius: 4, marginBottom: 14, border: "1px solid #e0ddd8" }}>
+          <div style={{ background: "#f2f5f7", padding: 12, borderRadius: 4, marginBottom: 14, border: "1px solid #e0ddd8" }}>
             <div style={{ display: "grid", gridTemplateColumns: nuevoForm.tipo === "nacional" ? "auto 1fr auto 1fr auto auto" : "auto 1fr auto auto auto auto", gap: 8, alignItems: "center" }}>
               <input type="date" value={nuevoForm.fecha} onChange={e => setNuevoForm({...nuevoForm, fecha: e.target.value})} style={inp} />
               <input placeholder="Nombre del festivo" value={nuevoForm.nombre} onChange={e => setNuevoForm({...nuevoForm, nombre: e.target.value})} style={inp} />
@@ -10685,7 +10685,7 @@ function PanelFestivos({ usuarioActual, onCerrar, onCambios }) {
         )}
 
         {!cargando && festivosFiltrados.map(f => (
-          <div key={f.id} style={{ background: "#fff", padding: 10, borderRadius: 4, marginBottom: 6, border: "1px solid #e0ddd8" }}>
+          <div key={f.id} style={{ background: "#f2f5f7", padding: 10, borderRadius: 4, marginBottom: 6, border: "1px solid #e0ddd8" }}>
             {editando?.id === f.id ? (
               <div style={{ display: "grid", gridTemplateColumns: editando.tipo === "nacional" ? "auto 1fr auto 1fr auto auto" : "auto 1fr auto auto auto auto", gap: 8, alignItems: "center" }}>
                 <input type="date" value={editando.fecha} onChange={e => setEditando({...editando, fecha: e.target.value})} style={inp} />
@@ -10716,7 +10716,7 @@ function PanelFestivos({ usuarioActual, onCerrar, onCambios }) {
                 <div style={{ fontSize: 12, color: "#1a1a1a" }}>{f.nombre}</div>
                 <span style={{
                   fontSize: 9, padding: "2px 8px", borderRadius: 3,
-                  background: tipoColores[f.tipo] || "#888", color: "#fff",
+                  background: tipoColores[f.tipo] || "#888", color: "#f2f5f7",
                   textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700,
                 }}>{f.tipo}</span>
                 <button onClick={() => setEditando({ id: f.id, fecha: f.fecha, nombre: f.nombre, tipo: f.tipo, comunidad: f.comunidad, _original: { fecha: f.fecha, tipo: f.tipo, comunidad: f.comunidad } })} style={btnGhost}>Editar</button>
@@ -10726,7 +10726,7 @@ function PanelFestivos({ usuarioActual, onCerrar, onCambios }) {
           </div>
         ))}
 
-        <div style={{ marginTop: 14, padding: 10, background: "#f0ede8", borderRadius: 4, fontSize: 10, color: "#666", lineHeight: 1.5 }}>
+        <div style={{ marginTop: 14, padding: 10, background: "#dfe4e8", borderRadius: 4, fontSize: 10, color: "#666", lineHeight: 1.5 }}>
           ℹ Los cambios en los festivos afectan a los cálculos de horas extra en fechas que caigan en festivo. Los perfiles ya guardados no se recalculan hasta que se vuelvan a abrir.
         </div>
       </div>
@@ -10803,7 +10803,7 @@ function BannerSesion({ usuario, proyectoActivo, onLogout, onAdmin, onLogs, onPu
 
   return (
     <div className="no-print" style={{
-      background: "#1a1a1a", color: "#f0ede8", padding: "8px 16px",
+      background: "#1a1a1a", color: "#dfe4e8", padding: "8px 16px",
       display: "flex", alignItems: "center", justifyContent: "space-between",
       fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize: 11, letterSpacing: "0.08em",
       gap: 12, flexWrap: "wrap",
@@ -10811,7 +10811,7 @@ function BannerSesion({ usuario, proyectoActivo, onLogout, onAdmin, onLogs, onPu
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <span style={{ width: 24, height: 24, background: "#c8a96e", color: "#1a1a1a", borderRadius: 4, display: "inline-flex", alignItems: "center", justifyContent: "center", fontWeight: 700 }}>B</span>
         <span style={{ color: "#888", textTransform: "uppercase", fontSize: 9, letterSpacing: "0.18em" }}>Sesión:</span>
-        <span style={{ fontWeight: 700, color: "#f0ede8" }}>{usuario.nombre}</span>
+        <span style={{ fontWeight: 700, color: "#dfe4e8" }}>{usuario.nombre}</span>
         {usuario.es_admin && <span style={{ background: "#c8a96e", color: "#1a1a1a", padding: "2px 6px", borderRadius: 3, fontSize: 8, fontWeight: 700, letterSpacing: "0.1em" }}>ADMIN</span>}
         <span style={{ color: "#ffffff", fontSize: 13, letterSpacing: "0.08em", fontWeight: 700, marginLeft: 6 }} title="Versión de la app">{APP_VERSION}</span>
       </div>
