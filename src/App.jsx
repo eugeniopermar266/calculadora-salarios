@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v98";
+const APP_VERSION = "v100";
 
 // v97: Departamentos de un rodaje audiovisual (obligatorio en cada perfil)
 const DEPARTAMENTOS = [
@@ -1253,6 +1253,7 @@ function GestorPerfiles({ tabId, datosActuales, onCargarPerfil, onRegistrarAccio
   const [cargando, setCargando] = useState(true);
   const [mostrarLista, setMostrarLista] = useState(false);
   const [nombrePerfil, setNombrePerfil] = useState("");
+  const [refreshTrigger, setRefreshTrigger] = useState(0); // v99
   const [mensaje, setMensaje] = useState(null);
   const [mostrarGuardar, setMostrarGuardar] = useState(false);
   const [verTodosProyectos, setVerTodosProyectos] = useState(false); // v46: toggle admin
@@ -1386,7 +1387,10 @@ function GestorPerfiles({ tabId, datosActuales, onCargarPerfil, onRegistrarAccio
       } catch (e) { console.error("Error cargando perfiles:", e); }
       setCargando(false);
     })();
-  }, [tabId, proyectoActivoCtx?.id, verTodosProyectos]);
+  }, [tabId, proyectoActivoCtx?.id, verTodosProyectos, refreshTrigger]);
+
+  // v99: forzar recarga de perfiles (usado desde botones externos)
+  const recargar = () => setRefreshTrigger(t => t + 1);
 
   const showMsg = (texto, tipo = "ok") => {
     setMensaje({ texto, tipo });
@@ -1653,53 +1657,69 @@ function GestorPerfiles({ tabId, datosActuales, onCargarPerfil, onRegistrarAccio
   });
 
   // v98: publicar handlers al App45 para que la barra negra pueda usarlos
-  useEffect(() => {
-    if (onRegistrarAcciones) {
-      onRegistrarAcciones({
-        guardarConNombre: async (nombre) => {
-          setNombrePerfil(nombre);
-          // Esperar al siguiente tick para que setNombrePerfil se aplique
-          await new Promise(r => setTimeout(r, 30));
-          await guardarPerfil();
-        },
-        cargarPerfil: (perfil) => cargarPerfil(perfil),
-        exportarJSON,
-        importarDesdeArchivo: (file) => {
-          if (!file) return;
-          const reader = new FileReader();
-          reader.onload = (ev) => {
-            try {
-              const data = JSON.parse(ev.target.result);
-              if (data.datos) { onCargarPerfil(data.datos); showMsg("✓ Importado"); }
-              else throw new Error("Formato inválido");
-            } catch (err) { showMsg("Archivo inválido", "error"); console.error(err); }
-          };
-          reader.readAsText(file);
-        },
-        recargar,
-        perfiles,
-        cargando,
-        perfilEnEdicion,
-        borrarPerfilesSeleccionados: async (ids) => {
-          let ok = 0, err = 0;
-          for (const id of ids) {
-            const p = perfiles.find(x => x.supabaseId === id || x.key === id);
-            if (!p) continue;
-            try {
-              if (p.fuente === "supabase" && p.supabaseId) {
-                await borrarPerfilSupabase(p.supabaseId, esAdmin ? usuarioCtx.pin : null);
-              } else {
-                await storage.delete(p.key);
-              }
-              ok++;
-            } catch (e) { console.warn("Fallo borrando", p.nombre, e); err++; }
+  // Guardamos las funciones vivas en un ref para evitar bucles infinitos
+  const accionesLiveRef = useRef({});
+  accionesLiveRef.current = {
+    guardarConNombre: async (nombre) => {
+      setNombrePerfil(nombre);
+      await new Promise(r => setTimeout(r, 30));
+      await guardarPerfil();
+    },
+    cargarPerfil: (perfil) => cargarPerfil(perfil),
+    exportarJSON,
+    importarDesdeArchivo: (file) => {
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        try {
+          const data = JSON.parse(ev.target.result);
+          if (data.datos) { onCargarPerfil(data.datos); showMsg("✓ Importado"); }
+          else throw new Error("Formato inválido");
+        } catch (err) { showMsg("Archivo inválido", "error"); console.error(err); }
+      };
+      reader.readAsText(file);
+    },
+    recargar,
+    perfiles,
+    cargando,
+    perfilEnEdicion,
+    borrarPerfilesSeleccionados: async (ids) => {
+      let ok = 0, err = 0;
+      for (const id of ids) {
+        const p = perfiles.find(x => x.supabaseId === id || x.key === id);
+        if (!p) continue;
+        try {
+          if (p.fuente === "supabase" && p.supabaseId) {
+            await borrarPerfilSupabase(p.supabaseId, esAdmin ? usuarioCtx.pin : null);
+          } else {
+            await storage.delete(p.key);
           }
-          await recargar();
-          return { ok, err };
-        },
-      });
-    }
-  }, [perfiles, cargando, perfilEnEdicion, onRegistrarAcciones]);
+          ok++;
+        } catch (e) { console.warn("Fallo borrando", p.nombre, e); err++; }
+      }
+      await recargar();
+      return { ok, err };
+    },
+  };
+
+  // Publicar UNA sola vez al montar (o cuando onRegistrarAcciones cambie), con proxy estable
+  useEffect(() => {
+    if (!onRegistrarAcciones) return;
+    // Proxy: mantiene la misma identidad de objeto pero delega a accionesLiveRef.current
+    const proxy = {
+      guardarConNombre: (n) => accionesLiveRef.current.guardarConNombre(n),
+      cargarPerfil: (p) => accionesLiveRef.current.cargarPerfil(p),
+      exportarJSON: () => accionesLiveRef.current.exportarJSON(),
+      importarDesdeArchivo: (f) => accionesLiveRef.current.importarDesdeArchivo(f),
+      recargar: () => accionesLiveRef.current.recargar(),
+      borrarPerfilesSeleccionados: (ids) => accionesLiveRef.current.borrarPerfilesSeleccionados(ids),
+      // Getters para acceso dinámico a datos que cambian
+      get perfiles() { return accionesLiveRef.current.perfiles; },
+      get cargando() { return accionesLiveRef.current.cargando; },
+      get perfilEnEdicion() { return accionesLiveRef.current.perfilEnEdicion; },
+    };
+    onRegistrarAcciones(proxy);
+  }, [onRegistrarAcciones]);
 
   return (
     <div style={{ background:"#fff", border:"1px solid #e0ddd8", borderRadius:8, padding:14, marginBottom:20, position:"relative" }}>
