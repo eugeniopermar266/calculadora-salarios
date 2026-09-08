@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v94-debug2";
+const APP_VERSION = "v95";
 
 // v73: importe fijo por jornada especial (se paga POR ENCIMA del salario pactado)
 const IMPORTE_JORNADA_ESPECIAL = 20;
@@ -1240,6 +1240,7 @@ function GestorPerfiles({ tabId, datosActuales, onCargarPerfil }) {
   const [mostrarGuardar, setMostrarGuardar] = useState(false);
   const [verTodosProyectos, setVerTodosProyectos] = useState(false); // v46: toggle admin
   const [huboFallbackSupabase, setHuboFallbackSupabase] = useState(false); // v46: para avisar
+  const [huerfanosLocalState, setHuerfanosLocalState] = useState([]); // v95: perfiles solo en local, no en Supabase
   const [mostrarImportador, setMostrarImportador] = useState(false); // v46: modal importar antiguos
   const [perfilEnEdicion, setPerfilEnEdicion] = useState(null); // v53: perfil cargado que se puede modificar
 
@@ -1335,20 +1336,26 @@ function GestorPerfiles({ tabId, datosActuales, onCargarPerfil }) {
           return false;
         });
 
-        // v46: Decidir qué perfiles locales mostrar según rol
-        // - Si Supabase falló → mostrar todos los locales (respaldo)
-        // - Si Supabase OK y ADMIN → añadir locales sin proyecto_id (los "antiguos") solo si NO estamos en modo verTodos
-        //   (si verTodos, ya vemos los de Supabase; los antiguos son locales)
-        //   → siempre mostramos antiguos locales al admin
-        // - Si Supabase OK y USUARIO NORMAL → NO mostrar antiguos (solo los del proyecto activo)
+        // v95: SIMPLIFICADO — Supabase como única fuente visible.
+        // localStorage se mantiene solo como respaldo silencioso si Supabase falla.
+        // Detectamos perfiles huérfanos (solo en local, no en Supabase) para poder migrarlos/borrarlos.
         let extrasLocal = [];
+        let huerfanosLocal = []; // v95: perfiles solo en local, no en Supabase → sugerir migración
         if (!supOK) {
+          // Sin conexión → usar todos los locales como fallback
           extrasLocal = localFiltrado;
-        } else if (esAdmin) {
-          // Admin ve los antiguos locales (los que no están en Supabase = no tienen proyecto_id)
-          extrasLocal = localFiltrado;
+        } else {
+          // Con Supabase OK: NO añadir locales al listado (evita duplicados).
+          // Pero identificar los que están SOLO en local (huérfanos) para poder ofrecer migración.
+          const clavesSup = new Set(listaFinal.map(p => `${(p.nombre || "").toLowerCase().trim()}::${p.proyectoId || ""}`));
+          huerfanosLocal = localFiltrado.filter(p => {
+            const k = `${(p.nombre || "").toLowerCase().trim()}::${p.proyectoId || ""}`;
+            return !clavesSup.has(k);
+          });
         }
-        // Evitar duplicados por nombre+timestamp (por si algún antiguo ya se migró)
+        // v95: publicar huérfanos en el estado si el componente lo consume
+        try { setHuerfanosLocalState && setHuerfanosLocalState(huerfanosLocal); } catch {}
+        // Evitar duplicados por nombre+timestamp (solo aplica cuando extrasLocal tiene contenido = fallback)
         const claves = new Set(listaFinal.map(p => `${p.nombre}::${p.timestamp}`));
         for (const p of extrasLocal) {
           const k = `${p.nombre}::${p.timestamp}`;
@@ -1411,9 +1418,12 @@ function GestorPerfiles({ tabId, datosActuales, onCargarPerfil }) {
         console.warn("Fallo al guardar en Supabase:", e.message);
       }
     }
-    // Guardar SIEMPRE en localStorage como respaldo
+    // v95: guardar en local SOLO como respaldo cuando Supabase falla (o no se pudo intentar)
+    // Con Supabase OK no duplicamos → todo va a la nube
     try {
-      await storage.set(key, JSON.stringify(payload));
+      if (!supabaseOK) {
+        await storage.set(key, JSON.stringify(payload));
+      }
       // Añadir a la lista según origen
       let nuevoPerfil;
       if (supabaseOK) {
@@ -1526,10 +1536,12 @@ function GestorPerfiles({ tabId, datosActuales, onCargarPerfil }) {
         console.warn("Fallo duplicando en Supabase:", err.message);
       }
     }
-    // Guardar copia en localStorage como respaldo
+    // v95: guardar copia en local SOLO si Supabase falla
     const key = `${STORAGE_PREFIX}${Date.now()}_${nombreCopia.replace(/[^a-zA-Z0-9]/g,"_").slice(0,40)}`;
     try {
-      await storage.set(key, JSON.stringify(payload));
+      if (!supabaseOK) {
+        await storage.set(key, JSON.stringify(payload));
+      }
       const nuevoPerfil = supabaseOK
         ? { key: `sup_${supabaseId}`, supabaseId, proyectoId: proyectoActivoCtx.id, fuente: "supabase", ...payload }
         : { key, fuente: "local", ...payload };
@@ -1704,6 +1716,46 @@ function GestorPerfiles({ tabId, datosActuales, onCargarPerfil }) {
           {huboFallbackSupabase && (
             <div style={{ background:"#fdf0e0", border:"1px solid #e8b878", color:"#7a5a2a", padding:"6px 8px", borderRadius:3, marginBottom:8, fontSize:10, fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>
               ⚠ Sin conexión con la nube. Mostrando solo perfiles locales.
+            </div>
+          )}
+          {/* v95: aviso de perfiles huérfanos (solo en local, no en Supabase) */}
+          {huerfanosLocalState.length > 0 && !huboFallbackSupabase && esAdmin && (
+            <div style={{ background:"#fdf0e0", border:"1px solid #e8b878", color:"#7a5a2a", padding:"8px 10px", borderRadius:3, marginBottom:8, fontSize:10, fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>
+              <div style={{ marginBottom: 4 }}>⚠ Detectados <strong>{huerfanosLocalState.length}</strong> perfil{huerfanosLocalState.length!==1?"es":""} solo en local (no están en la nube).</div>
+              <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
+                <button onClick={async () => {
+                  if (!confirm(`¿Migrar ${huerfanosLocalState.length} perfiles a Supabase?\n\nSe subirán al proyecto activo. Después puedes borrarlos del local.`)) return;
+                  if (!proyectoActivoCtx?.id) { alert("Necesitas tener un proyecto activo para migrar"); return; }
+                  let ok = 0, err = 0;
+                  for (const h of huerfanosLocalState) {
+                    try {
+                      await crearPerfilSupabase({
+                        proyectoId: proyectoActivoCtx.id,
+                        tabId: h.tabId || tabId,
+                        nombre: h.nombre,
+                        autor: h.autor || usuarioCtx?.nombre || "migración",
+                        datos: h.datos,
+                      });
+                      ok++;
+                    } catch (e) { console.warn("Fallo migrando", h.nombre, e); err++; }
+                  }
+                  alert(`Migración: ${ok} OK, ${err} errores.\n\nLos perfiles locales originales siguen ahí, puedes borrarlos con el otro botón cuando confirmes que todo bien.`);
+                  recargar();
+                }}
+                  style={{ fontSize: 9, padding: "4px 8px", border: "1px solid #7a5a2a", borderRadius: 3, background: "#fff", color: "#7a5a2a", cursor: "pointer", fontWeight: 700, fontFamily: "'Courier Prime', 'Courier New', monospace", letterSpacing: "0.05em" }}
+                >📤 Migrar a Supabase</button>
+                <button onClick={async () => {
+                  if (!confirm(`¿Borrar ${huerfanosLocalState.length} perfiles solo del navegador local?\n\nEsto NO afecta a Supabase. Solo se limpian los duplicados que estaban en tu navegador.`)) return;
+                  let ok = 0;
+                  for (const h of huerfanosLocalState) {
+                    try { await storage.delete(h.key); ok++; } catch {}
+                  }
+                  alert(`Borrados ${ok} perfiles del local.`);
+                  recargar();
+                }}
+                  style={{ fontSize: 9, padding: "4px 8px", border: "1px solid #c04040", borderRadius: 3, background: "#fff", color: "#c04040", cursor: "pointer", fontWeight: 700, fontFamily: "'Courier Prime', 'Courier New', monospace", letterSpacing: "0.05em" }}
+                >🗑 Borrar solo local</button>
+              </div>
             </div>
           )}
           {perfiles.length === 0 ? (
@@ -8278,39 +8330,13 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
     setError(null);
     try {
       console.log("[Exportar] Cargando perfiles del proyecto:", p.id, p.nombre, "esAdmin:", esAdmin, "esCoordinador:", esCoordinador);
-      // v93: si es admin pasar adminPin, si es coordinador NO pasa admin pin (RLS le da acceso por asignación)
       const adminPin = esAdmin ? usuarioActual.pin : null;
-
-      // v94-debug2: probar SIN admin pin (como user normal) para comparar
-      try {
-        const sinAdmin45 = await listarPerfilesSupabase({ tabId: "iruna45", proyectoId: p.id, adminPin: null });
-        const sinAdmin40 = await listarPerfilesSupabase({ tabId: "tab40", proyectoId: p.id, adminPin: null });
-        console.log("[Exportar] SIN admin pin - 45H:", sinAdmin45?.length, "40H:", sinAdmin40?.length);
-        if ((sinAdmin45?.length || 0) > 0) {
-          console.log("[Exportar] Ejemplo perfil SIN admin:", sinAdmin45[0]);
-        }
-      } catch (e) { console.warn("[Exportar] Sin admin falló:", e); }
-
-      // v94: DIAGNÓSTICO - ver todos los perfiles del sistema (solo admin) para comparar proyecto_id
-      if (esAdmin) {
-        try {
-          const todos45 = await listarPerfilesSupabase({ tabId: "iruna45", verTodos: true, adminPin });
-          const todos40 = await listarPerfilesSupabase({ tabId: "tab40", verTodos: true, adminPin });
-          console.log("[Exportar] TOTAL en Supabase (con admin pin) 45H:", todos45?.length, "40H:", todos40?.length);
-          if (todos45 && todos45.length > 0) {
-            console.log("[Exportar] Ejemplo perfil 45H:", { id: todos45[0].id, nombre: todos45[0].nombre, proyecto_id: todos45[0].proyecto_id, tipo_proyecto_id: typeof todos45[0].proyecto_id });
-          }
-          // v94-debug2: probar SIN admin pin sin filtro
-          const totalSinAdmin45 = await listarPerfilesSupabase({ tabId: "iruna45", verTodos: true, adminPin: null });
-          console.log("[Exportar] TOTAL SIN admin pin (verTodos) 45H:", totalSinAdmin45?.length);
-        } catch (dx) { console.warn("[Exportar] Diagnóstico falló:", dx); }
-      }
-
+      // v94-fix: los tab_id reales en Supabase son "45h" y "40h" (no "iruna45"/"tab40")
       const [p45, p40] = await Promise.all([
-        listarPerfilesSupabase({ tabId: "iruna45", proyectoId: p.id, adminPin }),
-        listarPerfilesSupabase({ tabId: "tab40", proyectoId: p.id, adminPin }),
+        listarPerfilesSupabase({ tabId: "45h", proyectoId: p.id, adminPin }),
+        listarPerfilesSupabase({ tabId: "40h", proyectoId: p.id, adminPin }),
       ]);
-      console.log("[Exportar] Perfiles CON admin pin (filtro proyecto) 45H:", p45?.length, "40H:", p40?.length);
+      console.log("[Exportar] Perfiles 45h:", p45?.length, "40h:", p40?.length);
       const todos = [...(p45 || []), ...(p40 || [])].sort((a, b) => (a.nombre || "").localeCompare(b.nombre || ""));
       setPerfiles(todos);
       // Preseleccionar los NO exportados
@@ -8414,7 +8440,7 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
         d.fechaFin || "",
         diasTot || "",
         d.salario45 || "",
-        p.tab_id === "tab40" ? "40H" : "45H",
+        p.tab_id === "40h" ? "40H" : "45H",
         d.esFijoDiscontinuo ? "Sí" : "No",
         d.vacAcumulada ? "Al final" : "Prorrateadas",
         d.indemAcumulada ? "Al final" : "Prorrateadas",
@@ -8557,7 +8583,7 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
                               <input type="checkbox" checked={sel} onChange={() => toggleSel(p.id)} onClick={e => e.stopPropagation()} style={{ cursor: "pointer" }} />
                             </td>
                             <td style={{ padding: "8px", fontWeight: 600 }}>{p.nombre}</td>
-                            <td style={{ padding: "8px", textAlign: "center", fontSize: 9, color: yaExp ? "#aaa" : "#8a5030", fontWeight: 700 }}>{p.tab_id === "tab40" ? "40H" : "45H"}</td>
+                            <td style={{ padding: "8px", textAlign: "center", fontSize: 9, color: yaExp ? "#aaa" : "#8a5030", fontWeight: 700 }}>{p.tab_id === "40h" ? "40H" : "45H"}</td>
                             <td style={{ padding: "8px", fontSize: 10 }}>{p.datos?.puesto || "—"}</td>
                             <td style={{ padding: "8px", textAlign: "right", fontSize: 10 }}>{p.datos?.salario45 ? Number(p.datos.salario45).toFixed(0) + " €" : "—"}</td>
                             <td style={{ padding: "8px", fontSize: 9, color: yaExp ? "#666" : "#bbb" }}>
