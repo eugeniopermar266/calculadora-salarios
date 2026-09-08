@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v109";
+const APP_VERSION = "v110";
 
 // v97: Departamentos de un rodaje audiovisual (obligatorio en cada perfil)
 const DEPARTAMENTOS = [
@@ -9452,7 +9452,7 @@ function PanelProyectos({ usuarioActual, onCerrar }) {
     background: "rgba(20,20,20,0.96)",
     backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)",
     border: "1px solid rgba(255,255,255,0.08)",
-    borderRadius: 16, padding: "32px 32px", maxWidth: 1050, width: "100%",
+    borderRadius: 16, padding: "32px 32px", maxWidth: 1400, width: "80%",
     maxHeight: "90vh", overflowY: "auto", color: "#f0f0f0",
     fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
     boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
@@ -9951,7 +9951,7 @@ function PanelCalendarioProyecto({ proyecto, usuarioActual, onCerrar }) {
     backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)",
     border: "1px solid rgba(255,255,255,0.08)",
     borderRadius: 16, padding: "24px 28px",
-    maxWidth: 1800, width: "98%",
+    maxWidth: 1600, width: "80%",
     maxHeight: "96vh", overflowY: "auto",
     color: "#f0f0f0",
     fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
