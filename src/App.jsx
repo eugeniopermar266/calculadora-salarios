@@ -15,7 +15,24 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v96";
+const APP_VERSION = "v97";
+
+// v97: Departamentos de un rodaje audiovisual (obligatorio en cada perfil)
+const DEPARTAMENTOS = [
+  "Dirección",
+  "Producción",
+  "Fotografía",
+  "Decoración",
+  "Vestuario",
+  "Maquillaje",
+  "Peluquería",
+  "FX",
+  "Sonido",
+  "Postproducción",
+  "Eléctricos",
+  "Maquinistas",
+  "Personal complementario",
+];
 
 // v73: importe fijo por jornada especial (se paga POR ENCIMA del salario pactado)
 const IMPORTE_JORNADA_ESPECIAL = 20;
@@ -2998,6 +3015,7 @@ function App45({ modoTab = "iruna45" }) {
   const [nombre,           setNombre]          = useState("");
   const [puesto,           setPuesto]          = useState("");
   const [codigoContable,   setCodigoContable]  = useState("");
+  const [departamento,     setDepartamento]    = useState(""); // v97: obligatorio para exportar
   const [esFijoDiscontinuo, setEsFijoDiscontinuo] = useState(false); // v47: solo 40H
   const [salario45,        setSalario45]       = useState("");
   const [horasRef,         setHorasRef]        = useState(22);
@@ -3918,7 +3936,7 @@ ${docHTML}
           <GestorPerfiles
             tabId={modoTab === "tab40" ? "40h" : "45h"}
             datosActuales={{
-              proyecto, productora, nombre, puesto, codigoContable, esFijoDiscontinuo, hxPorRodaje40, salario45, horasRef, modoInverso45, objetivoSemanal45,
+              proyecto, productora, nombre, puesto, codigoContable, departamento, esFijoDiscontinuo, hxPorRodaje40, salario45, horasRef, modoInverso45, objetivoSemanal45,
               fechaInicio, fechaFin, vacAcumulada, indemAcumulada, finiquitoAparte,
               horasPorMes, vacDiasPorMes, festivosPorMes, jornadasEspecialesPorMes, festivosActivos, comidaDiasPorMes,
               plusHerramienta, plusCoche, plusVivienda, plusSeguroVida, plusComida,
@@ -3952,6 +3970,7 @@ ${docHTML}
               if (d.nombre !== undefined) setNombre(d.nombre);
               if (d.puesto !== undefined) setPuesto(d.puesto);
               if (d.codigoContable !== undefined) setCodigoContable(d.codigoContable);
+              if (d.departamento !== undefined) setDepartamento(d.departamento); // v97
               if (d.esFijoDiscontinuo !== undefined) setEsFijoDiscontinuo(d.esFijoDiscontinuo);
               if (d.hxPorRodaje40 !== undefined) setHxPorRodaje40(d.hxPorRodaje40);
               if (d.salario45 !== undefined) setSalario45(d.salario45);
@@ -4010,6 +4029,33 @@ ${docHTML}
               onPuesto={setPuesto}
               onCodigoContable={setCodigoContable}
             />
+            {/* v97: Departamento (obligatorio, rojo si vacío) */}
+            <div style={{ marginTop: 8 }}>
+              <label style={{ display: "block", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: departamento ? "#666" : "#c00", marginBottom: 4, fontWeight: 700 }}>
+                Departamento {!departamento && <span style={{ color: "#c00", fontSize: 9 }}>· obligatorio</span>}
+              </label>
+              <select
+                value={departamento}
+                onChange={(e) => setDepartamento(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "9px 11px",
+                  borderRadius: 5,
+                  border: `1px solid ${departamento ? "#d0ccc6" : "#c04040"}`,
+                  background: departamento ? "#f0ede8" : "#fff4f4",
+                  fontFamily: "'Courier Prime', 'Courier New', monospace",
+                  fontSize: 12,
+                  color: departamento ? "#1a1a1a" : "#c04040",
+                  cursor: "pointer",
+                  fontWeight: departamento ? 700 : 400,
+                }}
+              >
+                <option value="">— Elegir departamento —</option>
+                {DEPARTAMENTOS.map(d => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
+              </select>
+            </div>
             {/* v47: Toggle Fijo Discontinuo — solo 40H */}
             {es40h && (
               <div
@@ -8309,6 +8355,8 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
   const [proyectoSel, setProyectoSel] = useState(null);
   const [perfiles, setPerfiles] = useState([]);
   const [seleccionados, setSeleccionados] = useState(new Set());
+  const [filtroDepto, setFiltroDepto] = useState("__todos__"); // v97: filtro por departamento
+  const [modoHojas, setModoHojas] = useState("una"); // v97: "una" o "por_depto"
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
   const [mensaje, setMensaje] = useState(null);
@@ -8359,11 +8407,18 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
     setSeleccionados(nueva);
   };
 
-  const seleccionarTodos = () => setSeleccionados(new Set(perfiles.map(p => p.id)));
+  // v97: perfiles filtrados por departamento
+  const perfilesFiltrados = perfiles.filter(p => {
+    if (filtroDepto === "__todos__") return true;
+    if (filtroDepto === "__sin__") return !p.datos?.departamento;
+    return (p.datos?.departamento || "") === filtroDepto;
+  });
+
+  const seleccionarTodos = () => setSeleccionados(new Set(perfilesFiltrados.map(p => p.id)));
   const deseleccionarTodos = () => setSeleccionados(new Set());
   const invertirSeleccion = () => {
     const nueva = new Set();
-    perfiles.forEach(p => { if (!seleccionados.has(p.id)) nueva.add(p.id); });
+    perfilesFiltrados.forEach(p => { if (!seleccionados.has(p.id)) nueva.add(p.id); });
     setSeleccionados(nueva);
   };
 
@@ -8394,16 +8449,17 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
       }
     } catch (e) { console.warn("Sin calendario, calculando rango desde perfiles"); }
 
-    // Cabeceras finales (v96): añadidas MMB, quitada % s/Salario, añadidas 3 columnas al final
+    // Cabeceras finales (v97): añadido Departamento entre C y D
     const headersFijos = [
-      "Nombre trabajador", "Puesto", "Código contable", "Proyecto", "Productora",              // A-E
-      "Fecha inicio", "Fecha fin", "Días totales", "Salario pactado (€/mes)",                   // F-I
-      "Modalidad", "Fijo discontinuo", "Vacaciones", "Indemnización", "Finiquito aparte",       // J-N
-      "Total Salario Base", "Total Vacaciones", "Total Indemnización", "Total H.Extra",         // O-R
-      "Total Plus Actividad", "Total Festivos", "Total Jornadas Especiales", "Total Complementos", // S-V
-      "BRUTO TRABAJADOR", "Total SS Empresa", "COSTE TOTAL",                                    // W-X-Y
-      "BRUTO MMB", "FRINGES MMB", "TOTAL MMB", "DIFERENCIA (Y - AB)",                           // Z-AA-AB-AC (v96: nuevo)
-      "Autor perfil", "Fecha creación", "Última modificación",                                  // AD-AE-AF
+      "Nombre trabajador", "Puesto", "Código contable", "Departamento",                          // A-D (v97: nuevo)
+      "Proyecto", "Productora",                                                                   // E-F
+      "Fecha inicio", "Fecha fin", "Días totales", "Salario pactado (€/mes)",                   // G-J
+      "Modalidad", "Fijo discontinuo", "Vacaciones", "Indemnización", "Finiquito aparte",       // K-O
+      "Total Salario Base", "Total Vacaciones", "Total Indemnización", "Total H.Extra",         // P-S
+      "Total Plus Actividad", "Total Festivos", "Total Jornadas Especiales", "Total Complementos", // T-W
+      "BRUTO TRABAJADOR", "Total SS Empresa", "COSTE TOTAL",                                    // X-Y-Z
+      "BRUTO MMB", "FRINGES MMB", "TOTAL MMB", "DIFERENCIA (Z - AC)",                           // AA-AB-AC-AD (v96)
+      "Autor perfil", "Fecha creación", "Última modificación",                                  // AE-AF-AG
     ];
     const headersMeses = [];
     mesesRango.forEach(ym => {
@@ -8412,6 +8468,8 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
     });
     const headersFinales = ["Salario / Día", "Coste Hora Extra (€/h)", "Coste Festivo (€/día)"]; // v96
     const headers = [...headersFijos, ...headersMeses, ...headersFinales];
+    const idxInicioMeses = headersFijos.length;
+    const idxFinMeses = idxInicioMeses + mesesRango.length * 3;
 
     // Helper: convertir número de columna (0-indexed) a letra Excel (0=A, 25=Z, 26=AA, ...)
     const colLetter = (idx) => {
@@ -8424,140 +8482,134 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
       return s;
     };
 
-    // Índices de columnas (0-indexed)
-    const IDX_BRUTO_TRAB = 22;   // W
-    const IDX_SS = 23;           // X
-    const IDX_COSTE_TOTAL = 24;  // Y
-    const IDX_BRUTO_MMB = 25;    // Z
-    const IDX_FRINGES_MMB = 26;  // AA
-    const IDX_TOTAL_MMB = 27;    // AB (fórmula = Z + AA)
-    const IDX_DIFERENCIA = 28;   // AC (fórmula = Y - AB)
+    // Índices de columnas (0-indexed) — v97: +1 desde D en adelante por columna Departamento
+    const IDX_BRUTO_TRAB = 23;   // X (antes W)
+    const IDX_SS = 24;           // Y (antes X)
+    const IDX_COSTE_TOTAL = 25;  // Z (antes Y)
+    const IDX_BRUTO_MMB = 26;    // AA (antes Z)
+    const IDX_FRINGES_MMB = 27;  // AB (antes AA)
+    const IDX_TOTAL_MMB = 28;    // AC (fórmula = AA + AB)
+    const IDX_DIFERENCIA = 29;   // AD (fórmula = Z - AC)
 
-    // Filas de datos (aoa = array of arrays)
-    const aoa = [headers];
-    perfilesExp.forEach((p, rowIdx) => {
-      const d = p.datos || {};
-      const c = d._calculado || {};
-      const totBase = c.totBase || 0;
-      const totVac = c.totVac || 0;
-      const totIndem = c.totIndem || 0;
-      const totHx = c.totHx || 0;
-      const totPlus = c.totPlus || 0;
-      const totFest = c.totalFestImport45 || 0;
-      const totJE = c.totJEImporte || 0;
-      const totCompl = c.totalCompl || 0;
-      const bruto = c.totFinal ? (c.totFinal + totFest) : (totBase + totVac + totIndem + totHx + totPlus + totFest + totJE + totCompl);
-      const { totalSS, porMes } = calcularCosteSSPerfil(d);
-      const costeTotal = bruto + totalSS;
-
-      // v96: valores del contrato (base teórica)
-      const salarioDia = c.salarioDia || 0;
-      const vHoraEx = c.vHoraEx || 0;
-      const valorFestivo = salarioDia * 1.75;
-
-      // Días totales del contrato
-      let diasTot = 0;
-      if (d.fechaInicio && d.fechaFin) {
-        const ini = new Date(d.fechaInicio + "T12:00:00");
-        const fin = new Date(d.fechaFin + "T12:00:00");
-        diasTot = Math.round((fin - ini) / (1000 * 60 * 60 * 24)) + 1;
-      }
-
-      // Excel row number (1-indexed, +2 porque headers = fila 1, primer perfil = fila 2)
-      const excelRow = rowIdx + 2;
-
-      const fila = [
-        d.nombre || p.nombre || "",
-        d.puesto || "",
-        d.codigoContable || "",
-        d.proyecto || proyectoSel.nombre,
-        d.productora || proyectoSel.productora || "",
-        d.fechaInicio || "",
-        d.fechaFin || "",
-        diasTot || 0,
-        Number(d.salario45) || 0,
-        p.tab_id === "40h" ? "40H" : "45H",
-        d.esFijoDiscontinuo ? "Sí" : "No",
-        d.vacAcumulada ? "Al final" : "Prorrateadas",
-        d.indemAcumulada ? "Al final" : "Prorrateadas",
-        d.finiquitoAparte ? "Sí" : "No",
-        totBase, totVac, totIndem, totHx, totPlus, totFest, totJE, totCompl,   // O-V
-        bruto, totalSS, costeTotal,                                             // W-X-Y
-        // Z, AA vacías; AB = Z+AA; AC = Y - AB (fórmulas con celdas)
-        null, null,                                                             // Z, AA vacías
-        { f: `${colLetter(IDX_BRUTO_MMB)}${excelRow}+${colLetter(IDX_FRINGES_MMB)}${excelRow}` },   // AB
-        { f: `${colLetter(IDX_COSTE_TOTAL)}${excelRow}-${colLetter(IDX_TOTAL_MMB)}${excelRow}` }, // AC
-        p.autor || "",
-        p.created_at ? new Date(p.created_at).toLocaleDateString("es-ES") : "",
-        p.updated_at ? new Date(p.updated_at).toLocaleDateString("es-ES") : "",
-      ];
-      // Cash flow por mes
-      mesesRango.forEach(ym => {
-        const m = porMes[ym];
-        fila.push(m ? m.bruto : 0, m ? m.ss : 0, m ? m.total : 0);
-      });
-      // Columnas finales v96: valores del contrato
-      fila.push(salarioDia, vHoraEx, valorFestivo);
-      aoa.push(fila);
-    });
-
-    // Crear worksheet
-    const ws = XLSX.utils.aoa_to_sheet(aoa);
-
-    // Formato contabilidad con € para las columnas de importe
-    // Formato Excel: [$€-C0A]  #,##0.00 (contabilidad con símbolo €)
-    const FMT_EUR = '_-* #,##0.00 [$€-C0A]_-;-* #,##0.00 [$€-C0A]_-;_-* "-"?? [$€-C0A]_-;_-@_-';
-    // Columnas con formato €: I (salario pactado) + O..Y + Z..AC (MMB) + cash flow + finales
-    const colsEUR = new Set();
-    colsEUR.add(8); // I - Salario pactado
-    for (let i = 14; i <= 28; i++) colsEUR.add(i); // O..AC (totales y MMB)
-    // Cash flow: desde índice (32) = después de AF (30 fijas + 3 cash flow por mes...)
-    const idxInicioMeses = headersFijos.length;                    // después de columnas fijas
-    const idxFinMeses = idxInicioMeses + mesesRango.length * 3;    // 3 cols por mes
-    for (let i = idxInicioMeses; i < idxFinMeses; i++) colsEUR.add(i);
-    // 3 finales
-    for (let i = idxFinMeses; i < idxFinMeses + 3; i++) colsEUR.add(i);
-
-    // Aplicar formato a cada celda de esas columnas (excepto headers)
-    const totalRows = aoa.length;
-    colsEUR.forEach(colIdx => {
-      for (let r = 1; r < totalRows; r++) {
-        const cellRef = colLetter(colIdx) + (r + 1);
-        if (ws[cellRef]) {
-          ws[cellRef].z = FMT_EUR;
-          // Si la celda tiene fórmula (f) o número, aseguramos tipo numérico
-          if (ws[cellRef].v === null || ws[cellRef].v === undefined) {
-            // celda vacía: dejar sin valor pero con formato
-            ws[cellRef].t = "n";
-          }
-        } else {
-          // Celda no creada por SheetJS (vacía) → crearla con formato
-          ws[cellRef] = { t: "n", z: FMT_EUR, v: null };
+    // v97: función que construye un worksheet a partir de un array de perfiles
+    const construirHoja = (perfilesHoja) => {
+      const aoa = [headers];
+      perfilesHoja.forEach((p, rowIdx) => {
+        const d = p.datos || {};
+        const c = d._calculado || {};
+        const totBase = c.totBase || 0;
+        const totVac = c.totVac || 0;
+        const totIndem = c.totIndem || 0;
+        const totHx = c.totHx || 0;
+        const totPlus = c.totPlus || 0;
+        const totFest = c.totalFestImport45 || 0;
+        const totJE = c.totJEImporte || 0;
+        const totCompl = c.totalCompl || 0;
+        const bruto = c.totFinal ? (c.totFinal + totFest) : (totBase + totVac + totIndem + totHx + totPlus + totFest + totJE + totCompl);
+        const { totalSS, porMes } = calcularCosteSSPerfil(d);
+        const costeTotal = bruto + totalSS;
+        const salarioDia = c.salarioDia || 0;
+        const vHoraEx = c.vHoraEx || 0;
+        const valorFestivo = salarioDia * 1.75;
+        let diasTot = 0;
+        if (d.fechaInicio && d.fechaFin) {
+          const ini = new Date(d.fechaInicio + "T12:00:00");
+          const fin = new Date(d.fechaFin + "T12:00:00");
+          diasTot = Math.round((fin - ini) / (1000 * 60 * 60 * 24)) + 1;
         }
-      }
-    });
+        const excelRow = rowIdx + 2;
+        const fila = [
+          d.nombre || p.nombre || "",
+          d.puesto || "",
+          d.codigoContable || "",
+          d.departamento || "",
+          d.proyecto || proyectoSel.nombre,
+          d.productora || proyectoSel.productora || "",
+          d.fechaInicio || "",
+          d.fechaFin || "",
+          diasTot || 0,
+          Number(d.salario45) || 0,
+          p.tab_id === "40h" ? "40H" : "45H",
+          d.esFijoDiscontinuo ? "Sí" : "No",
+          d.vacAcumulada ? "Al final" : "Prorrateadas",
+          d.indemAcumulada ? "Al final" : "Prorrateadas",
+          d.finiquitoAparte ? "Sí" : "No",
+          totBase, totVac, totIndem, totHx, totPlus, totFest, totJE, totCompl,
+          bruto, totalSS, costeTotal,
+          null, null,
+          { f: `${colLetter(IDX_BRUTO_MMB)}${excelRow}+${colLetter(IDX_FRINGES_MMB)}${excelRow}` },
+          { f: `${colLetter(IDX_COSTE_TOTAL)}${excelRow}-${colLetter(IDX_TOTAL_MMB)}${excelRow}` },
+          p.autor || "",
+          p.created_at ? new Date(p.created_at).toLocaleDateString("es-ES") : "",
+          p.updated_at ? new Date(p.updated_at).toLocaleDateString("es-ES") : "",
+        ];
+        mesesRango.forEach(ym => {
+          const m = porMes[ym];
+          fila.push(m ? m.bruto : 0, m ? m.ss : 0, m ? m.total : 0);
+        });
+        fila.push(salarioDia, vHoraEx, valorFestivo);
+        aoa.push(fila);
+      });
 
-    // Anchos de columna aproximados
-    const wscols = [];
-    headers.forEach((h, i) => {
-      let w = 12;
-      if (i === 0) w = 22;                            // Nombre
-      else if (i === 1) w = 18;                       // Puesto
-      else if (i === 3 || i === 4) w = 14;            // Proyecto, Productora
-      else if (i >= 5 && i <= 7) w = 11;              // Fechas, días
-      else if (i >= 14 && i <= 28) w = 15;            // Totales y MMB
-      else if (i >= idxInicioMeses && i < idxFinMeses) w = 11; // Cash flow
-      else if (i >= idxFinMeses) w = 14;              // Finales
-      wscols.push({ wch: w });
-    });
-    ws["!cols"] = wscols;
+      const ws = XLSX.utils.aoa_to_sheet(aoa);
+      const FMT_EUR = '_-* #,##0.00 [$€-C0A]_-;-* #,##0.00 [$€-C0A]_-;_-* "-"?? [$€-C0A]_-;_-@_-';
+      const colsEUR = new Set();
+      colsEUR.add(9);
+      for (let i = 15; i <= 29; i++) colsEUR.add(i);
+      for (let i = idxInicioMeses; i < idxFinMeses; i++) colsEUR.add(i);
+      for (let i = idxFinMeses; i < idxFinMeses + 3; i++) colsEUR.add(i);
+      const totalRows = aoa.length;
+      colsEUR.forEach(colIdx => {
+        for (let r = 1; r < totalRows; r++) {
+          const cellRef = colLetter(colIdx) + (r + 1);
+          if (ws[cellRef]) {
+            ws[cellRef].z = FMT_EUR;
+            if (ws[cellRef].v === null || ws[cellRef].v === undefined) ws[cellRef].t = "n";
+          } else {
+            ws[cellRef] = { t: "n", z: FMT_EUR, v: null };
+          }
+        }
+      });
+      const wscols = [];
+      headers.forEach((h, i) => {
+        let w = 12;
+        if (i === 0) w = 22;
+        else if (i === 1) w = 18;
+        else if (i === 3) w = 16;
+        else if (i === 4 || i === 5) w = 14;
+        else if (i >= 6 && i <= 8) w = 11;
+        else if (i >= 15 && i <= 29) w = 15;
+        else if (i >= idxInicioMeses && i < idxFinMeses) w = 11;
+        else if (i >= idxFinMeses) w = 14;
+        wscols.push({ wch: w });
+      });
+      ws["!cols"] = wscols;
+      ws["!freeze"] = { xSplit: 6, ySplit: 1 };
+      return ws;
+    };
 
-    // Congelar primera fila y primeras 5 columnas (nombre..productora)
-    ws["!freeze"] = { xSplit: 5, ySplit: 1 };
-
-    // Crear workbook y descargar
+    // Crear workbook y añadir hoja(s)
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Listado");
+    if (modoHojas === "por_depto") {
+      // Agrupar por departamento
+      const grupos = {};
+      perfilesExp.forEach(p => {
+        const depto = p.datos?.departamento || "Sin departamento";
+        if (!grupos[depto]) grupos[depto] = [];
+        grupos[depto].push(p);
+      });
+      // Orden: DEPARTAMENTOS conocidos primero, luego "Sin departamento"
+      const ordenDeptos = [...DEPARTAMENTOS.filter(d => grupos[d]), ...Object.keys(grupos).filter(d => !DEPARTAMENTOS.includes(d))];
+      ordenDeptos.forEach(depto => {
+        const ws = construirHoja(grupos[depto]);
+        // Nombre hoja: máx 31 chars, sin caracteres inválidos
+        const nombreHoja = depto.replace(/[\\/*?:[\]]/g, "").slice(0, 31);
+        XLSX.utils.book_append_sheet(wb, ws, nombreHoja);
+      });
+    } else {
+      const ws = construirHoja(perfilesExp);
+      XLSX.utils.book_append_sheet(wb, ws, "Listado");
+    }
     const nombreArchivo = `Listado_${proyectoSel.nombre.replace(/[^a-zA-Z0-9]/g, "_")}_${new Date().toISOString().slice(0, 10)}.xlsx`;
     XLSX.writeFile(wb, nombreArchivo);
 
@@ -8637,6 +8689,22 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
                   </div>
                 )}
 
+                {/* v97: Filtro por departamento */}
+                {perfiles.length > 0 && (
+                  <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 10, flexWrap: "wrap" }}>
+                    <label style={{ fontSize: 10, color: "#666", letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 700 }}>Filtrar:</label>
+                    <select value={filtroDepto} onChange={(e) => setFiltroDepto(e.target.value)} style={{ padding: "5px 10px", fontSize: 11, border: "1px solid #b8864a", borderRadius: 4, background: "#fff", fontFamily: "'Courier Prime', 'Courier New', monospace", cursor: "pointer", color: "#1a1a1a" }}>
+                      <option value="__todos__">Todos los departamentos</option>
+                      <option value="__sin__">— Sin departamento —</option>
+                      {DEPARTAMENTOS.map(d => {
+                        const count = perfiles.filter(p => (p.datos?.departamento || "") === d).length;
+                        return count > 0 ? <option key={d} value={d}>{d} ({count})</option> : null;
+                      })}
+                    </select>
+                    <span style={{ fontSize: 9, color: "#888" }}>{perfilesFiltrados.length} de {perfiles.length} mostrados</span>
+                  </div>
+                )}
+
                 <div style={{ background: "#fff", border: "1px solid #d0ccc6", borderRadius: 5, maxHeight: 400, overflow: "auto" }}>
                   <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11, fontFamily: "'Courier Prime', 'Courier New', monospace" }}>
                     <thead style={{ position: "sticky", top: 0, background: "#f0ede8", zIndex: 1 }}>
@@ -8645,17 +8713,19 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
                         <th style={{ padding: "10px 6px", textAlign: "left", borderBottom: "1px solid #d0ccc6", fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", color: "#666", fontWeight: 700 }}>Perfil</th>
                         <th style={{ padding: "10px 6px", textAlign: "center", borderBottom: "1px solid #d0ccc6", fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", color: "#666", width: 60, fontWeight: 700 }}>Tipo</th>
                         <th style={{ padding: "10px 6px", textAlign: "left", borderBottom: "1px solid #d0ccc6", fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", color: "#666", fontWeight: 700 }}>Puesto</th>
+                        <th style={{ padding: "10px 6px", textAlign: "left", borderBottom: "1px solid #d0ccc6", fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", color: "#666", fontWeight: 700 }}>Departamento</th>
                         <th style={{ padding: "10px 6px", textAlign: "right", borderBottom: "1px solid #d0ccc6", fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", color: "#666", width: 90, fontWeight: 700 }}>Salario</th>
                         <th style={{ padding: "10px 6px", textAlign: "left", borderBottom: "1px solid #d0ccc6", fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", color: "#666", fontWeight: 700 }}>Exportado</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {perfiles.length === 0 && (
-                        <tr><td colSpan={6} style={{ padding: 30, textAlign: "center", color: "#888", fontStyle: "italic" }}>No hay perfiles guardados en este proyecto.</td></tr>
+                      {perfilesFiltrados.length === 0 && (
+                        <tr><td colSpan={7} style={{ padding: 30, textAlign: "center", color: "#888", fontStyle: "italic" }}>{perfiles.length === 0 ? "No hay perfiles guardados en este proyecto." : "Ningún perfil coincide con el filtro."}</td></tr>
                       )}
-                      {perfiles.map(p => {
+                      {perfilesFiltrados.map(p => {
                         const yaExp = !!p.exportado_el;
                         const sel = seleccionados.has(p.id);
+                        const depto = p.datos?.departamento || "";
                         return (
                           <tr key={p.id} style={{ borderBottom: "1px solid #f0ede8", background: yaExp ? "#f5f4f0" : (sel ? "#faf6ee" : "transparent"), color: yaExp ? "#999" : "#1a1a1a", cursor: "pointer" }} onClick={() => toggleSel(p.id)}>
                             <td style={{ padding: "8px 6px", textAlign: "center" }}>
@@ -8664,6 +8734,7 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
                             <td style={{ padding: "8px", fontWeight: 600 }}>{p.nombre}</td>
                             <td style={{ padding: "8px", textAlign: "center", fontSize: 9, color: yaExp ? "#aaa" : "#8a5030", fontWeight: 700 }}>{p.tab_id === "40h" ? "40H" : "45H"}</td>
                             <td style={{ padding: "8px", fontSize: 10 }}>{p.datos?.puesto || "—"}</td>
+                            <td style={{ padding: "8px", fontSize: 10, color: depto ? "#1a1a1a" : "#c04040", fontStyle: depto ? "normal" : "italic" }}>{depto || "sin depto"}</td>
                             <td style={{ padding: "8px", textAlign: "right", fontSize: 10 }}>{p.datos?.salario45 ? Number(p.datos.salario45).toFixed(0) + " €" : "—"}</td>
                             <td style={{ padding: "8px", fontSize: 9, color: yaExp ? "#666" : "#bbb" }}>
                               {yaExp ? (
@@ -8680,10 +8751,21 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
                   </table>
                 </div>
 
-                {perfiles.length > 0 && (
+                {perfilesFiltrados.length > 0 && (
                   <div style={{ marginTop: 16, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
-                    <div style={{ fontSize: 10, color: "#666" }}>
-                      Se descargará un archivo <strong>.xlsx</strong> (Excel) con {seleccionados.size} perfil{seleccionados.size !== 1 ? "es" : ""}, formato contabilidad y fórmulas.
+                    <div style={{ fontSize: 10, color: "#666", display: "flex", flexDirection: "column", gap: 6 }}>
+                      <div>Se descargará un archivo <strong>.xlsx</strong> (Excel) con {seleccionados.size} perfil{seleccionados.size !== 1 ? "es" : ""}, formato contabilidad y fórmulas.</div>
+                      {/* v97: modo hojas */}
+                      <div style={{ display: "flex", gap: 12, alignItems: "center", marginTop: 2 }}>
+                        <label style={{ display: "flex", alignItems: "center", gap: 5, cursor: "pointer", fontSize: 10 }}>
+                          <input type="radio" name="modoHojas" checked={modoHojas === "una"} onChange={() => setModoHojas("una")} />
+                          Una sola hoja
+                        </label>
+                        <label style={{ display: "flex", alignItems: "center", gap: 5, cursor: "pointer", fontSize: 10 }}>
+                          <input type="radio" name="modoHojas" checked={modoHojas === "por_depto"} onChange={() => setModoHojas("por_depto")} />
+                          Una hoja por departamento
+                        </label>
+                      </div>
                     </div>
                     <button onClick={exportar} disabled={seleccionados.size === 0}
                       style={{ background: seleccionados.size === 0 ? "#ccc" : "#5a8a5a", color: "#fff", border: "none", padding: "12px 24px", borderRadius: 5, cursor: seleccionados.size === 0 ? "not-allowed" : "pointer", fontFamily: "'Courier Prime', 'Courier New', monospace", fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>
