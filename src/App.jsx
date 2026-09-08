@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v118";
+const APP_VERSION = "v120";
 
 // v97: Departamentos de un rodaje audiovisual (obligatorio en cada perfil)
 const DEPARTAMENTOS = [
@@ -2654,7 +2654,7 @@ function DocumentoImprimible({
     marginTop: 14, marginBottom: 6,
     fontSize: 8, fontWeight: 700,
     letterSpacing: "0.18em", textTransform: "uppercase",
-    color: "#4ec9b8", paddingBottom: 2,
+    color: "#1a1a1a", paddingBottom: 2,
   };
   const tdHead = {
     padding: "5px 6px", fontSize: 7,
@@ -2735,11 +2735,7 @@ function DocumentoImprimible({
         <tbody>
           <tr>
             <td style={{ width: "45%", verticalAlign: "middle", padding: 0 }}>
-              <div style={{ background: "#1a1a1a", padding: "10px 14px", borderRadius: 3, display: "inline-block" }}>
-                <div style={{ color: "#4ec9b8", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontWeight: 700, fontSize: 18, letterSpacing: "0.15em", lineHeight: 1 }}>
-                  BD PROD TOOLS
-                </div>
-              </div>
+              <img src="/logo.png" alt="Bdprodtools" style={{ height: 50, width: "auto", display: "block" }} />
             </td>
             <td style={{ width: "55%", verticalAlign: "middle", padding: 0, textAlign: "right" }}>
               <div style={{ fontSize: 8, color: "#888", letterSpacing: "0.3em", textTransform: "uppercase", marginBottom: 3 }}>
@@ -2748,8 +2744,8 @@ function DocumentoImprimible({
               <div style={{ fontSize: 16, fontWeight: 700, letterSpacing: "0.05em", color: "#1a1a1a", marginBottom: 5 }}>
                 CALCULADORA DE SALARIOS
               </div>
-              <div style={{ fontSize: 9, color: "#4ec9b8", letterSpacing: "0.05em" }}>
-                <span style={{ background: "#4ec9b8", color: "#f2f5f7", padding: "1px 4px", marginRight: 4, fontSize: 7 }}>📁</span>
+              <div style={{ fontSize: 9, color: "#1a1a1a", letterSpacing: "0.05em" }}>
+                <span style={{ background: "#1a1a1a", color: "#f2f5f7", padding: "1px 4px", marginRight: 4, fontSize: 7 }}>📁</span>
                 {(proyecto || "—") + " · " + (productora || "—")}
               </div>
             </td>
@@ -2771,7 +2767,7 @@ function DocumentoImprimible({
           </tr>
           {!es40h && (
             <tr>
-              <td style={tdLabel}><strong>Salario pactado 45h:</strong> <span style={{ color: "#4ec9b8", fontWeight: 700 }}>{fmtE(salario45efectivo)}</span></td>
+              <td style={tdLabel}><strong>Salario pactado 45h:</strong> <span style={{ color: "#1a1a1a", fontWeight: 700 }}>{fmtE(salario45efectivo)}</span></td>
               <td style={tdValue}><strong>Horas referencia:</strong> {horasRef}h/mes</td>
             </tr>
           )}
@@ -2827,7 +2823,7 @@ function DocumentoImprimible({
             <tbody>
               <tr>
                 <td style={{ background: "#fdf8f0", border: "1px solid #e8d4a8", padding: "7px 10px", textAlign: "center", fontSize: 10, fontWeight: 700, color: "#1a1a1a", letterSpacing: "0.04em", width: "50%" }}>
-                  TOTAL MES 40H · <span style={{ color: "#4ec9b8", fontSize: 12 }}>{fmt(baseRef + vacRef + indemRef)} €</span> <span style={{ display: "inline-block", background: "#4ec9b8", color: "#f2f5f7", fontSize: 8, fontWeight: 700, letterSpacing: "0.1em", padding: "1px 5px", borderRadius: 3, marginLeft: 4, verticalAlign: "middle" }}>BRUTOS</span>
+                  TOTAL MES 40H · <span style={{ color: "#1a1a1a", fontSize: 12 }}>{fmt(baseRef + vacRef + indemRef)} €</span> <span style={{ display: "inline-block", background: "#1a1a1a", color: "#f2f5f7", fontSize: 8, fontWeight: 700, letterSpacing: "0.1em", padding: "1px 5px", borderRadius: 3, marginLeft: 4, verticalAlign: "middle" }}>BRUTOS</span>
                 </td>
                 <td style={{ background: "#f0f6fc", border: "1px solid #c8d8e8", padding: "7px 10px", textAlign: "center", fontSize: 10, fontWeight: 700, color: "#1a1a1a", letterSpacing: "0.04em", width: "50%" }}>
                   SALARIO EN CONTRATO · <span style={{ color: "#1a1a1a", fontSize: 12 }}>{fmt(vacAcumulada ? baseRef : (baseRef + vacRef))} €</span> <span style={{ display: "inline-block", background: "#1a1a1a", color: "#f2f5f7", fontSize: 8, fontWeight: 700, letterSpacing: "0.1em", padding: "1px 5px", borderRadius: 3, marginLeft: 4, verticalAlign: "middle" }}>BRUTOS</span>
@@ -2848,7 +2844,7 @@ function DocumentoImprimible({
             <tbody>
               <tr>
                 <td style={{ background: "#fdf8f0", border: "1px solid #e8d4a8", padding: "7px 10px", textAlign: "center", fontSize: 10, fontWeight: 700, color: "#1a1a1a", letterSpacing: "0.04em", width: "50%" }}>
-                  TOTAL MES 45H TODO INCLUIDO · <span style={{ color: "#4ec9b8", fontSize: 12 }}>{fmt(sumaRef)} €</span> <span style={{ display: "inline-block", background: "#4ec9b8", color: "#f2f5f7", fontSize: 8, fontWeight: 700, letterSpacing: "0.1em", padding: "1px 5px", borderRadius: 3, marginLeft: 4, verticalAlign: "middle" }}>BRUTOS</span>
+                  TOTAL MES 45H TODO INCLUIDO · <span style={{ color: "#1a1a1a", fontSize: 12 }}>{fmt(sumaRef)} €</span> <span style={{ display: "inline-block", background: "#1a1a1a", color: "#f2f5f7", fontSize: 8, fontWeight: 700, letterSpacing: "0.1em", padding: "1px 5px", borderRadius: 3, marginLeft: 4, verticalAlign: "middle" }}>BRUTOS</span>
                 </td>
                 <td style={{ background: "#f0f6fc", border: "1px solid #c8d8e8", padding: "7px 10px", textAlign: "center", fontSize: 10, fontWeight: 700, color: "#1a1a1a", letterSpacing: "0.04em", width: "50%" }}>
                   SALARIO EN CONTRATO · <span style={{ color: "#1a1a1a", fontSize: 12 }}>{fmt(baseRef + vacRef)} €</span> <span style={{ display: "inline-block", background: "#1a1a1a", color: "#f2f5f7", fontSize: 8, fontWeight: 700, letterSpacing: "0.1em", padding: "1px 5px", borderRadius: 3, marginLeft: 4, verticalAlign: "middle" }}>BRUTOS</span>
@@ -2880,7 +2876,7 @@ function DocumentoImprimible({
       </table>
 
       {/* ═══ NÓMINA 45H POR MES TRABAJADO ═══ */}
-      <div style={sectionTitle}>▸ NÓMINA {es40h ? "40H" : "45H"} POR MES TRABAJADO <span style={{ display: "inline-block", background: "#4ec9b8", color: "#f2f5f7", fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", padding: "2px 7px", borderRadius: 3, marginLeft: 8, verticalAlign: "middle", textTransform: "uppercase" }}>Importes Brutos</span></div>
+      <div style={sectionTitle}>▸ NÓMINA {es40h ? "40H" : "45H"} POR MES TRABAJADO <span style={{ display: "inline-block", background: "#1a1a1a", color: "#f2f5f7", fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", padding: "2px 7px", borderRadius: 3, marginLeft: 8, verticalAlign: "middle", textTransform: "uppercase" }}>Importes Brutos</span></div>
       <table style={{ width: "100%", borderCollapse: "collapse" }}>
         <thead>
           <tr>
@@ -2903,7 +2899,7 @@ function DocumentoImprimible({
               <th key={hi} style={{
                 padding: "5px 4px", fontSize: 7,
                 textAlign: h.a, letterSpacing: "0.05em", textTransform: "uppercase", fontWeight: 700,
-                color: h.gold ? "#4ec9b8" : "#666",
+                color: h.gold ? "#1a1a1a" : "#666",
                 background: "#f2f5f7",
                 border: "1px solid #d8d4ce",
               }}>{h.l}</th>
@@ -2939,13 +2935,13 @@ function DocumentoImprimible({
                 <td style={tdCell({ textAlign: "right", color: (d.importeJE || 0) > 0 ? "#8a1e4a" : "#bbb" })}>{(d.importeJE || 0) > 0 ? fmt(d.importeJE) : "—"}</td>
                 <td style={tdCell({ textAlign: "right", color: plusesSinComida > 0 ? "#5a8a5a" : "#bbb" })}>{plusesSinComida > 0 ? fmt(plusesSinComida) : "—"}</td>
                 <td style={tdCell({ textAlign: "right", color: comida > 0 ? "#5a8a5a" : "#bbb" })}>{comida > 0 ? fmt(comida) : "—"}</td>
-                <td style={tdCell({ textAlign: "right", color: "#4ec9b8", fontWeight: 700 })}>{fmt(totalRow)}</td>
+                <td style={tdCell({ textAlign: "right", color: "#1a1a1a", fontWeight: 700 })}>{fmt(totalRow)}</td>
               </tr>
             );
           })}
           {/* Fila TOTAL */}
           <tr style={{ background: "#fdf8f0", fontWeight: 700 }}>
-            <td style={tdCell({ background: "#fdf8f0", color: "#4ec9b8", letterSpacing: "0.1em", textTransform: "uppercase", fontSize: 8 })}>TOTAL</td>
+            <td style={tdCell({ background: "#fdf8f0", color: "#1a1a1a", letterSpacing: "0.1em", textTransform: "uppercase", fontSize: 8 })}>TOTAL</td>
             <td style={tdCell({ background: "#fdf8f0", textAlign: "right", color: "#888" })}>—</td>
             <td style={tdCell({ background: "#fdf8f0", textAlign: "right" })}>{fmt(totBase)}</td>
             <td style={tdCell({ background: "#fdf8f0", textAlign: "right" })}>{fmt(totVac)}</td>
@@ -2967,7 +2963,7 @@ function DocumentoImprimible({
             <td style={tdCell({ background: "#fdf8f0", textAlign: "right", color: "#5a8a5a" })}>
               {fmt(complementos45.reduce((s,c)=>s+(c.comida||0), 0))}
             </td>
-            <td style={tdCell({ background: "#fdf8f0", textAlign: "right", color: "#4ec9b8" })}>{fmt(es40h ? (totalConExtras - (totPlus || 0)) : totalConExtras)}</td>
+            <td style={tdCell({ background: "#fdf8f0", textAlign: "right", color: "#1a1a1a" })}>{fmt(es40h ? (totalConExtras - (totPlus || 0)) : totalConExtras)}</td>
           </tr>
         </tbody>
       </table>
@@ -2991,7 +2987,7 @@ function DocumentoImprimible({
       )}
 
       {/* ═══ RESUMEN DEL PERÍODO ═══ */}
-      <div style={sectionTitle}>▸ RESUMEN DEL PERÍODO <span style={{ display: "inline-block", background: "#4ec9b8", color: "#f2f5f7", fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", padding: "2px 7px", borderRadius: 3, marginLeft: 8, verticalAlign: "middle", textTransform: "uppercase" }}>Importes Brutos</span></div>
+      <div style={sectionTitle}>▸ RESUMEN DEL PERÍODO <span style={{ display: "inline-block", background: "#1a1a1a", color: "#f2f5f7", fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", padding: "2px 7px", borderRadius: 3, marginLeft: 8, verticalAlign: "middle", textTransform: "uppercase" }}>Importes Brutos</span></div>
       <table style={{ width: "100%", borderCollapse: "collapse" }}>
         <tbody>
           <tr>
@@ -3035,10 +3031,10 @@ function DocumentoImprimible({
             </tr>
           )}
           <tr style={{ background: "#fdf8f0" }}>
-            <td style={{ ...tdLabel, background: "#fdf8f0", color: "#4ec9b8", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", fontSize: 10, padding: "8px 8px" }}>
-              TOTAL A PERCIBIR ({es40h ? "40h" : "45h"}) {tieneCompl ? "(sin extras)" : ""} <span style={{ display: "inline-block", background: "#4ec9b8", color: "#f2f5f7", fontSize: 8, fontWeight: 700, letterSpacing: "0.12em", padding: "1px 6px", borderRadius: 3, marginLeft: 6, verticalAlign: "middle", textTransform: "uppercase" }}>Importe Bruto</span>
+            <td style={{ ...tdLabel, background: "#fdf8f0", color: "#1a1a1a", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", fontSize: 10, padding: "8px 8px" }}>
+              TOTAL A PERCIBIR ({es40h ? "40h" : "45h"}) {tieneCompl ? "(sin extras)" : ""} <span style={{ display: "inline-block", background: "#1a1a1a", color: "#f2f5f7", fontSize: 8, fontWeight: 700, letterSpacing: "0.12em", padding: "1px 6px", borderRadius: 3, marginLeft: 6, verticalAlign: "middle", textTransform: "uppercase" }}>Importe Bruto</span>
             </td>
-            <td style={{ ...tdValue, background: "#fdf8f0", textAlign: "right", fontSize: 13, fontWeight: 700, color: "#4ec9b8", padding: "8px 8px" }}>
+            <td style={{ ...tdValue, background: "#fdf8f0", textAlign: "right", fontSize: 13, fontWeight: 700, color: "#1a1a1a", padding: "8px 8px" }}>
               {fmtE((es40h ? (totFinal - (totPlus || 0)) : totFinal) + (totalFestImport45 || 0))}
             </td>
           </tr>
@@ -7671,7 +7667,7 @@ function CosteEmpresa() {
         <td class="n ${incluirGestoria ? 'g' : 'z'}" style="${incluirGestoria ? '' : 'text-decoration:line-through'}">${fmt(f.gestoria)}</td>
         <td class="n ${(f.exento || 0) === 0 ? 'z' : 'red'}">${(f.exento || 0) === 0 ? "—" : "-" + fmt(f.exento)}</td>
         <td class="n red"><b>${fmt(f.totalCosteEmpresa)}</b></td>
-        <td class="n gold" style="background:#f2f5f7;border-left:2px solid #4ec9b8"><b>${fmt(f.total + f.totalCosteEmpresa)}</b></td>
+        <td class="n gold" style="background:#f2f5f7;border-left:2px solid #1a1a1a"><b>${fmt(f.total + f.totalCosteEmpresa)}</b></td>
       </tr>
     `).join("");
 
@@ -7688,13 +7684,13 @@ function CosteEmpresa() {
   .watermark .wm2 { font-size: 38px; display: block; letter-spacing: 0.20em; margin-top: 6px; }
   .content { position: relative; z-index: 1; }
   .banner { background: #1a1a1a; color: #f0f0f0; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; border-radius: 4px; margin-bottom: 12px; }
-  .logo { background: #4ec9b8; color: #1a1a1a; padding: 5px 8px; font-weight: 700; letter-spacing: 0.1em; border-radius: 3px; font-size: 9px; }
+  .logo { background: #1a1a1a; color: #1a1a1a; padding: 5px 8px; font-weight: 700; letter-spacing: 0.1em; border-radius: 3px; font-size: 9px; }
   .title-right { text-align: right; }
-  .subtitle { font-size: 7px; color: #4ec9b8; letter-spacing: 0.25em; text-transform: uppercase; }
+  .subtitle { font-size: 7px; color: #1a1a1a; letter-spacing: 0.25em; text-transform: uppercase; }
   .title { font-size: 12px; font-weight: 700; letter-spacing: 0.07em; }
   .meta { font-size: 7px; color: #aaa; margin-top: 2px; }
   .section { margin-bottom: 12px; }
-  h2 { font-size: 8px; letter-spacing: 0.18em; color: #4ec9b8; text-transform: uppercase; margin: 0 0 6px; padding-bottom: 5px; border-bottom: 1px solid #d5d9dc; }
+  h2 { font-size: 8px; letter-spacing: 0.18em; color: #1a1a1a; text-transform: uppercase; margin: 0 0 6px; padding-bottom: 5px; border-bottom: 1px solid #d5d9dc; }
   h2.red { color: #a04545; }
   .datos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
   .datos > div { background: #f2f5f7; border: 1px solid #d5d9dc; border-radius: 3px; padding: 5px 7px; }
@@ -7703,7 +7699,7 @@ function CosteEmpresa() {
   table { width: 100%; border-collapse: collapse; font-size: 7px; table-layout: fixed; }
   th { background: #dfe4e8; color: #666; font-size: 6.5px; letter-spacing: 0.03em; text-transform: uppercase; font-weight: 700; padding: 4px 2px; border-bottom: 1px solid #d5d9dc; text-align: right; word-wrap: break-word; }
   th.first { text-align: left; }
-  th.gold { color: #4ec9b8; }
+  th.gold { color: #1a1a1a; }
   th.red { color: #a04545; }
   th.p { color: #6a3a9a; }
   th.jp { color: #8a1e4a; }
@@ -7713,10 +7709,10 @@ function CosteEmpresa() {
   td.n { text-align: right; }
   td.b { color: #1a1a1a; }
   td.o { color: #b07030; }
-  td.g { color: #4ec9b8; }
+  td.g { color: #1a1a1a; }
   td.p { color: #6a3a9a; }
   td.jp { color: #8a1e4a; }
-  td.gold { color: #4ec9b8; }
+  td.gold { color: #1a1a1a; }
   td.red { color: #a04545; }
   td.z { color: #ccc; }
   .small { font-size: 6px; color: #888; }
@@ -7747,7 +7743,7 @@ function CosteEmpresa() {
 <div class="content">
 
 <div class="banner">
-  <div class="logo">BD PROD TOOLS</div>
+  <img src="/logo.png" alt="Bdprodtools" style="height:36px;width:auto;display:block;" />
   <div class="title-right">
     <div class="subtitle">Coste Empresa · ${tipo}</div>
     <div class="title">CALCULADORA DE SALARIOS</div>
@@ -7829,7 +7825,7 @@ function CosteEmpresa() {
         <th>Gestoría</th>
         <th class="red">Exento</th>
         <th class="red">TOTAL</th>
-        <th style="background:#4ec9b8;color:#fff;border-left:2px solid #4ec9b8">TOTAL MES</th>
+        <th style="background:#1a1a1a;color:#fff;border-left:2px solid #1a1a1a">TOTAL MES</th>
       </tr>
     </thead>
     <tbody>
@@ -7845,7 +7841,7 @@ function CosteEmpresa() {
         <td class="n ${incluirGestoria ? 'g' : 'z'}" style="${incluirGestoria ? '' : 'text-decoration:line-through'}">${fmt(totales.gestoria)}</td>
         <td class="n red">${(totales.exento || 0) === 0 ? "—" : "-" + fmt(totales.exento)}</td>
         <td class="n red">${fmt(totales.totalCosteEmpresa)}</td>
-        <td class="n gold" style="background:#4ec9b8;color:#fff;border-left:2px solid #4ec9b8"><b>${fmt(totales.total + totales.totalCosteEmpresa)}</b></td>
+        <td class="n gold" style="background:#1a1a1a;color:#fff;border-left:2px solid #1a1a1a"><b>${fmt(totales.total + totales.totalCosteEmpresa)}</b></td>
       </tr>
     </tbody>
   </table>
@@ -7864,7 +7860,7 @@ function CosteEmpresa() {
   <div class="resumen">
     <div><div class="l">Bruto trabajador</div><div class="v">${fmt(totales.total)} €</div></div>
     <div><div class="l">Coste empresa</div><div class="v" style="color:#a04545">${fmt(totales.totalCosteEmpresa)} €</div></div>
-    <div><div class="l">Coste total</div><div class="vL" style="color:#4ec9b8">${fmt(totalConCE)} €</div></div>
+    <div><div class="l">Coste total</div><div class="vL" style="color:#1a1a1a">${fmt(totalConCE)} €</div></div>
     <div><div class="l">% s/salario</div><div class="v" style="color:#6a3a9a">${pctSobre.toFixed(2)} %</div></div>
   </div>
 </div>
@@ -8380,7 +8376,7 @@ function CosteEmpresa() {
                 <thead>
                   <tr style={{ background: "#dfe4e8" }}>
                     {["Mes", "Salario Base", "Vacaciones", "Indemnización", "H.Extra €", "Plus Act.", "Festivos €", "Jorn.Esp €", "Coche", "Vivienda", "Seguro Vida", "Comida", "Exento", "TOTAL"].map(h => (
-                      <th key={h} style={{ padding: "8px 6px", fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 700, textAlign: h === "Mes" ? "left" : "right", color: h === "TOTAL" ? "#4ec9b8" : (h === "Exento" ? "#a04545" : (h === "Festivos €" ? "#6a3a9a" : (h === "Jorn.Esp €" ? "#8a1e4a" : "#666"))), borderBottom: "1px solid #d5d9dc", whiteSpace: "nowrap" }}>{h}</th>
+                      <th key={h} style={{ padding: "8px 6px", fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 700, textAlign: h === "Mes" ? "left" : "right", color: h === "TOTAL" ? "#1a1a1a" : (h === "Exento" ? "#a04545" : (h === "Festivos €" ? "#6a3a9a" : (h === "Jorn.Esp €" ? "#8a1e4a" : "#666"))), borderBottom: "1px solid #d5d9dc", whiteSpace: "nowrap" }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -8418,7 +8414,7 @@ function CosteEmpresa() {
                         <td style={{ padding: "7px 6px", textAlign: "right", color: (c.seguroVida || 0) === 0 ? "#bbb" : "#4ec9b8" }}>{(c.seguroVida || 0) === 0 ? "—" : fmt(c.seguroVida)}</td>
                         <td style={{ padding: "7px 6px", textAlign: "right", color: (c.comida || 0) === 0 ? "#bbb" : "#4ec9b8" }}>{(c.comida || 0) === 0 ? "—" : fmt(c.comida)}</td>
                         <td style={{ padding: "7px 6px", textAlign: "right", color: exentoMes === 0 ? "#bbb" : "#a04545", fontWeight: exentoMes > 0 ? 700 : 400 }}>{exentoMes === 0 ? "—" : `-${fmt(exentoMes)}`}</td>
-                        <td style={{ padding: "7px 6px", textAlign: "right", fontWeight: 700, color: "#4ec9b8" }}>{fmt(totalMes)}</td>
+                        <td style={{ padding: "7px 6px", textAlign: "right", fontWeight: 800, color: "#1a1a1a" }}>{fmt(totalMes)}</td>
                       </tr>
                     );
                   })}
