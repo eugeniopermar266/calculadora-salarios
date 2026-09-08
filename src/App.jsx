@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v136";
+const APP_VERSION = "v137";
 
 // v97: Departamentos de un rodaje audiovisual (obligatorio en cada perfil)
 const DEPARTAMENTOS = [
