@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v127";
+const APP_VERSION = "v129";
 
 // v97: Departamentos de un rodaje audiovisual (obligatorio en cada perfil)
 const DEPARTAMENTOS = [
@@ -1689,19 +1689,38 @@ function GestorPerfiles({ tabId, datosActuales, onCargarPerfil, onRegistrarAccio
     perfilEnEdicion,
     borrarPerfilesSeleccionados: async (ids) => {
       let ok = 0, err = 0;
+      const errores = [];
+      console.log("🗑 [BORRAR MÚLTIPLE] IDs recibidos:", ids);
+      console.log("🗑 [BORRAR MÚLTIPLE] perfiles en memoria:", perfiles.length);
       for (const id of ids) {
         const p = perfiles.find(x => x.supabaseId === id || x.key === id);
-        if (!p) continue;
+        if (!p) {
+          console.warn("🗑 No encontrado en memoria:", id);
+          err++;
+          errores.push(`ID ${id}: no encontrado`);
+          continue;
+        }
         try {
           if (p.fuente === "supabase" && p.supabaseId) {
+            console.log("🗑 Borrando de Supabase:", p.supabaseId, p.nombre);
             await borrarPerfilSupabase(p.supabaseId, esAdmin ? usuarioCtx.pin : null);
           } else {
+            console.log("🗑 Borrando local:", p.key, p.nombre);
             await storage.delete(p.key);
           }
           ok++;
-        } catch (e) { console.warn("Fallo borrando", p.nombre, e); err++; }
+        } catch (e) {
+          console.error("🗑 Fallo borrando", p.nombre, e);
+          err++;
+          errores.push(`${p.nombre}: ${e.message || e}`);
+        }
       }
       await recargar();
+      if (err > 0) {
+        alert(`Borrado incompleto:\n✓ ${ok} correctos\n✗ ${err} con error\n\nDetalles:\n${errores.slice(0, 5).join("\n")}${errores.length > 5 ? "\n..." : ""}\n\nMira la consola (F12) para más info.`);
+      } else if (ok > 0) {
+        showMsg(`✓ ${ok} perfil${ok !== 1 ? "es" : ""} borrado${ok !== 1 ? "s" : ""}`);
+      }
       return { ok, err };
     },
     // v101: renombrar (solo nombre del perfil guardado)
@@ -4774,7 +4793,7 @@ ${docHTML}
                         <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",borderBottom:"1px solid #d5d9dc",color:"#1a1a1a"}}>TOTAL MES €</th>
                         <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",borderBottom:"1px solid #d5d9dc",color:"#8a1e4a"}} title="Jornadas especiales (por encima del salario pactado)">Jorn.Esp €</th>
                         <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",borderBottom:"1px solid #d5d9dc",color:"#5a8a5a"}}>Compl. €</th>
-                        <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",borderBottom:"1px solid #d5d9dc",color:"#4ec9b8"}}>TOTAL MES + Compl. €</th>
+                        <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",borderBottom:"1px solid #d5d9dc",color:"#1a1a1a"}}>TOTAL MES + Compl. €</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -4809,8 +4828,8 @@ ${docHTML}
                       ))}
                     </tbody>
                     <tfoot>
-                      <tr style={{ background:"rgba(184,134,74,0.06)" }}>
-                        <td colSpan={2} style={{padding:"8px",fontSize:10,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:"#4ec9b8",borderTop:"1px solid #d8d4ce"}}>TOTAL</td>
+                      <tr style={{ background:"#f2f5f7" }}>
+                        <td colSpan={2} style={{padding:"8px",fontSize:10,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:"#1a1a1a",borderTop:"1px solid #d5d9dc"}}>TOTAL</td>
                         <td style={{padding:"8px",fontSize:11,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:"#666",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{fmt(totBase)}</td>
                         <td style={{padding:"8px",fontSize:11,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color: totVacMostrar < 0 ? "#c04040" : "#666",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{fmt(totVacMostrar)}</td>
                         <td style={{padding:"8px",fontSize:11,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:"#666",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{fmt(totIndem)}</td>
