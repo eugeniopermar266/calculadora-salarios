@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v94-debug";
+const APP_VERSION = "v94-debug2";
 
 // v73: importe fijo por jornada especial (se paga POR ENCIMA del salario pactado)
 const IMPORTE_JORNADA_ESPECIAL = 20;
@@ -8281,20 +8281,28 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
       // v93: si es admin pasar adminPin, si es coordinador NO pasa admin pin (RLS le da acceso por asignación)
       const adminPin = esAdmin ? usuarioActual.pin : null;
 
+      // v94-debug2: probar SIN admin pin (como user normal) para comparar
+      try {
+        const sinAdmin45 = await listarPerfilesSupabase({ tabId: "iruna45", proyectoId: p.id, adminPin: null });
+        const sinAdmin40 = await listarPerfilesSupabase({ tabId: "tab40", proyectoId: p.id, adminPin: null });
+        console.log("[Exportar] SIN admin pin - 45H:", sinAdmin45?.length, "40H:", sinAdmin40?.length);
+        if ((sinAdmin45?.length || 0) > 0) {
+          console.log("[Exportar] Ejemplo perfil SIN admin:", sinAdmin45[0]);
+        }
+      } catch (e) { console.warn("[Exportar] Sin admin falló:", e); }
+
       // v94: DIAGNÓSTICO - ver todos los perfiles del sistema (solo admin) para comparar proyecto_id
       if (esAdmin) {
         try {
           const todos45 = await listarPerfilesSupabase({ tabId: "iruna45", verTodos: true, adminPin });
           const todos40 = await listarPerfilesSupabase({ tabId: "tab40", verTodos: true, adminPin });
-          console.log("[Exportar] TOTAL en Supabase 45H:", todos45?.length, "40H:", todos40?.length);
+          console.log("[Exportar] TOTAL en Supabase (con admin pin) 45H:", todos45?.length, "40H:", todos40?.length);
           if (todos45 && todos45.length > 0) {
             console.log("[Exportar] Ejemplo perfil 45H:", { id: todos45[0].id, nombre: todos45[0].nombre, proyecto_id: todos45[0].proyecto_id, tipo_proyecto_id: typeof todos45[0].proyecto_id });
-            const conEsteProy = todos45.filter(x => String(x.proyecto_id) === String(p.id));
-            console.log("[Exportar] Perfiles 45H con proyecto_id ==", p.id, "→", conEsteProy.length);
-            if (todos45.length > 0 && conEsteProy.length === 0) {
-              console.log("[Exportar] Todos los proyecto_id 45H:", [...new Set(todos45.map(x => x.proyecto_id))]);
-            }
           }
+          // v94-debug2: probar SIN admin pin sin filtro
+          const totalSinAdmin45 = await listarPerfilesSupabase({ tabId: "iruna45", verTodos: true, adminPin: null });
+          console.log("[Exportar] TOTAL SIN admin pin (verTodos) 45H:", totalSinAdmin45?.length);
         } catch (dx) { console.warn("[Exportar] Diagnóstico falló:", dx); }
       }
 
@@ -8302,7 +8310,7 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
         listarPerfilesSupabase({ tabId: "iruna45", proyectoId: p.id, adminPin }),
         listarPerfilesSupabase({ tabId: "tab40", proyectoId: p.id, adminPin }),
       ]);
-      console.log("[Exportar] Perfiles 45H:", p45?.length, "40H:", p40?.length);
+      console.log("[Exportar] Perfiles CON admin pin (filtro proyecto) 45H:", p45?.length, "40H:", p40?.length);
       const todos = [...(p45 || []), ...(p40 || [])].sort((a, b) => (a.nombre || "").localeCompare(b.nombre || ""));
       setPerfiles(todos);
       // Preseleccionar los NO exportados
