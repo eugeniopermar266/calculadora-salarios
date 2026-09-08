@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v108";
+const APP_VERSION = "v109";
 
 // v97: Departamentos de un rodaje audiovisual (obligatorio en cada perfil)
 const DEPARTAMENTOS = [
@@ -10238,13 +10238,15 @@ function PanelCalendarioProyecto({ proyecto, usuarioActual, onCerrar }) {
                             } else if (info.rodaje) {
                               etiqueta = { texto: "RODAJE", color: "#000" };
                             }
+                            const popupAbierto = popup && popup.fecha === iso;
                             return (
                               <div
                                 key={i}
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  const rect = e.currentTarget.getBoundingClientRect();
-                                  setPopup({ fecha: iso, x: rect.left, y: rect.bottom + 4, yTop: rect.top - 4, xCenter: rect.left + rect.width / 2, esFestivo });
+                                  // v109: solo alterna abrir/cerrar el popup de ESTE día (posición gestionada por CSS absolute)
+                                  if (popupAbierto) setPopup(null);
+                                  else setPopup({ fecha: iso, esFestivo });
                                 }}
                                 style={{
                                   background: color.bg,
@@ -10253,10 +10255,11 @@ function PanelCalendarioProyecto({ proyecto, usuarioActual, onCerrar }) {
                                   cursor: "pointer", position: "relative",
                                   transition: "transform 0.1s, box-shadow 0.1s",
                                   fontFamily: "'Inter', sans-serif",
-                                  overflow: "hidden",
+                                  overflow: popupAbierto ? "visible" : "hidden",
+                                  zIndex: popupAbierto ? 100 : "auto",
                                 }}
-                                onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.04)"; e.currentTarget.style.boxShadow = `0 4px 12px ${color.bg}55`; e.currentTarget.style.zIndex = "5"; }}
-                                onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.zIndex = "auto"; }}
+                                onMouseEnter={e => { if (!popupAbierto) { e.currentTarget.style.transform = "scale(1.04)"; e.currentTarget.style.boxShadow = `0 4px 12px ${color.bg}55`; e.currentTarget.style.zIndex = "5"; } }}
+                                onMouseLeave={e => { if (!popupAbierto) { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.zIndex = "auto"; } }}
                                 title={nombreFestivo || (etiqueta ? etiqueta.texto : "")}
                               >
                                 <div style={{ fontSize: 15, fontWeight: 700, color: color.txt }}>{fecha.getDate()}</div>
@@ -10275,6 +10278,57 @@ function PanelCalendarioProyecto({ proyecto, usuarioActual, onCerrar }) {
                                     </div>
                                   )
                                 )}
+
+                                {/* v109: popup RELATIVO al día (siempre encima) */}
+                                {popupAbierto && (
+                                  <div
+                                    onClick={e => e.stopPropagation()}
+                                    style={{
+                                      position: "absolute",
+                                      bottom: "calc(100% + 6px)",
+                                      left: "50%",
+                                      transform: "translateX(-50%)",
+                                      background: "rgba(20,20,20,0.98)",
+                                      backdropFilter: "blur(20px)",
+                                      WebkitBackdropFilter: "blur(20px)",
+                                      border: "1px solid rgba(78,201,184,0.35)",
+                                      borderRadius: 10,
+                                      padding: 10, zIndex: 1200,
+                                      boxShadow: "0 8px 32px rgba(0,0,0,0.7)",
+                                      width: 200,
+                                      fontFamily: "'Inter', sans-serif",
+                                      cursor: "default",
+                                    }}
+                                  >
+                                    <div style={{ fontSize: 11, color: "#4ec9b8", marginBottom: 8, letterSpacing: "0.04em", fontWeight: 600 }}>
+                                      {iso}
+                                    </div>
+                                    <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                                      {[
+                                        { key: "rodaje", label: "Rodaje" },
+                                        { key: "vacaciones", label: "Vacaciones" },
+                                        { key: "descanso", label: "Descanso" },
+                                        { key: "especial", label: "Jornada especial" },
+                                      ].map(item => (
+                                        <label key={item.key} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 12, padding: "5px 8px", background: dias[iso]?.[item.key] ? "rgba(78,201,184,0.12)" : "rgba(255,255,255,0.03)", border: `1px solid ${dias[iso]?.[item.key] ? "rgba(78,201,184,0.3)" : "rgba(255,255,255,0.05)"}`, borderRadius: 5, color: "#f0f0f0" }}>
+                                          <input type="checkbox" checked={!!(dias[iso]?.[item.key])} onChange={() => toggleProp(iso, item.key)} style={{ accentColor: "#4ec9b8", width: 13, height: 13, margin: 0 }} />
+                                          <span>{item.label}</span>
+                                        </label>
+                                      ))}
+                                      {esFestivo && (
+                                        <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 12, padding: "5px 8px", background: dias[iso]?.festivo_trabajado ? "rgba(255,145,0,0.15)" : "rgba(255,255,255,0.03)", border: `1px solid ${dias[iso]?.festivo_trabajado ? "rgba(255,145,0,0.4)" : "rgba(255,255,255,0.05)"}`, borderRadius: 5, color: "#f0f0f0" }}>
+                                          <input type="checkbox" checked={!!(dias[iso]?.festivo_trabajado)} onChange={() => toggleProp(iso, "festivo_trabajado")} style={{ accentColor: "#ff9100", width: 13, height: 13, margin: 0 }} />
+                                          <span>Festivo trabajado</span>
+                                        </label>
+                                      )}
+                                      <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 12, padding: "5px 8px", background: dias[iso]?.laboral ? "rgba(0,230,118,0.12)" : "rgba(255,255,255,0.03)", border: `1px solid ${dias[iso]?.laboral ? "rgba(0,230,118,0.35)" : "rgba(255,255,255,0.05)"}`, borderRadius: 5, color: "#f0f0f0" }}>
+                                        <input type="checkbox" checked={!!(dias[iso]?.laboral)} onChange={() => toggleLaboral(iso)} style={{ accentColor: "#00e676", width: 13, height: 13, margin: 0 }} />
+                                        <span>Laboral</span>
+                                      </label>
+                                    </div>
+                                    <button onClick={() => setPopup(null)} style={{ ...btnGhost, width: "100%", marginTop: 7, justifyContent: "center", padding: "6px 12px", fontSize: 11 }}>Cerrar</button>
+                                  </div>
+                                )}
                               </div>
                             );
                           })}
@@ -10286,61 +10340,8 @@ function PanelCalendarioProyecto({ proyecto, usuarioActual, onCerrar }) {
               </div>
             )}
 
-            {/* Popup al clicar día (v108: compacto, siempre arriba) */}
-            {popup && (() => {
-              const POPUP_H = popup.esFestivo ? 235 : 210;
-              const POPUP_W = 200;
-              // Siempre hacia arriba: base del popup pegada encima del día
-              const topFinal = Math.max(10, popup.yTop - POPUP_H);
-              // Centrar horizontalmente sobre el día
-              const xCenter = popup.xCenter ?? popup.x;
-              const leftIdeal = xCenter - POPUP_W / 2;
-              const leftFinal = Math.max(10, Math.min(leftIdeal, window.innerWidth - POPUP_W - 10));
-              return (
-              <div style={{
-                position: "fixed",
-                left: leftFinal,
-                top: topFinal,
-                background: "rgba(20,20,20,0.98)",
-                backdropFilter: "blur(20px)",
-                WebkitBackdropFilter: "blur(20px)",
-                border: "1px solid rgba(78,201,184,0.3)",
-                borderRadius: 10,
-                padding: 10, zIndex: 1200,
-                boxShadow: "0 8px 32px rgba(0,0,0,0.6)",
-                width: POPUP_W,
-                fontFamily: "'Inter', sans-serif",
-              }} onClick={e => e.stopPropagation()}>
-                <div style={{ fontSize: 11, color: "#4ec9b8", marginBottom: 8, letterSpacing: "0.04em", fontWeight: 600 }}>
-                  {popup.fecha}
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                  {[
-                    { key: "rodaje", label: "Rodaje" },
-                    { key: "vacaciones", label: "Vacaciones" },
-                    { key: "descanso", label: "Descanso" },
-                    { key: "especial", label: "Jornada especial" },
-                  ].map(item => (
-                    <label key={item.key} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 12, padding: "5px 8px", background: dias[popup.fecha]?.[item.key] ? "rgba(78,201,184,0.12)" : "rgba(255,255,255,0.03)", border: `1px solid ${dias[popup.fecha]?.[item.key] ? "rgba(78,201,184,0.3)" : "rgba(255,255,255,0.05)"}`, borderRadius: 5, color: "#f0f0f0" }}>
-                      <input type="checkbox" checked={!!(dias[popup.fecha]?.[item.key])} onChange={() => toggleProp(popup.fecha, item.key)} style={{ accentColor: "#4ec9b8", width: 13, height: 13, margin: 0 }} />
-                      <span>{item.label}</span>
-                    </label>
-                  ))}
-                  {popup.esFestivo && (
-                    <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 12, padding: "5px 8px", background: dias[popup.fecha]?.festivo_trabajado ? "rgba(255,145,0,0.15)" : "rgba(255,255,255,0.03)", border: `1px solid ${dias[popup.fecha]?.festivo_trabajado ? "rgba(255,145,0,0.4)" : "rgba(255,255,255,0.05)"}`, borderRadius: 5, color: "#f0f0f0" }}>
-                      <input type="checkbox" checked={!!(dias[popup.fecha]?.festivo_trabajado)} onChange={() => toggleProp(popup.fecha, "festivo_trabajado")} style={{ accentColor: "#ff9100", width: 13, height: 13, margin: 0 }} />
-                      <span>Festivo trabajado</span>
-                    </label>
-                  )}
-                  <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 12, padding: "5px 8px", background: dias[popup.fecha]?.laboral ? "rgba(0,230,118,0.12)" : "rgba(255,255,255,0.03)", border: `1px solid ${dias[popup.fecha]?.laboral ? "rgba(0,230,118,0.35)" : "rgba(255,255,255,0.05)"}`, borderRadius: 5, color: "#f0f0f0" }}>
-                    <input type="checkbox" checked={!!(dias[popup.fecha]?.laboral)} onChange={() => toggleLaboral(popup.fecha)} style={{ accentColor: "#00e676", width: 13, height: 13, margin: 0 }} />
-                    <span>Laboral</span>
-                  </label>
-                </div>
-                <button onClick={() => setPopup(null)} style={{ ...btnGhost, width: "100%", marginTop: 7, justifyContent: "center", padding: "6px 12px", fontSize: 11 }}>Cerrar</button>
-              </div>
-              );
-            })()}
+            {/* Popup: v109 renderizado como hijo del día con position:absolute bottom:100% */}
+
 
             {/* Barra inferior */}
             <div style={{ display: "flex", gap: 8, marginTop: 14, justifyContent: "space-between", alignItems: "center", position: "sticky", bottom: -24, background: "rgba(20,20,20,0.96)", padding: "16px 0 4px", borderTop: "1px solid rgba(255,255,255,0.08)" }}>
