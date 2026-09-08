@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v125";
+const APP_VERSION = "v127";
 
 // v97: Departamentos de un rodaje audiovisual (obligatorio en cada perfil)
 const DEPARTAMENTOS = [
@@ -4696,13 +4696,13 @@ ${docHTML}
                 {es40h ? (
                   <div style={{ marginTop:10, display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
                     <div style={{ padding:"14px 18px", background:"#f2f5f7", borderRadius:8, border:"1px solid #d5d9dc", display:"flex", justifyContent:"space-between", alignItems:"center", gap:12 }}>
-                      <span style={{ fontSize:11, color:"#666", letterSpacing:"0.06em", textTransform:"uppercase", fontFamily:"'Inter', -apple-system, sans-serif", fontWeight: 600, lineHeight:1.3 }}>Total Mes 40h</span>
-                      <span style={{ fontSize:18, fontWeight:700, color:"#1a1a1a", fontFamily:"'Inter', -apple-system, sans-serif", whiteSpace:"nowrap" }}>{fmt(baseRef + vacRef + indemRef)} €</span>
+                      <span style={{ fontSize:11, color:"#666", letterSpacing:"0.08em", textTransform:"uppercase", fontFamily:"'Inter', -apple-system, sans-serif", fontWeight: 600 }}>Total Mes 40h</span>
+                      <span style={{ fontSize:15, fontWeight:700, color:"#1a1a1a", fontFamily:"'Inter', -apple-system, sans-serif", whiteSpace:"nowrap" }}>{fmt(baseRef + vacRef + indemRef)} €</span>
                     </div>
                     <div style={{ padding:"14px 18px", background:"#f2f5f7", borderRadius:8, border:"1px solid #d5d9dc", display:"flex", flexDirection:"column" }}>
                       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", gap:12 }}>
-                        <span style={{ fontSize:11, color:"#666", letterSpacing:"0.06em", textTransform:"uppercase", fontFamily:"'Inter', -apple-system, sans-serif", fontWeight: 600, lineHeight:1.3 }}>Salario en<br/>Contrato</span>
-                        <span style={{ fontSize:18, fontWeight:700, color:"#1a1a1a", fontFamily:"'Inter', -apple-system, sans-serif", whiteSpace:"nowrap" }}>{fmt(vacAcumulada ? baseRef : (baseRef + vacRef))} €</span>
+                        <span style={{ fontSize:11, color:"#666", letterSpacing:"0.08em", textTransform:"uppercase", fontFamily:"'Inter', -apple-system, sans-serif", fontWeight: 600 }}>Salario en Contrato</span>
+                        <span style={{ fontSize:15, fontWeight:700, color:"#1a1a1a", fontFamily:"'Inter', -apple-system, sans-serif", whiteSpace:"nowrap" }}>{fmt(vacAcumulada ? baseRef : (baseRef + vacRef))} €</span>
                       </div>
                       {vacAcumulada && (
                         <div style={{ fontSize:10, color:"#4ec9b8", marginTop:4, textAlign:"right", letterSpacing:"0.05em", fontStyle:"italic", fontFamily:"'Inter', -apple-system, sans-serif", fontWeight: 500 }}>Base 40h · vacaciones al final</div>
@@ -4712,12 +4712,12 @@ ${docHTML}
                 ) : (
                   <div style={{ marginTop:10, display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
                     <div style={{ padding:"14px 18px", background:"#f2f5f7", borderRadius:8, border:"1px solid #d5d9dc", display:"flex", justifyContent:"space-between", alignItems:"center", gap:12 }}>
-                      <span style={{ fontSize:11, color:"#666", letterSpacing:"0.06em", textTransform:"uppercase", fontFamily:"'Inter', -apple-system, sans-serif", fontWeight: 600, lineHeight:1.3 }}>Total Mes 45h<br/>Todo Incluido</span>
-                      <span style={{ fontSize:18, fontWeight:700, color:"#1a1a1a", fontFamily:"'Inter', -apple-system, sans-serif", whiteSpace:"nowrap" }}>{fmt(sumaRef)} €</span>
+                      <span style={{ fontSize:11, color:"#666", letterSpacing:"0.08em", textTransform:"uppercase", fontFamily:"'Inter', -apple-system, sans-serif", fontWeight: 600 }}>Total Mes 45h Todo Incluido</span>
+                      <span style={{ fontSize:15, fontWeight:700, color:"#1a1a1a", fontFamily:"'Inter', -apple-system, sans-serif", whiteSpace:"nowrap" }}>{fmt(sumaRef)} €</span>
                     </div>
                     <div style={{ padding:"14px 18px", background:"#f2f5f7", borderRadius:8, border:"1px solid #d5d9dc", display:"flex", justifyContent:"space-between", alignItems:"center", gap:12 }}>
-                      <span style={{ fontSize:11, color:"#666", letterSpacing:"0.06em", textTransform:"uppercase", fontFamily:"'Inter', -apple-system, sans-serif", fontWeight: 600, lineHeight:1.3 }}>Salario en<br/>Contrato</span>
-                      <span style={{ fontSize:18, fontWeight:700, color:"#1a1a1a", fontFamily:"'Inter', -apple-system, sans-serif", whiteSpace:"nowrap" }}>{fmt(baseRef + vacRef)} €</span>
+                      <span style={{ fontSize:11, color:"#666", letterSpacing:"0.08em", textTransform:"uppercase", fontFamily:"'Inter', -apple-system, sans-serif", fontWeight: 600 }}>Salario en Contrato</span>
+                      <span style={{ fontSize:15, fontWeight:700, color:"#1a1a1a", fontFamily:"'Inter', -apple-system, sans-serif", whiteSpace:"nowrap" }}>{fmt(baseRef + vacRef)} €</span>
                     </div>
                   </div>
                 )}
@@ -4739,11 +4739,11 @@ ${docHTML}
                     { l:"Salario / Día",    v: salarioDia,          s:"Base ÷ 30" },
                     { l:"Salario / Semana", v: salarioDia * 7,      s:"Día × 7" },
                     { l:"Valor Hora",       v: vHora,               s:"Hora Extra" },
-                    { l:"Hora Extra ×1,5",  v: vHoraEx,             s:"Hora × 1,5" },
-                    { l:"Festivo ×1,75",    v: salarioDia * 1.75,   s:"Día × 1,75" },
+                    { l:"Hora Extra",       v: vHoraEx,             s:"Hora × 1,5" },
+                    { l:"Festivo",          v: salarioDia * 1.75,   s:"Día × 1,75" },
                   ].map(it=>(
                     <div key={it.l} style={{ background:"#fff", borderRadius:8, padding:"14px 10px", border:"1px solid #d5d9dc", display:"flex", flexDirection:"column", justifyContent:"space-between", minHeight:110 }}>
-                      <div style={{ fontSize:10, color:"#666", letterSpacing:"0.1em", textTransform:"uppercase", fontFamily:"'Inter', -apple-system, sans-serif", fontWeight: 600, textAlign:"center", minHeight:26, display:"flex", alignItems:"center", justifyContent:"center" }}>{it.l}</div>
+                      <div style={{ fontSize:9, color:"#666", letterSpacing:"0.06em", textTransform:"uppercase", fontFamily:"'Inter', -apple-system, sans-serif", fontWeight: 600, textAlign:"center", minHeight:26, display:"flex", alignItems:"center", justifyContent:"center", whiteSpace:"nowrap" }}>{it.l}</div>
                       <div style={{ fontSize:17, fontWeight:700, color:"#1a1a1a", fontFamily:"'Inter', -apple-system, sans-serif", textAlign:"center" }}>{fmt(it.v)} €</div>
                       <div style={{ fontSize:10, color:"#4ec9b8", fontFamily:"'Inter', -apple-system, sans-serif", fontWeight: 500, textAlign:"center" }}>{it.s}</div>
                     </div>
