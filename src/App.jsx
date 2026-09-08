@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v91";
+const APP_VERSION = "v92";
 
 // v73: importe fijo por jornada especial (se paga POR ENCIMA del salario pactado)
 const IMPORTE_JORNADA_ESPECIAL = 20;
@@ -5613,7 +5613,7 @@ async function borrarLogsAntiguos(adminPin, dias = 30) {
 // ═══════════════════════════════════════════════════════════════════════
 // PANTALLA SELECTOR DE PROYECTO (v45)
 // ═══════════════════════════════════════════════════════════════════════
-function PantallaSelectorProyecto({ usuario, onSeleccionar, onLogout, onGestionar, onEditarCalendario }) {
+function PantallaSelectorProyecto({ usuario, onSeleccionar, onLogout, onGestionar, onEditarCalendario, onExportarListado }) {
   const [proyectos, setProyectos] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
@@ -5745,22 +5745,33 @@ function PantallaSelectorProyecto({ usuario, onSeleccionar, onLogout, onGestiona
         )}
 
         {/* Botones inferiores */}
-        <div style={{ display: "flex", gap: 8, marginTop: 12, paddingTop: 14, borderTop: "1px solid #e0ddd8" }}>
+        <div style={{ display: "flex", gap: 8, marginTop: 12, paddingTop: 14, borderTop: "1px solid #e0ddd8", flexWrap: "wrap" }}>
           {usuario.es_admin && (
             <button
               onClick={onGestionar}
               style={{
-                flex: 1, background: "#c8a96e", color: "#1a1a1a", border: "none",
+                flex: 1, minWidth: 140, background: "#c8a96e", color: "#1a1a1a", border: "none",
                 padding: "10px 14px", borderRadius: 5, cursor: "pointer",
                 fontFamily: "'Courier Prime', 'Courier New', monospace", fontSize: 10, fontWeight: 700,
                 letterSpacing: "0.12em", textTransform: "uppercase",
               }}
             >⚙ Gestionar proyectos</button>
           )}
+          {(usuario.es_admin || usuario.rol === "coordinador") && onExportarListado && (
+            <button
+              onClick={onExportarListado}
+              style={{
+                flex: 1, minWidth: 140, background: "#5a8a5a", color: "#fff", border: "none",
+                padding: "10px 14px", borderRadius: 5, cursor: "pointer",
+                fontFamily: "'Courier Prime', 'Courier New', monospace", fontSize: 10, fontWeight: 700,
+                letterSpacing: "0.12em", textTransform: "uppercase",
+              }}
+            >📊 Exportar listado</button>
+          )}
           <button
             onClick={onLogout}
             style={{
-              flex: 1, background: "transparent", color: "#888", border: "1px solid #ccc",
+              flex: 1, minWidth: 140, background: "transparent", color: "#888", border: "1px solid #ccc",
               padding: "10px 14px", borderRadius: 5, cursor: "pointer",
               fontFamily: "'Courier Prime', 'Courier New', monospace", fontSize: 10, fontWeight: 700,
               letterSpacing: "0.12em", textTransform: "uppercase",
@@ -8115,6 +8126,373 @@ function CosteEmpresa() {
 
 
 // ═══════════════════════════════════════════════════════════════════════
+// v92: EXPORTAR LISTADO DE PERFILES A EXCEL
+// ═══════════════════════════════════════════════════════════════════════
+
+async function marcarPerfilExportado(perfilId, nombreUsuario, auth) {
+  const headers = { "Prefer": "return=representation" };
+  if (auth?.adminPin) headers["x-admin-pin"] = auth.adminPin;
+  if (auth?.userPin) headers["x-user-pin"] = auth.userPin;
+  return supabaseFetch(`perfiles?id=eq.${perfilId}`, {
+    method: "PATCH",
+    headers,
+    body: JSON.stringify({
+      exportado_el: new Date().toISOString(),
+      exportado_por: nombreUsuario,
+    }),
+  });
+}
+
+// Generar meses YYYY-MM entre 2 fechas
+function generarMesesEntre(fechaInicioStr, fechaFinStr) {
+  if (!fechaInicioStr || !fechaFinStr) return [];
+  const [ay, am] = fechaInicioStr.split("-").map(Number);
+  const [by, bm] = fechaFinStr.split("-").map(Number);
+  const meses = [];
+  let y = ay, m = am;
+  while (y < by || (y === by && m <= bm)) {
+    meses.push(`${y}-${String(m).padStart(2, "0")}`);
+    m++;
+    if (m > 12) { m = 1; y++; }
+  }
+  return meses;
+}
+
+// Nombre corto del mes para header Excel
+function labelMesCorto(ym) {
+  const [y, m] = ym.split("-").map(Number);
+  const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+  return `${MESES[m - 1]}-${String(y).slice(2)}`;
+}
+
+// Calcula coste SS total de un perfil (usando calcularCosteEmpresaMes sobre su desglose)
+function calcularCosteSSPerfil(datos) {
+  const desglose = datos?._calculado?.desglose45 || datos?.desglose45 || [];
+  const complementos = datos?._calculado?.complementos45 || datos?.complementos45 || [];
+  const importeFestMes = datos?._calculado?.importeFestMes45 || [];
+  const esTab40 = datos?.tabId === "tab40";
+  const vacAcumulada = datos?.vacAcumulada || false;
+  let total = 0;
+  const porMes = {};
+  desglose.forEach((mes, i) => {
+    const c = complementos[i] || {};
+    const festImp = importeFestMes[i] || 0;
+    const jeImp = mes.importeJE || 0;
+    const plusAct = esTab40 ? 0 : (mes.plusAct || 0);
+    const vdShow = mes.vdShow || 0;
+    const totalBruto = (mes.base40 || 0) + (mes.vac40 || 0) + (mes.indem40 || 0) + (mes.cobroHx || 0) + plusAct
+                     + festImp + jeImp
+                     + (c.herramienta || 0) + (c.coche || 0) + (c.vivienda || 0) + (c.seguroVida || 0) + (c.comida || 0);
+    const ce = calcularCosteEmpresaMes({
+      total: totalBruto,
+      vacaciones: mes.vac40 || 0,
+      vacDisfrutadas: vdShow,
+      indem: mes.indem40 || 0,
+      horasExtraEur: mes.cobroHx || 0,
+      plusVivienda: c.vivienda || 0,
+      irpfActivo: false, pctIRPF: 0,
+      esPrimerMes: i === 0,
+      importeExento: 0,
+      firmaContrato: true,
+      incluirGestoria: false,
+      vacAcumulada,
+    });
+    const ss = (ce.ssPrincipal || 0) + (ce.ssVacaciones || 0) + (ce.ssHorasExtra || 0) + (ce.imei || 0) + (ce.solidaridad || 0);
+    // key mes: parse "Mayo De 2027" o similar
+    const parsed = parseMesEspañol ? parseMesEspañol(mes.mes) : null;
+    const key = parsed ? `${parsed.year}-${String(parsed.month).padStart(2, "0")}` : null;
+    // Bruto percibido (líquido)
+    const brutoLiq = totalBruto - vdShow;
+    if (key) porMes[key] = { bruto: brutoLiq, ss, total: brutoLiq + ss };
+    total += ss;
+  });
+  return { totalSS: total, porMes };
+}
+
+function PanelExportarListado({ usuarioActual, onCerrar }) {
+  const esAdmin = !!usuarioActual?.es_admin;
+  const esCoordinador = usuarioActual?.rol === "coordinador";
+  const auth = esAdmin ? { adminPin: usuarioActual.pin } : (esCoordinador ? { userPin: usuarioActual.pin } : {});
+
+  const [proyectos, setProyectos] = useState([]);
+  const [proyectoSel, setProyectoSel] = useState(null);
+  const [perfiles, setPerfiles] = useState([]);
+  const [seleccionados, setSeleccionados] = useState(new Set());
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState(null);
+  const [mensaje, setMensaje] = useState(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        setCargando(true);
+        const lista = await listarProyectos({ adminPin: esAdmin ? usuarioActual.pin : null, usuarioId: usuarioActual.id, esAdmin });
+        setProyectos(lista || []);
+        setCargando(false);
+      } catch (e) { setError(e.message); setCargando(false); }
+    })();
+  }, []);
+
+  const cargarPerfiles = async (p) => {
+    setProyectoSel(p);
+    setCargando(true);
+    try {
+      const [p45, p40] = await Promise.all([
+        listarPerfilesSupabase({ tabId: "iruna45", proyectoId: p.id, adminPin: esAdmin ? usuarioActual.pin : null }),
+        listarPerfilesSupabase({ tabId: "tab40", proyectoId: p.id, adminPin: esAdmin ? usuarioActual.pin : null }),
+      ]);
+      const todos = [...(p45 || []), ...(p40 || [])].sort((a, b) => (a.nombre || "").localeCompare(b.nombre || ""));
+      setPerfiles(todos);
+      // Preseleccionar los NO exportados
+      const preSel = new Set(todos.filter(p => !p.exportado_el).map(p => p.id));
+      setSeleccionados(preSel);
+      setCargando(false);
+    } catch (e) { setError(e.message); setCargando(false); }
+  };
+
+  const toggleSel = (id) => {
+    const nueva = new Set(seleccionados);
+    if (nueva.has(id)) nueva.delete(id); else nueva.add(id);
+    setSeleccionados(nueva);
+  };
+
+  const seleccionarTodos = () => setSeleccionados(new Set(perfiles.map(p => p.id)));
+  const deseleccionarTodos = () => setSeleccionados(new Set());
+  const invertirSeleccion = () => {
+    const nueva = new Set();
+    perfiles.forEach(p => { if (!seleccionados.has(p.id)) nueva.add(p.id); });
+    setSeleccionados(nueva);
+  };
+
+  const exportar = async () => {
+    if (seleccionados.size === 0) { alert("Selecciona al menos un perfil"); return; }
+    const perfilesExp = perfiles.filter(p => seleccionados.has(p.id));
+
+    // Determinar rango de meses del proyecto (calendario)
+    let mesesRango = [];
+    try {
+      const cal = await obtenerCalendarioProyecto(proyectoSel.id);
+      if (cal && cal.fecha_inicio && cal.fecha_fin) {
+        mesesRango = generarMesesEntre(cal.fecha_inicio, cal.fecha_fin);
+      } else {
+        // Fallback: usar rango unión de todos los perfiles
+        const fechas = perfilesExp.map(p => ({ ini: p.datos?.fechaInicio, fin: p.datos?.fechaFin })).filter(f => f.ini && f.fin);
+        if (fechas.length > 0) {
+          const ini = fechas.map(f => f.ini).sort()[0];
+          const fin = fechas.map(f => f.fin).sort().reverse()[0];
+          mesesRango = generarMesesEntre(ini, fin);
+        }
+      }
+    } catch (e) { console.warn("Sin calendario, calculando rango desde perfiles"); }
+
+    // Preparar cabeceras: columnas fijas + 3 por mes
+    const headersFijos = [
+      "Nombre trabajador", "Puesto", "Código contable", "Proyecto", "Productora",
+      "Fecha inicio", "Fecha fin", "Días totales", "Salario pactado (€/mes)",
+      "Modalidad", "Fijo discontinuo", "Vacaciones", "Indemnización", "Finiquito aparte",
+      "Total Salario Base", "Total Vacaciones", "Total Indemnización", "Total H.Extra",
+      "Total Plus Actividad", "Total Festivos", "Total Jornadas Especiales", "Total Complementos",
+      "BRUTO TRABAJADOR", "Total SS Empresa", "COSTE TOTAL", "% s/Salario",
+      "Autor perfil", "Fecha creación", "Última modificación",
+    ];
+    const headersMeses = [];
+    mesesRango.forEach(ym => {
+      const lbl = labelMesCorto(ym);
+      headersMeses.push(`${lbl} Bruto`, `${lbl} SS`, `${lbl} Total`);
+    });
+    const headers = [...headersFijos, ...headersMeses];
+
+    // Filas de datos
+    const filas = perfilesExp.map(p => {
+      const d = p.datos || {};
+      const c = d._calculado || {};
+      const totBase = c.totBase || 0;
+      const totVac = c.totVac || 0;
+      const totIndem = c.totIndem || 0;
+      const totHx = c.totHx || 0;
+      const totPlus = c.totPlus || 0;
+      const totFest = c.totalFestImport45 || 0;
+      const totJE = c.totJEImporte || 0;
+      const totCompl = c.totalCompl || 0;
+      const bruto = c.totFinal ? (c.totFinal + totFest) : (totBase + totVac + totIndem + totHx + totPlus + totFest + totJE + totCompl);
+      const { totalSS, porMes } = calcularCosteSSPerfil(d);
+      const costeTotal = bruto + totalSS;
+      const pctSalario = bruto > 0 ? (totalSS / bruto * 100) : 0;
+
+      // Días totales del contrato
+      let diasTot = 0;
+      if (d.fechaInicio && d.fechaFin) {
+        const ini = new Date(d.fechaInicio + "T12:00:00");
+        const fin = new Date(d.fechaFin + "T12:00:00");
+        diasTot = Math.round((fin - ini) / (1000 * 60 * 60 * 24)) + 1;
+      }
+
+      const fila = [
+        d.nombre || p.nombre || "",
+        d.puesto || "",
+        d.codigoContable || "",
+        d.proyecto || proyectoSel.nombre,
+        d.productora || proyectoSel.productora || "",
+        d.fechaInicio || "",
+        d.fechaFin || "",
+        diasTot || "",
+        d.salario45 || "",
+        p.tab_id === "tab40" ? "40H" : "45H",
+        d.esFijoDiscontinuo ? "Sí" : "No",
+        d.vacAcumulada ? "Al final" : "Prorrateadas",
+        d.indemAcumulada ? "Al final" : "Prorrateadas",
+        d.finiquitoAparte ? "Sí" : "No",
+        totBase, totVac, totIndem, totHx, totPlus, totFest, totJE, totCompl,
+        bruto, totalSS, costeTotal, pctSalario,
+        p.autor || "",
+        p.created_at ? new Date(p.created_at).toLocaleDateString("es-ES") : "",
+        p.updated_at ? new Date(p.updated_at).toLocaleDateString("es-ES") : "",
+      ];
+      // Añadir columnas de cash flow por mes
+      mesesRango.forEach(ym => {
+        const m = porMes[ym];
+        fila.push(m ? m.bruto : 0, m ? m.ss : 0, m ? m.total : 0);
+      });
+      return fila;
+    });
+
+    // Generar CSV (compatible con Excel, separador ;)
+    const escaparCSV = (v) => {
+      if (v === null || v === undefined) return "";
+      if (typeof v === "number") return String(v).replace(".", ",");
+      const s = String(v);
+      if (s.includes(";") || s.includes("\"") || s.includes("\n")) return `"${s.replace(/"/g, '""')}"`;
+      return s;
+    };
+    const bom = "\uFEFF"; // BOM para que Excel lo lea con UTF-8
+    const csv = bom + [headers, ...filas].map(r => r.map(escaparCSV).join(";")).join("\r\n");
+    const nombreArchivo = `Listado_${proyectoSel.nombre}_${new Date().toISOString().slice(0, 10)}.csv`;
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = nombreArchivo;
+    a.style.display = "none";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+
+    // Marcar perfiles como exportados
+    setMensaje({ tipo: "ok", texto: `Exportando ${perfilesExp.length} perfiles y marcando...` });
+    for (const p of perfilesExp) {
+      try {
+        await marcarPerfilExportado(p.id, usuarioActual.nombre, auth);
+      } catch (e) { console.warn("Error marcando", p.id, e); }
+    }
+    setMensaje({ tipo: "ok", texto: `✓ ${perfilesExp.length} perfiles exportados y marcados` });
+    // Recargar para ver los cambios
+    await cargarPerfiles(proyectoSel);
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 100, display: "flex", justifyContent: "center", alignItems: "flex-start", padding: 20, overflow: "auto" }}>
+      <div style={{ background: "#faf7f2", borderRadius: 8, padding: 24, maxWidth: 900, width: "100%", maxHeight: "90vh", overflow: "auto" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, paddingBottom: 12, borderBottom: "1px solid #e0ddd8" }}>
+          <h2 style={{ margin: 0, fontSize: 14, letterSpacing: "0.15em", textTransform: "uppercase", color: "#1a1a1a" }}>📊 Exportar listado</h2>
+          <button onClick={onCerrar} style={{ background: "transparent", border: "1px solid #ccc", padding: "6px 12px", borderRadius: 4, cursor: "pointer", fontSize: 11 }}>✕ Cerrar</button>
+        </div>
+
+        {mensaje && (
+          <div style={{ padding: "8px 12px", marginBottom: 12, borderRadius: 4, background: mensaje.tipo === "ok" ? "#e6f4e6" : "#fce8e8", color: mensaje.tipo === "ok" ? "#2a6e2a" : "#c00", fontSize: 11 }}>{mensaje.texto}</div>
+        )}
+        {error && (
+          <div style={{ padding: "8px 12px", marginBottom: 12, borderRadius: 4, background: "#fce8e8", color: "#c00", fontSize: 11 }}>{error}</div>
+        )}
+
+        {!proyectoSel ? (
+          <div>
+            <div style={{ fontSize: 11, color: "#666", marginBottom: 10, letterSpacing: "0.05em" }}>Elige el proyecto del que quieres exportar los perfiles:</div>
+            {cargando ? <div>Cargando…</div> : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {proyectos.length === 0 && <div style={{ fontSize: 11, color: "#888" }}>No hay proyectos disponibles.</div>}
+                {proyectos.map(p => (
+                  <button key={p.id} onClick={() => cargarPerfiles(p)}
+                    style={{ background: "#fff", border: "1px solid #d0ccc6", borderRadius: 5, padding: "10px 14px", cursor: "pointer", textAlign: "left", fontFamily: "'Courier Prime', 'Courier New', monospace" }}>
+                    <div style={{ fontSize: 12, fontWeight: 700 }}>{p.nombre}</div>
+                    <div style={{ fontSize: 10, color: "#888", marginTop: 2 }}>{p.productora}</div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 700 }}>{proyectoSel.nombre}</div>
+                <div style={{ fontSize: 10, color: "#888" }}>{proyectoSel.productora} · {perfiles.length} perfiles · {seleccionados.size} seleccionados</div>
+              </div>
+              <button onClick={() => { setProyectoSel(null); setPerfiles([]); setSeleccionados(new Set()); }} style={{ background: "transparent", border: "1px solid #ccc", padding: "5px 10px", borderRadius: 4, cursor: "pointer", fontSize: 10 }}>← Cambiar proyecto</button>
+            </div>
+
+            {cargando ? <div>Cargando…</div> : (
+              <>
+                <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
+                  <button onClick={seleccionarTodos} style={{ fontSize: 10, padding: "4px 10px", border: "1px solid #ccc", borderRadius: 4, background: "#fff", cursor: "pointer" }}>Todos</button>
+                  <button onClick={deseleccionarTodos} style={{ fontSize: 10, padding: "4px 10px", border: "1px solid #ccc", borderRadius: 4, background: "#fff", cursor: "pointer" }}>Ninguno</button>
+                  <button onClick={invertirSeleccion} style={{ fontSize: 10, padding: "4px 10px", border: "1px solid #ccc", borderRadius: 4, background: "#fff", cursor: "pointer" }}>Invertir</button>
+                </div>
+
+                <div style={{ background: "#fff", border: "1px solid #e0ddd8", borderRadius: 5, maxHeight: 400, overflow: "auto" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11, fontFamily: "'Courier Prime', 'Courier New', monospace" }}>
+                    <thead style={{ position: "sticky", top: 0, background: "#f0ede8", zIndex: 1 }}>
+                      <tr>
+                        <th style={{ padding: "8px 6px", textAlign: "center", width: 30, borderBottom: "1px solid #d0ccc6" }}>✓</th>
+                        <th style={{ padding: "8px 6px", textAlign: "left", borderBottom: "1px solid #d0ccc6", fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase" }}>Nombre</th>
+                        <th style={{ padding: "8px 6px", textAlign: "center", borderBottom: "1px solid #d0ccc6", fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase" }}>Tipo</th>
+                        <th style={{ padding: "8px 6px", textAlign: "left", borderBottom: "1px solid #d0ccc6", fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase" }}>Puesto</th>
+                        <th style={{ padding: "8px 6px", textAlign: "right", borderBottom: "1px solid #d0ccc6", fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase" }}>Salario</th>
+                        <th style={{ padding: "8px 6px", textAlign: "left", borderBottom: "1px solid #d0ccc6", fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase" }}>Exportado</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {perfiles.length === 0 && (
+                        <tr><td colSpan={6} style={{ padding: 20, textAlign: "center", color: "#888" }}>No hay perfiles en este proyecto</td></tr>
+                      )}
+                      {perfiles.map(p => {
+                        const yaExp = !!p.exportado_el;
+                        const sel = seleccionados.has(p.id);
+                        return (
+                          <tr key={p.id} style={{ borderBottom: "1px solid #f0ede8", background: yaExp ? "#f5f4f0" : "transparent", color: yaExp ? "#999" : "#1a1a1a", cursor: "pointer" }} onClick={() => toggleSel(p.id)}>
+                            <td style={{ padding: "6px", textAlign: "center" }}>
+                              <input type="checkbox" checked={sel} onChange={() => toggleSel(p.id)} onClick={e => e.stopPropagation()} />
+                            </td>
+                            <td style={{ padding: "6px 8px" }}>{p.nombre}</td>
+                            <td style={{ padding: "6px 8px", textAlign: "center", fontSize: 9 }}>{p.tab_id === "tab40" ? "40H" : "45H"}</td>
+                            <td style={{ padding: "6px 8px", fontSize: 10 }}>{p.datos?.puesto || ""}</td>
+                            <td style={{ padding: "6px 8px", textAlign: "right", fontSize: 10 }}>{p.datos?.salario45 ? Number(p.datos.salario45).toFixed(0) + " €" : ""}</td>
+                            <td style={{ padding: "6px 8px", fontSize: 9, color: "#888" }}>
+                              {yaExp ? `${new Date(p.exportado_el).toLocaleDateString("es-ES")} · ${p.exportado_por || "?"}` : "—"}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div style={{ marginTop: 14, display: "flex", justifyContent: "flex-end", gap: 8 }}>
+                  <button onClick={exportar} disabled={seleccionados.size === 0}
+                    style={{ background: seleccionados.size === 0 ? "#ccc" : "#5a8a5a", color: "#fff", border: "none", padding: "10px 20px", borderRadius: 5, cursor: seleccionados.size === 0 ? "not-allowed" : "pointer", fontFamily: "'Courier Prime', 'Courier New', monospace", fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>
+                    📥 Exportar CSV ({seleccionados.size})
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════
 // PANEL ADMIN: GESTIÓN DE PROYECTOS (v43)
 // ═══════════════════════════════════════════════════════════════════════
 
@@ -9429,6 +9807,7 @@ export default function App() {
   const [mostrarLogs, setMostrarLogs] = useState(false);
   const [mostrarPuestos, setMostrarPuestos] = useState(false);
   const [mostrarProyectos, setMostrarProyectos] = useState(false);
+  const [mostrarExportar, setMostrarExportar] = useState(false); // v92
   const [proyectoCalendarioSelector, setProyectoCalendarioSelector] = useState(null); // v88: proyecto para editar calendario desde selector
   const [mostrarFestivos, setMostrarFestivos] = useState(false); // v54
   const [proyectoActivo, setProyectoActivo] = useState(null); // v45: proyecto seleccionado
@@ -9645,9 +10024,13 @@ export default function App() {
           onLogout={cerrarSesion}
           onGestionar={() => setMostrarProyectos(true)}
           onEditarCalendario={(p) => setProyectoCalendarioSelector(p)}
+          onExportarListado={() => setMostrarExportar(true)}
         />
         {mostrarProyectos && usuario.es_admin && (
           <PanelProyectos usuarioActual={usuario} onCerrar={() => setMostrarProyectos(false)} />
+        )}
+        {mostrarExportar && (usuario.es_admin || usuario.rol === "coordinador") && (
+          <PanelExportarListado usuarioActual={usuario} onCerrar={() => setMostrarExportar(false)} />
         )}
         {proyectoCalendarioSelector && (usuario.es_admin || usuario.rol === "coordinador") && (
           <PanelCalendarioProyecto
