@@ -8038,17 +8038,17 @@ function CosteEmpresa() {
   if (!perfilCargado) {
     return (
       <div style={{ color: "#1a1a1a", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", padding: "32px 32px" }}>
-        <div style={{ maxWidth: 1400, margin: "0 auto 24px" }}>
-          <div style={{ background: "#1a1a1a", padding: "18px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", color: "#f0f0f0", borderRadius: 8 }}>
-            <div style={{ background: "#4ec9b8", color: "#1a1a1a", padding: "8px 14px", borderRadius: 4, fontSize: 12, fontWeight: 700, letterSpacing: "0.1em" }}>BD PROD TOOLS</div>
+        <div style={{ maxWidth: 2100, margin: "0 auto 24px" }}>
+          <div style={{ background: "#1a1a1a", padding: "24px 28px", display: "flex", justifyContent: "space-between", alignItems: "center", color: "#f0f0f0", borderRadius: 10, border: "1px solid rgba(255,255,255,0.05)" }}>
+            <img src="/logo.png" alt="Bdprodtools" style={{ height: 60, width: "auto" }} />
             <div style={{ textAlign: "right" }}>
-              <div style={{ fontSize: 9, color: "#4ec9b8", letterSpacing: "0.25em", textTransform: "uppercase", marginBottom: 4 }}>Coste Empresa</div>
-              <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: "0.07em" }}>CALCULADORA DE SALARIOS</div>
+              <div style={{ fontSize: 14, color: "#4ec9b8", letterSpacing: "0.18em", textTransform: "uppercase", fontWeight: 700, marginBottom: 6 }}>Coste Empresa</div>
+              <div style={{ fontSize: 24, fontWeight: 500, letterSpacing: "-0.01em", color: "#f0f0f0" }}>Payroll cost calculator</div>
             </div>
           </div>
         </div>
 
-        <div style={{ maxWidth: 1400, margin: "0 auto" }}>
+        <div style={{ maxWidth: 2100, margin: "0 auto" }}>
           <div style={P}>
             <div style={ST}>▸ Cargar Perfil Guardado</div>
 
@@ -8135,60 +8135,73 @@ function CosteEmpresa() {
 
   return (
     <div style={{ color: "#1a1a1a", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", padding: "32px 32px" }}>
-      <div style={{ maxWidth: 1400, margin: "0 auto 24px" }}>
-        <div style={{ background: "#1a1a1a", padding: "18px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", color: "#f0f0f0", borderRadius: 8 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-            <div style={{ background: "#4ec9b8", color: "#1a1a1a", padding: "8px 14px", borderRadius: 4, fontSize: 12, fontWeight: 700, letterSpacing: "0.1em" }}>BD PROD TOOLS</div>
+      <div style={{ maxWidth: 2100, margin: "0 auto 24px" }}>
+        <div style={{ background: "#1a1a1a", padding: "24px 28px", display: "flex", justifyContent: "space-between", alignItems: "center", color: "#f0f0f0", borderRadius: 10, border: "1px solid rgba(255,255,255,0.05)", gap: 20, flexWrap: "wrap" }}>
+          {/* Logo real Bdprodtools + info perfil */}
+          <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
+            <img src="/logo.png" alt="Bdprodtools" style={{ height: 60, width: "auto" }} />
             <div>
-              <div style={{ fontSize: 9, color: "#4ec9b8", letterSpacing: "0.2em", textTransform: "uppercase" }}>Perfil cargado</div>
-              <div style={{ fontSize: 13, fontWeight: 700, marginTop: 2 }}>
-                {perfilCargado.nombre} <span style={{ background: tipo.color, color: "#f2f5f7", padding: "1px 6px", borderRadius: 3, fontSize: 8, marginLeft: 4, letterSpacing: "0.05em" }}>{tipo.txt}</span>
+              <div style={{ fontSize: 12, color: "#4ec9b8", letterSpacing: "0.18em", textTransform: "uppercase", fontWeight: 700, marginBottom: 4 }}>Perfil cargado</div>
+              <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 3, color: "#f0f0f0" }}>
+                {d.nombre || perfilCargado.nombre} · <span style={{ color: "#ccc", fontWeight: 500 }}>{d.puesto || "—"}</span> <span style={{ background: tipo.color, color: "#0a0a0a", padding: "3px 9px", borderRadius: 5, fontSize: 10, marginLeft: 6, letterSpacing: "0.08em", fontWeight: 700 }}>{tipo.txt}</span>
               </div>
-              <div style={{ fontSize: 9.5, color: "#aaa", marginTop: 2 }}>
-                {d.nombre || "—"} · {d.puesto || "—"} · {fmtFecha(perfilCargado.timestamp)}
+              <div style={{ fontSize: 11, color: "#888", fontWeight: 500 }}>
+                {fmtFecha(perfilCargado.timestamp)} · creado por {perfilCargado.autor || "—"}
               </div>
             </div>
           </div>
-          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          {/* Botones acción a la derecha */}
+          <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", marginLeft: "auto" }}>
             <button
-              onClick={exportarCSV}
-              style={{ background: "transparent", color: "#4ec9b8", border: "1px solid #4ec9b8", padding: "6px 12px", borderRadius: 4, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}
-              title="Descargar CSV"
+              onClick={() => setPerfilCargado(null)}
+              style={{ background: "transparent", color: "#ddd", border: "1px solid rgba(255,255,255,0.2)", padding: "8px 14px", borderRadius: 6, fontSize: 11, fontWeight: 600, letterSpacing: "0.03em", cursor: "pointer", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", display: "flex", alignItems: "center", gap: 5, transition: "all 0.15s" }}
+              onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.05)"; }}
+              onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
             >
-              📊 CSV
+              ← Cambiar perfil
             </button>
-            <button
-              onClick={exportarPDF}
-              style={{ background: "transparent", color: "#d8a0a0", border: "1px solid #a04545", padding: "6px 12px", borderRadius: 4, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}
-              title="Generar PDF (se abre en otra ventana para imprimir o guardar como PDF)"
-            >
-              📄 PDF
-            </button>
-            <button
-              onClick={abrirModalExportMaster}
-              style={{ background: "transparent", color: "#4ec9b8", border: "1px solid #4ec9b8", padding: "6px 12px", borderRadius: 4, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}
-              title="Rellenar fila en el Excel Master (EQUIPO TÉCNICO)"
-            >
-              📋 Excel Master
-            </button>
+            <span style={{ width: 1, background: "rgba(255,255,255,0.1)", height: 20, margin: "0 4px" }}></span>
             <button
               onClick={guardarConfigCosteEmpresa}
-              style={{ background: "transparent", color: "#1a1a1a", border: "1px solid #1a1a1a", padding: "6px 12px", borderRadius: 4, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}
+              style={{ background: "#4ec9b8", color: "#0a0a0a", border: "none", padding: "8px 14px", borderRadius: 6, fontSize: 11, fontWeight: 700, letterSpacing: "0.03em", cursor: "pointer", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", display: "flex", alignItems: "center", gap: 5, transition: "background 0.15s" }}
+              onMouseEnter={e => e.currentTarget.style.background = "#5ed9c8"}
+              onMouseLeave={e => e.currentTarget.style.background = "#4ec9b8"}
               title="Guardar la configuración actual (IRPF, firma, baja) en el perfil"
             >
               💾 Guardar Config
             </button>
             <button
-              onClick={() => setPerfilCargado(null)}
-              style={{ background: "transparent", color: "#aaa", border: "1px solid #555", padding: "6px 12px", borderRadius: 4, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}
+              onClick={abrirModalExportMaster}
+              style={{ background: "transparent", color: "#4ec9b8", border: "1px solid rgba(78,201,184,0.35)", padding: "8px 14px", borderRadius: 6, fontSize: 11, fontWeight: 600, letterSpacing: "0.03em", cursor: "pointer", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", display: "flex", alignItems: "center", gap: 5, transition: "all 0.15s" }}
+              onMouseEnter={e => { e.currentTarget.style.background = "rgba(78,201,184,0.1)"; e.currentTarget.style.borderColor = "#4ec9b8"; }}
+              onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = "rgba(78,201,184,0.35)"; }}
+              title="Rellenar fila en el Excel Master (EQUIPO TÉCNICO)"
             >
-              ← Cambiar perfil
+              📋 Excel Master
+            </button>
+            <button
+              onClick={exportarCSV}
+              style={{ background: "#2196f3", color: "#fff", border: "none", padding: "8px 14px", borderRadius: 6, fontSize: 11, fontWeight: 600, letterSpacing: "0.03em", cursor: "pointer", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", display: "flex", alignItems: "center", gap: 5, transition: "background 0.15s" }}
+              onMouseEnter={e => e.currentTarget.style.background = "#42a5f5"}
+              onMouseLeave={e => e.currentTarget.style.background = "#2196f3"}
+              title="Descargar CSV"
+            >
+              CSV
+            </button>
+            <button
+              onClick={exportarPDF}
+              style={{ background: "#d32f2f", color: "#fff", border: "none", padding: "8px 14px", borderRadius: 6, fontSize: 11, fontWeight: 600, letterSpacing: "0.03em", cursor: "pointer", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", display: "flex", alignItems: "center", gap: 5, transition: "background 0.15s" }}
+              onMouseEnter={e => e.currentTarget.style.background = "#f44336"}
+              onMouseLeave={e => e.currentTarget.style.background = "#d32f2f"}
+              title="Generar PDF"
+            >
+              PDF
             </button>
           </div>
         </div>
       </div>
 
-      <div style={{ maxWidth: 1400, margin: "0 auto" }}>
+      <div style={{ maxWidth: 2100, margin: "0 auto" }}>
         {/* Bloque Datos del trabajador */}
         <div style={P}>
           <div style={ST}>▸ Datos del Trabajador</div>
@@ -8210,13 +8223,13 @@ function CosteEmpresa() {
           </div>
 
           {/* Toggle IRPF Plus Vivienda (cuando empresa lo asume) */}
-          <div style={{ background: "#faf6ee", border: "1px solid #d8c8a0", borderRadius: 6, padding: "10px 14px", marginTop: 12, display: "flex", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+          <div style={{ background: "#f2f5f7", border: "1px solid #d5d9dc", borderRadius: 8, padding: "12px 16px", marginTop: 12, display: "flex", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
             <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", flex: "0 0 auto" }}>
-              <span style={{ position: "relative", display: "inline-block", width: 38, height: 20, background: irpfActivo ? "#2a6e2a" : "#bbb", borderRadius: 10, transition: "background 0.15s" }}>
+              <span style={{ position: "relative", display: "inline-block", width: 38, height: 20, background: irpfActivo ? "#4ec9b8" : "#bbb", borderRadius: 10, transition: "background 0.15s" }}>
                 <span style={{ position: "absolute", top: 2, left: irpfActivo ? 20 : 2, width: 16, height: 16, background: "#f2f5f7", borderRadius: "50%", transition: "left 0.15s" }} />
               </span>
               <input type="checkbox" checked={irpfActivo} onChange={e => setIrpfActivo(e.target.checked)} style={{ display: "none" }} />
-              <span style={{ fontSize: 11, fontWeight: 700, color: "#555", letterSpacing: "0.05em" }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", letterSpacing: "0.05em", fontFamily: "'Inter', sans-serif" }}>
                 La empresa asume el IRPF del Plus Vivienda
               </span>
             </label>
@@ -8242,13 +8255,13 @@ function CosteEmpresa() {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 8 }}>
 
             {/* Toggle Firma de Contrato (afecta gestoría del primer mes) */}
-            <div style={{ background: "#f0f5ee", border: "1px solid #c8d8b8", borderRadius: 6, padding: "10px 14px", display: "flex", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+            <div style={{ background: "#f2f5f7", border: "1px solid #d5d9dc", borderRadius: 8, padding: "12px 16px", display: "flex", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
               <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", flex: "0 0 auto" }}>
-                <span style={{ position: "relative", display: "inline-block", width: 38, height: 20, background: firmaContrato ? "#2a6e2a" : "#bbb", borderRadius: 10, transition: "background 0.15s" }}>
+                <span style={{ position: "relative", display: "inline-block", width: 38, height: 20, background: firmaContrato ? "#4ec9b8" : "#bbb", borderRadius: 10, transition: "background 0.15s" }}>
                   <span style={{ position: "absolute", top: 2, left: firmaContrato ? 20 : 2, width: 16, height: 16, background: "#f2f5f7", borderRadius: "50%", transition: "left 0.15s" }} />
                 </span>
                 <input type="checkbox" checked={firmaContrato} onChange={e => setFirmaContrato(e.target.checked)} style={{ display: "none" }} />
-                <span style={{ fontSize: 11, fontWeight: 700, color: "#555", letterSpacing: "0.05em" }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", letterSpacing: "0.05em", fontFamily: "'Inter', sans-serif" }}>
                   Firma de contrato
                 </span>
               </label>
@@ -8258,13 +8271,13 @@ function CosteEmpresa() {
             </div>
 
             {/* v78: Toggle Incluir Gestoría (por defecto OFF: aparece pero no suma al total) */}
-            <div style={{ background: incluirGestoria ? "#f0f5ee" : "#f5f4f0", border: `1px solid ${incluirGestoria ? "#c8d8b8" : "#d8d4ce"}`, borderRadius: 6, padding: "10px 14px", display: "flex", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+            <div style={{ background: "#f2f5f7", border: "1px solid #d5d9dc", borderRadius: 8, padding: "12px 16px", display: "flex", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
               <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", flex: "0 0 auto" }}>
-                <span style={{ position: "relative", display: "inline-block", width: 38, height: 20, background: incluirGestoria ? "#2a6e2a" : "#bbb", borderRadius: 10, transition: "background 0.15s" }}>
+                <span style={{ position: "relative", display: "inline-block", width: 38, height: 20, background: incluirGestoria ? "#4ec9b8" : "#bbb", borderRadius: 10, transition: "background 0.15s" }}>
                   <span style={{ position: "absolute", top: 2, left: incluirGestoria ? 20 : 2, width: 16, height: 16, background: "#f2f5f7", borderRadius: "50%", transition: "left 0.15s" }} />
                 </span>
                 <input type="checkbox" checked={incluirGestoria} onChange={e => setIncluirGestoria(e.target.checked)} style={{ display: "none" }} />
-                <span style={{ fontSize: 11, fontWeight: 700, color: "#555", letterSpacing: "0.05em" }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", letterSpacing: "0.05em", fontFamily: "'Inter', sans-serif" }}>
                   Incluir Gestoría en total
                 </span>
               </label>
@@ -8276,14 +8289,14 @@ function CosteEmpresa() {
           </div>
 
           {/* Toggle Baja médica (importe exento de SS/IMEI/Solidaridad) */}
-          <div style={{ background: "#f5eeee", border: "1px solid #d8c0c0", borderRadius: 6, padding: "10px 14px", marginTop: 8 }}>
+          <div style={{ background: "#f2f5f7", border: "1px solid #d5d9dc", borderRadius: 8, padding: "12px 16px", marginTop: 8 }}>
             <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
               <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", flex: "0 0 auto" }}>
-                <span style={{ position: "relative", display: "inline-block", width: 38, height: 20, background: bajaActiva ? "#a04545" : "#bbb", borderRadius: 10, transition: "background 0.15s" }}>
+                <span style={{ position: "relative", display: "inline-block", width: 38, height: 20, background: bajaActiva ? "#4ec9b8" : "#bbb", borderRadius: 10, transition: "background 0.15s" }}>
                   <span style={{ position: "absolute", top: 2, left: bajaActiva ? 20 : 2, width: 16, height: 16, background: "#f2f5f7", borderRadius: "50%", transition: "left 0.15s" }} />
                 </span>
                 <input type="checkbox" checked={bajaActiva} onChange={e => setBajaActiva(e.target.checked)} style={{ display: "none" }} />
-                <span style={{ fontSize: 11, fontWeight: 700, color: "#555", letterSpacing: "0.05em" }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", letterSpacing: "0.05em", fontFamily: "'Inter', sans-serif" }}>
                   Hay baja médica (importe exento de SS)
                 </span>
               </label>
@@ -8548,13 +8561,13 @@ function CosteEmpresa() {
                   const pctSobreSalario = totalBruto > 0 ? (T.totalCosteEmpresa / totalBruto * 100) : 0;
                   return [
                     { l: "Bruto trabajador", v: fmt(totalBruto) + " €", color: "#1a1a1a" },
-                    { l: "Coste empresa", v: fmt(T.totalCosteEmpresa) + " €", color: "#a04545" },
-                    { l: "Coste total", v: fmt(totalConCE) + " €", color: "#4ec9b8", bold: true },
-                    { l: "% s/salario", v: pctSobreSalario.toFixed(2) + " %", color: "#6a3a9a" },
+                    { l: "Coste empresa", v: fmt(T.totalCosteEmpresa) + " €", color: "#d32f2f", bold: true },
+                    { l: "Coste total", v: fmt(totalConCE) + " €", color: "#1a1a1a", bold: true },
+                    { l: "% s/salario", v: pctSobreSalario.toFixed(2) + " %", color: "#1a1a1a" },
                   ].map(it => (
-                    <div key={it.l} style={{ background: "#dfe4e8", borderRadius: 6, padding: "10px 14px", border: "1px solid #d5d9dc", textAlign: "center" }}>
-                      <div style={{ fontSize: 9, color: "#666", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 4 }}>{it.l}</div>
-                      <div style={{ fontSize: it.bold ? 16 : 14, fontWeight: 700, color: it.color, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>{it.v}</div>
+                    <div key={it.l} style={{ background: "#fff", borderRadius: 8, padding: "14px 16px", border: "1px solid #d5d9dc", textAlign: "center" }}>
+                      <div style={{ fontSize: 10, color: "#666", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6, fontWeight: 600, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>{it.l}</div>
+                      <div style={{ fontSize: it.bold ? 20 : 17, fontWeight: it.bold ? 800 : 700, color: it.color, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", letterSpacing: "-0.01em" }}>{it.v}</div>
                     </div>
                   ));
                 })()}
