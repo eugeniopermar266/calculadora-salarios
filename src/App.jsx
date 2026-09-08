@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v122";
+const APP_VERSION = "v125";
 
 // v97: Departamentos de un rodaje audiovisual (obligatorio en cada perfil)
 const DEPARTAMENTOS = [
@@ -1402,8 +1402,6 @@ function GestorPerfiles({ tabId, datosActuales, onCargarPerfil, onRegistrarAccio
   };
 
   const guardarPerfil = async () => {
-    // v122: LOG DIAGNÓSTICO — verificar qué salario45 se está guardando
-    console.log("🔍 [GUARDAR PERFIL] salario45 =", datosActuales.salario45, "tipo:", typeof datosActuales.salario45);
     // Si el usuario no escribió nada, usar el placeholder sugerido como nombre
     let nombre = nombrePerfil.trim();
     if (!nombre) {
@@ -4182,10 +4180,7 @@ ${docHTML}
               if (d.departamento !== undefined) setDepartamento(d.departamento); // v97
               if (d.esFijoDiscontinuo !== undefined) setEsFijoDiscontinuo(d.esFijoDiscontinuo);
               if (d.hxPorRodaje40 !== undefined) setHxPorRodaje40(d.hxPorRodaje40);
-              if (d.salario45 !== undefined) {
-                console.log("🔍 [CARGAR PERFIL] salario45 en perfil =", d.salario45, "tipo:", typeof d.salario45);
-                setSalario45(d.salario45);
-              }
+              if (d.salario45 !== undefined) setSalario45(d.salario45);
               if (d.horasRef !== undefined) setHorasRef(d.horasRef);
               if (d.modoInverso45 !== undefined) setModoInverso45(d.modoInverso45);
               if (d.objetivoSemanal45 !== undefined) setObjetivoSemanal45(d.objetivoSemanal45);
@@ -4700,14 +4695,14 @@ ${docHTML}
                 </div>
                 {es40h ? (
                   <div style={{ marginTop:10, display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
-                    <div style={{ padding:"14px 18px", background:"#f2f5f7", borderRadius:8, border:"1px solid #d5d9dc", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                      <span style={{ fontSize:11, color:"#666", letterSpacing:"0.08em", textTransform:"uppercase", fontFamily:"'Inter', -apple-system, sans-serif", fontWeight: 600 }}>Total Mes 40h</span>
-                      <span style={{ fontSize:18, fontWeight:700, color:"#1a1a1a", fontFamily:"'Inter', -apple-system, sans-serif" }}>{fmt(baseRef + vacRef + indemRef)} €</span>
+                    <div style={{ padding:"14px 18px", background:"#f2f5f7", borderRadius:8, border:"1px solid #d5d9dc", display:"flex", justifyContent:"space-between", alignItems:"center", gap:12 }}>
+                      <span style={{ fontSize:11, color:"#666", letterSpacing:"0.06em", textTransform:"uppercase", fontFamily:"'Inter', -apple-system, sans-serif", fontWeight: 600, lineHeight:1.3 }}>Total Mes 40h</span>
+                      <span style={{ fontSize:18, fontWeight:700, color:"#1a1a1a", fontFamily:"'Inter', -apple-system, sans-serif", whiteSpace:"nowrap" }}>{fmt(baseRef + vacRef + indemRef)} €</span>
                     </div>
                     <div style={{ padding:"14px 18px", background:"#f2f5f7", borderRadius:8, border:"1px solid #d5d9dc", display:"flex", flexDirection:"column" }}>
-                      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                        <span style={{ fontSize:11, color:"#666", letterSpacing:"0.08em", textTransform:"uppercase", fontFamily:"'Inter', -apple-system, sans-serif", fontWeight: 600 }}>Salario en Contrato</span>
-                        <span style={{ fontSize:18, fontWeight:700, color:"#1a1a1a", fontFamily:"'Inter', -apple-system, sans-serif" }}>{fmt(vacAcumulada ? baseRef : (baseRef + vacRef))} €</span>
+                      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", gap:12 }}>
+                        <span style={{ fontSize:11, color:"#666", letterSpacing:"0.06em", textTransform:"uppercase", fontFamily:"'Inter', -apple-system, sans-serif", fontWeight: 600, lineHeight:1.3 }}>Salario en<br/>Contrato</span>
+                        <span style={{ fontSize:18, fontWeight:700, color:"#1a1a1a", fontFamily:"'Inter', -apple-system, sans-serif", whiteSpace:"nowrap" }}>{fmt(vacAcumulada ? baseRef : (baseRef + vacRef))} €</span>
                       </div>
                       {vacAcumulada && (
                         <div style={{ fontSize:10, color:"#4ec9b8", marginTop:4, textAlign:"right", letterSpacing:"0.05em", fontStyle:"italic", fontFamily:"'Inter', -apple-system, sans-serif", fontWeight: 500 }}>Base 40h · vacaciones al final</div>
@@ -4716,13 +4711,13 @@ ${docHTML}
                   </div>
                 ) : (
                   <div style={{ marginTop:10, display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
-                    <div style={{ padding:"14px 18px", background:"#f2f5f7", borderRadius:8, border:"1px solid #d5d9dc", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                      <span style={{ fontSize:11, color:"#666", letterSpacing:"0.08em", textTransform:"uppercase", fontFamily:"'Inter', -apple-system, sans-serif", fontWeight: 600 }}>Total Mes 45h Todo Incluido</span>
-                      <span style={{ fontSize:18, fontWeight:700, color:"#1a1a1a", fontFamily:"'Inter', -apple-system, sans-serif" }}>{fmt(sumaRef)} €</span>
+                    <div style={{ padding:"14px 18px", background:"#f2f5f7", borderRadius:8, border:"1px solid #d5d9dc", display:"flex", justifyContent:"space-between", alignItems:"center", gap:12 }}>
+                      <span style={{ fontSize:11, color:"#666", letterSpacing:"0.06em", textTransform:"uppercase", fontFamily:"'Inter', -apple-system, sans-serif", fontWeight: 600, lineHeight:1.3 }}>Total Mes 45h<br/>Todo Incluido</span>
+                      <span style={{ fontSize:18, fontWeight:700, color:"#1a1a1a", fontFamily:"'Inter', -apple-system, sans-serif", whiteSpace:"nowrap" }}>{fmt(sumaRef)} €</span>
                     </div>
-                    <div style={{ padding:"14px 18px", background:"#f2f5f7", borderRadius:8, border:"1px solid #d5d9dc", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                      <span style={{ fontSize:11, color:"#666", letterSpacing:"0.08em", textTransform:"uppercase", fontFamily:"'Inter', -apple-system, sans-serif", fontWeight: 600 }}>Salario en Contrato</span>
-                      <span style={{ fontSize:18, fontWeight:700, color:"#1a1a1a", fontFamily:"'Inter', -apple-system, sans-serif" }}>{fmt(baseRef + vacRef)} €</span>
+                    <div style={{ padding:"14px 18px", background:"#f2f5f7", borderRadius:8, border:"1px solid #d5d9dc", display:"flex", justifyContent:"space-between", alignItems:"center", gap:12 }}>
+                      <span style={{ fontSize:11, color:"#666", letterSpacing:"0.06em", textTransform:"uppercase", fontFamily:"'Inter', -apple-system, sans-serif", fontWeight: 600, lineHeight:1.3 }}>Salario en<br/>Contrato</span>
+                      <span style={{ fontSize:18, fontWeight:700, color:"#1a1a1a", fontFamily:"'Inter', -apple-system, sans-serif", whiteSpace:"nowrap" }}>{fmt(baseRef + vacRef)} €</span>
                     </div>
                   </div>
                 )}
@@ -4743,14 +4738,14 @@ ${docHTML}
                   {[
                     { l:"Salario / Día",    v: salarioDia,          s:"Base ÷ 30" },
                     { l:"Salario / Semana", v: salarioDia * 7,      s:"Día × 7" },
-                    { l:"Valor Hora",       v: vHora,               s:"Semana ÷ 40h" },
+                    { l:"Valor Hora",       v: vHora,               s:"Hora Extra" },
                     { l:"Hora Extra ×1,5",  v: vHoraEx,             s:"Hora × 1,5" },
                     { l:"Festivo ×1,75",    v: salarioDia * 1.75,   s:"Día × 1,75" },
                   ].map(it=>(
-                    <div key={it.l} style={{ background:"#fff", borderRadius:8, padding:"14px 10px", border:"1px solid #d5d9dc", textAlign:"center" }}>
-                      <div style={{ fontSize:10, color:"#666", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:6, fontFamily:"'Inter', -apple-system, sans-serif", fontWeight: 600 }}>{it.l}</div>
-                      <div style={{ fontSize:17, fontWeight:700, color:"#1a1a1a", fontFamily:"'Inter', -apple-system, sans-serif" }}>{fmt(it.v)} €</div>
-                      <div style={{ fontSize:10, color:"#4ec9b8", marginTop:4, fontFamily:"'Inter', -apple-system, sans-serif", fontWeight: 500 }}>{it.s}</div>
+                    <div key={it.l} style={{ background:"#fff", borderRadius:8, padding:"14px 10px", border:"1px solid #d5d9dc", display:"flex", flexDirection:"column", justifyContent:"space-between", minHeight:110 }}>
+                      <div style={{ fontSize:10, color:"#666", letterSpacing:"0.1em", textTransform:"uppercase", fontFamily:"'Inter', -apple-system, sans-serif", fontWeight: 600, textAlign:"center", minHeight:26, display:"flex", alignItems:"center", justifyContent:"center" }}>{it.l}</div>
+                      <div style={{ fontSize:17, fontWeight:700, color:"#1a1a1a", fontFamily:"'Inter', -apple-system, sans-serif", textAlign:"center" }}>{fmt(it.v)} €</div>
+                      <div style={{ fontSize:10, color:"#4ec9b8", fontFamily:"'Inter', -apple-system, sans-serif", fontWeight: 500, textAlign:"center" }}>{it.s}</div>
                     </div>
                   ))}
                 </div>
@@ -8825,8 +8820,8 @@ function ModalCargarPerfil({ perfiles, cargando, onCerrar, onCargar, onBorrarSel
                   {p.datos?.puesto && <div style={{ fontSize: 10, color: "#666", marginBottom: 6, lineHeight: 1.3 }}>{p.datos.puesto}</div>}
                   {depto && <div style={{ fontSize: 9, color: "#4ec9b8", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 8, fontWeight: 700 }}>{depto}</div>}
                   <div style={{ borderTop: "1px solid #d5d9dc", paddingTop: 6, marginBottom: 8 }}>
-                    <div style={{ fontSize: 9, color: "#888" }}>Salario</div>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a" }}>{salario ? salario.toLocaleString("es-ES") + " €/mes" : "—"}</div>
+                    <div style={{ fontSize: 9, color: "#888" }}>Salario pactado {es40 ? "40h" : "45h"}</div>
+                    <div title={`Guardado en BD: salario45 = ${p.datos?.salario45} (tipo ${typeof p.datos?.salario45})`} style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a" }}>{salario ? salario.toLocaleString("es-ES") + " €/mes" : "—"}</div>
                   </div>
                   {/* v101: 3 botones grandes abajo (Opción B) */}
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 4 }}>
