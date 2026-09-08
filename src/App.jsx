@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v102";
+const APP_VERSION = "v103";
 
 // v97: Departamentos de un rodaje audiovisual (obligatorio en cada perfil)
 const DEPARTAMENTOS = [
@@ -6160,6 +6160,15 @@ function PantallaLogin({ onAcierto }) {
   const [verificando, setVerificando] = useState(false);
 
   useEffect(() => {
+    // v103: cargar fuente Inter desde Google Fonts (solo en la pantalla de login)
+    const fontId = "inter-font-loader";
+    if (!document.getElementById(fontId)) {
+      const link = document.createElement("link");
+      link.id = fontId;
+      link.rel = "stylesheet";
+      link.href = "https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap";
+      document.head.appendChild(link);
+    }
     if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
       setErrorCarga("Supabase no configurado. Revisa las variables de entorno en Vercel.");
       setCargando(false);
@@ -6375,12 +6384,19 @@ function PantallaLogin({ onAcierto }) {
           </>
         )}
 
-        {/* Versión (más grande) */}
+        {/* v103: Título con Inter 300 + versión */}
         <div style={{ textAlign: "center", marginTop: 32 }}>
-          <div style={{ fontSize: 13, color: "#4ec9b8", letterSpacing: "0.2em", fontWeight: 700 }}>{APP_VERSION}</div>
-          <div style={{ fontSize: 10, color: "#666", marginTop: 4, letterSpacing: "0.15em", textTransform: "uppercase" }}>
-            Calculadora Salarios
+          <div style={{
+            fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+            fontSize: 22,
+            fontWeight: 300,
+            color: "#f0f0f0",
+            letterSpacing: "-0.01em",
+            marginBottom: 8,
+          }}>
+            Payroll
           </div>
+          <div style={{ fontSize: 13, color: "#4ec9b8", letterSpacing: "0.2em", fontWeight: 700, fontFamily: "'Courier Prime', 'Courier New', monospace" }}>{APP_VERSION}</div>
         </div>
       </div>
     </div>
