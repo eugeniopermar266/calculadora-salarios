@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v103";
+const APP_VERSION = "v104";
 
 // v97: Departamentos de un rodaje audiovisual (obligatorio en cada perfil)
 const DEPARTAMENTOS = [
@@ -6207,24 +6207,30 @@ function PantallaLogin({ onAcierto }) {
   return (
     <div style={{
       minHeight: "100vh",
+      width: "100%",
       position: "relative",
       display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
       fontFamily: "'Courier Prime', 'Courier New', monospace",
       overflow: "hidden",
+      boxSizing: "border-box",
     }}>
-      {/* v102: Fondo con imagen de rodaje + overlay oscuro */}
+      {/* v104: Fondo a pantalla completa (fixed, cover) */}
       <div style={{
-        position: "absolute", inset: 0,
+        position: "fixed",
+        top: 0, left: 0,
+        width: "100vw", height: "100vh",
         backgroundImage: "url('/bg.jpg')",
         backgroundSize: "cover",
-        backgroundPosition: "center",
-        filter: "brightness(0.55) saturate(0.9)",
+        backgroundPosition: "center center",
+        backgroundRepeat: "no-repeat",
         zIndex: 0,
       }} />
-      {/* Overlay gradiente para asegurar contraste */}
+      {/* v104: Overlay más sutil (imagen visible) */}
       <div style={{
-        position: "absolute", inset: 0,
-        background: "linear-gradient(180deg, rgba(10,10,10,0.55) 0%, rgba(10,10,10,0.75) 100%)",
+        position: "fixed",
+        top: 0, left: 0,
+        width: "100vw", height: "100vh",
+        background: "linear-gradient(180deg, rgba(10,15,20,0.35) 0%, rgba(10,15,20,0.55) 100%)",
         zIndex: 1,
       }} />
 
@@ -6394,7 +6400,7 @@ function PantallaLogin({ onAcierto }) {
             letterSpacing: "-0.01em",
             marginBottom: 8,
           }}>
-            Payroll
+            Payroll cost calculator
           </div>
           <div style={{ fontSize: 13, color: "#4ec9b8", letterSpacing: "0.2em", fontWeight: 700, fontFamily: "'Courier Prime', 'Courier New', monospace" }}>{APP_VERSION}</div>
         </div>
