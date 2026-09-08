@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v110";
+const APP_VERSION = "v111";
 
 // v97: Departamentos de un rodaje audiovisual (obligatorio en cada perfil)
 const DEPARTAMENTOS = [
@@ -11100,7 +11100,11 @@ export default function App() {
   return (
     <UsuarioContext.Provider value={usuario}>
       <ProyectoContext.Provider value={proyectoActivo ? { ...proyectoActivo, __calendario: calendarioActivo } : null}>
-      <div style={{ minHeight: "100vh", background: "#f0ede8" }}>
+      <div style={{ minHeight: "100vh", background: "#0a0f14" }}>
+        {/* v111: fondo global oscuro + Inter cargada */}
+        <style>{`
+          @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        `}</style>
         <BannerSesion
           usuario={usuario}
           proyectoActivo={proyectoActivo}
