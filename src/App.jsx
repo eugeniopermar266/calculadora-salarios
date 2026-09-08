@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v92";
+const APP_VERSION = "v93";
 
 // v73: importe fijo por jornada especial (se paga POR ENCIMA del salario pactado)
 const IMPORTE_JORNADA_ESPECIAL = 20;
@@ -2929,6 +2929,8 @@ function App45({ modoTab = "iruna45" }) {
   // Usuario actual de la sesión (para mostrar autor en exports)
   const usuarioSesion = useContext(UsuarioContext);
   const esAdmin = !!usuarioSesion?.es_admin; // v84: para mostrar box Coste Empresa a admins
+  const esCoordinadorApp45 = usuarioSesion?.rol === "coordinador"; // v93
+  const [mostrarExportarListado, setMostrarExportarListado] = useState(false); // v93
   const proyectoActivoCtx = useContext(ProyectoContext); // v45
 
   // === FLAG PESTAÑA 40H ===
@@ -4782,7 +4784,28 @@ ${docHTML}
           }}
           title="Abrir vista de PDF (Guardar HTML / Imprimir / Cerrar)"
         >🖨 Abrir PDF</button>
+        {/* v93: Exportar Listado (solo admin/coordinador) */}
+        {(esAdmin || esCoordinadorApp45) && (
+          <button
+            onClick={() => setMostrarExportarListado(true)}
+            style={{
+              padding: "10px 24px", fontSize: 11, fontFamily: "'Courier Prime', 'Courier New', monospace",
+              letterSpacing: "0.15em", textTransform: "uppercase", borderRadius: 4,
+              cursor: "pointer", fontWeight: 700,
+              border: "1px solid #5a8a5a",
+              background: "#5a8a5a",
+              color: "#fff",
+              transition: "all 0.15s",
+            }}
+            title="Exportar listado de perfiles del proyecto a Excel/CSV"
+          >📊 Exportar listado</button>
+        )}
       </div>
+
+      {/* v93: Modal exportar listado */}
+      {mostrarExportarListado && (esAdmin || esCoordinadorApp45) && (
+        <PanelExportarListado usuarioActual={usuarioSesion} onCerrar={() => setMostrarExportarListado(false)} />
+      )}
 
       {/* Banner de error/confirmación de exportación */}
       {exportError && (
@@ -5030,7 +5053,8 @@ async function listarPerfilesSupabase({ tabId, proyectoId, verTodos, adminPin })
     if (!proyectoId) return [];
     path += `&proyecto_id=eq.${proyectoId}`;
   }
-  const headers = verTodos && adminPin ? { "x-admin-pin": adminPin } : {};
+  // v93: enviar admin pin siempre que se tenga (para que admin vea perfiles de otros users también)
+  const headers = adminPin ? { "x-admin-pin": adminPin } : {};
   try {
     const data = await supabaseFetch(path, { headers });
     return data || [];
@@ -5757,7 +5781,7 @@ function PantallaSelectorProyecto({ usuario, onSeleccionar, onLogout, onGestiona
               }}
             >⚙ Gestionar proyectos</button>
           )}
-          {(usuario.es_admin || usuario.rol === "coordinador") && onExportarListado && (
+          {(usuario.es_admin || usuario.rol === "coordinador") && false && onExportarListado && (
             <button
               onClick={onExportarListado}
               style={{
@@ -8236,18 +8260,30 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
   const cargarPerfiles = async (p) => {
     setProyectoSel(p);
     setCargando(true);
+    setError(null);
     try {
+      console.log("[Exportar] Cargando perfiles del proyecto:", p.id, p.nombre, "esAdmin:", esAdmin, "esCoordinador:", esCoordinador);
+      // v93: si es admin pasar adminPin, si es coordinador NO pasa admin pin (RLS le da acceso por asignación)
+      const adminPin = esAdmin ? usuarioActual.pin : null;
       const [p45, p40] = await Promise.all([
-        listarPerfilesSupabase({ tabId: "iruna45", proyectoId: p.id, adminPin: esAdmin ? usuarioActual.pin : null }),
-        listarPerfilesSupabase({ tabId: "tab40", proyectoId: p.id, adminPin: esAdmin ? usuarioActual.pin : null }),
+        listarPerfilesSupabase({ tabId: "iruna45", proyectoId: p.id, adminPin }),
+        listarPerfilesSupabase({ tabId: "tab40", proyectoId: p.id, adminPin }),
       ]);
+      console.log("[Exportar] Perfiles 45H:", p45?.length, "40H:", p40?.length);
       const todos = [...(p45 || []), ...(p40 || [])].sort((a, b) => (a.nombre || "").localeCompare(b.nombre || ""));
       setPerfiles(todos);
       // Preseleccionar los NO exportados
-      const preSel = new Set(todos.filter(p => !p.exportado_el).map(p => p.id));
+      const preSel = new Set(todos.filter(pp => !pp.exportado_el).map(pp => pp.id));
       setSeleccionados(preSel);
       setCargando(false);
-    } catch (e) { setError(e.message); setCargando(false); }
+      if (todos.length === 0) {
+        setMensaje({ tipo: "info", texto: "No hay perfiles guardados en este proyecto todavía." });
+      }
+    } catch (e) {
+      console.error("[Exportar] Error:", e);
+      setError("Error cargando perfiles: " + e.message);
+      setCargando(false);
+    }
   };
 
   const toggleSel = (id) => {
@@ -8392,30 +8428,39 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 100, display: "flex", justifyContent: "center", alignItems: "flex-start", padding: 20, overflow: "auto" }}>
-      <div style={{ background: "#faf7f2", borderRadius: 8, padding: 24, maxWidth: 900, width: "100%", maxHeight: "90vh", overflow: "auto" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, paddingBottom: 12, borderBottom: "1px solid #e0ddd8" }}>
-          <h2 style={{ margin: 0, fontSize: 14, letterSpacing: "0.15em", textTransform: "uppercase", color: "#1a1a1a" }}>📊 Exportar listado</h2>
-          <button onClick={onCerrar} style={{ background: "transparent", border: "1px solid #ccc", padding: "6px 12px", borderRadius: 4, cursor: "pointer", fontSize: 11 }}>✕ Cerrar</button>
+      <div style={{ background: "#faf7f2", borderRadius: 8, padding: 24, maxWidth: 900, width: "100%", maxHeight: "90vh", overflow: "auto", fontFamily: "'Courier Prime', 'Courier New', monospace" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, paddingBottom: 12, borderBottom: "2px solid #b8864a" }}>
+          <h2 style={{ margin: 0, fontSize: 14, letterSpacing: "0.15em", textTransform: "uppercase", color: "#1a1a1a", fontWeight: 700 }}>📊 Exportar listado de perfiles</h2>
+          <button onClick={onCerrar} style={{ background: "#fff", border: "1px solid #b8864a", padding: "6px 14px", borderRadius: 4, cursor: "pointer", fontSize: 11, color: "#8a5030", fontFamily: "'Courier Prime', 'Courier New', monospace", fontWeight: 700 }}>✕ Cerrar</button>
         </div>
 
         {mensaje && (
-          <div style={{ padding: "8px 12px", marginBottom: 12, borderRadius: 4, background: mensaje.tipo === "ok" ? "#e6f4e6" : "#fce8e8", color: mensaje.tipo === "ok" ? "#2a6e2a" : "#c00", fontSize: 11 }}>{mensaje.texto}</div>
+          <div style={{ padding: "10px 14px", marginBottom: 14, borderRadius: 4, background: mensaje.tipo === "ok" ? "#e6f4e6" : (mensaje.tipo === "info" ? "#e8eef7" : "#fce8e8"), color: mensaje.tipo === "ok" ? "#2a6e2a" : (mensaje.tipo === "info" ? "#2a5a8a" : "#c00"), fontSize: 11, border: `1px solid ${mensaje.tipo === "ok" ? "#a0d0a0" : (mensaje.tipo === "info" ? "#a0b8d8" : "#e0a0a0")}` }}>{mensaje.texto}</div>
         )}
         {error && (
-          <div style={{ padding: "8px 12px", marginBottom: 12, borderRadius: 4, background: "#fce8e8", color: "#c00", fontSize: 11 }}>{error}</div>
+          <div style={{ padding: "10px 14px", marginBottom: 14, borderRadius: 4, background: "#fce8e8", color: "#c00", fontSize: 11, border: "1px solid #e0a0a0" }}>⚠ {error}</div>
         )}
 
         {!proyectoSel ? (
           <div>
-            <div style={{ fontSize: 11, color: "#666", marginBottom: 10, letterSpacing: "0.05em" }}>Elige el proyecto del que quieres exportar los perfiles:</div>
-            {cargando ? <div>Cargando…</div> : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                {proyectos.length === 0 && <div style={{ fontSize: 11, color: "#888" }}>No hay proyectos disponibles.</div>}
+            <div style={{ fontSize: 11, color: "#666", marginBottom: 12, letterSpacing: "0.05em", padding: "10px 12px", background: "#f4f0e8", borderRadius: 4, border: "1px solid #e0d4b8" }}>
+              <strong style={{ color: "#8a5030" }}>Paso 1:</strong> Elige el proyecto del que quieres exportar los perfiles.
+            </div>
+            {cargando ? <div style={{ padding: 20, textAlign: "center", color: "#888" }}>Cargando proyectos…</div> : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {proyectos.length === 0 && <div style={{ fontSize: 11, color: "#888", padding: 20, textAlign: "center" }}>No hay proyectos disponibles.</div>}
                 {proyectos.map(p => (
                   <button key={p.id} onClick={() => cargarPerfiles(p)}
-                    style={{ background: "#fff", border: "1px solid #d0ccc6", borderRadius: 5, padding: "10px 14px", cursor: "pointer", textAlign: "left", fontFamily: "'Courier Prime', 'Courier New', monospace" }}>
-                    <div style={{ fontSize: 12, fontWeight: 700 }}>{p.nombre}</div>
-                    <div style={{ fontSize: 10, color: "#888", marginTop: 2 }}>{p.productora}</div>
+                    style={{ background: "#fff", border: "1px solid #d0ccc6", borderRadius: 5, padding: "12px 16px", cursor: "pointer", textAlign: "left", fontFamily: "'Courier Prime', 'Courier New', monospace", transition: "all 0.15s", display: "flex", justifyContent: "space-between", alignItems: "center" }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = "#b8864a"; e.currentTarget.style.background = "#faf6ee"; }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = "#d0ccc6"; e.currentTarget.style.background = "#fff"; }}
+                  >
+                    <div>
+                      <div style={{ fontSize: 9, color: "#888", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 2 }}>Proyecto</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a" }}>{p.nombre}</div>
+                      <div style={{ fontSize: 10, color: "#888", marginTop: 4, letterSpacing: "0.05em" }}>Productora: {p.productora || "—"}</div>
+                    </div>
+                    <div style={{ color: "#c8a96e", fontSize: 20 }}>→</div>
                   </button>
                 ))}
               </div>
@@ -8423,52 +8468,64 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
           </div>
         ) : (
           <div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+            <div style={{ background: "#f4f0e8", padding: "12px 14px", borderRadius: 5, marginBottom: 14, border: "1px solid #e0d4b8", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
               <div>
-                <div style={{ fontSize: 12, fontWeight: 700 }}>{proyectoSel.nombre}</div>
-                <div style={{ fontSize: 10, color: "#888" }}>{proyectoSel.productora} · {perfiles.length} perfiles · {seleccionados.size} seleccionados</div>
+                <div style={{ fontSize: 9, color: "#888", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 2 }}>Proyecto seleccionado</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a" }}>{proyectoSel.nombre}</div>
+                <div style={{ fontSize: 10, color: "#666", marginTop: 2 }}>
+                  <strong>{perfiles.length}</strong> perfil{perfiles.length !== 1 ? "es" : ""} · <strong>{seleccionados.size}</strong> seleccionado{seleccionados.size !== 1 ? "s" : ""}
+                </div>
               </div>
-              <button onClick={() => { setProyectoSel(null); setPerfiles([]); setSeleccionados(new Set()); }} style={{ background: "transparent", border: "1px solid #ccc", padding: "5px 10px", borderRadius: 4, cursor: "pointer", fontSize: 10 }}>← Cambiar proyecto</button>
+              <button onClick={() => { setProyectoSel(null); setPerfiles([]); setSeleccionados(new Set()); setMensaje(null); setError(null); }} style={{ background: "#fff", border: "1px solid #ccc", padding: "6px 12px", borderRadius: 4, cursor: "pointer", fontSize: 10, fontFamily: "'Courier Prime', 'Courier New', monospace", color: "#666", fontWeight: 700 }}>← Cambiar proyecto</button>
             </div>
 
-            {cargando ? <div>Cargando…</div> : (
+            {cargando ? <div style={{ padding: 20, textAlign: "center", color: "#888" }}>Cargando perfiles…</div> : (
               <>
-                <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
-                  <button onClick={seleccionarTodos} style={{ fontSize: 10, padding: "4px 10px", border: "1px solid #ccc", borderRadius: 4, background: "#fff", cursor: "pointer" }}>Todos</button>
-                  <button onClick={deseleccionarTodos} style={{ fontSize: 10, padding: "4px 10px", border: "1px solid #ccc", borderRadius: 4, background: "#fff", cursor: "pointer" }}>Ninguno</button>
-                  <button onClick={invertirSeleccion} style={{ fontSize: 10, padding: "4px 10px", border: "1px solid #ccc", borderRadius: 4, background: "#fff", cursor: "pointer" }}>Invertir</button>
-                </div>
+                {perfiles.length > 0 && (
+                  <div style={{ display: "flex", gap: 6, marginBottom: 10, alignItems: "center", flexWrap: "wrap" }}>
+                    <span style={{ fontSize: 10, color: "#666", letterSpacing: "0.05em", marginRight: 4 }}>Selección:</span>
+                    <button onClick={seleccionarTodos} style={{ fontSize: 10, padding: "5px 12px", border: "1px solid #b8864a", borderRadius: 4, background: "#fff", cursor: "pointer", color: "#8a5030", fontFamily: "'Courier Prime', 'Courier New', monospace", fontWeight: 700 }}>Todos</button>
+                    <button onClick={deseleccionarTodos} style={{ fontSize: 10, padding: "5px 12px", border: "1px solid #ccc", borderRadius: 4, background: "#fff", cursor: "pointer", color: "#666", fontFamily: "'Courier Prime', 'Courier New', monospace", fontWeight: 700 }}>Ninguno</button>
+                    <button onClick={invertirSeleccion} style={{ fontSize: 10, padding: "5px 12px", border: "1px solid #ccc", borderRadius: 4, background: "#fff", cursor: "pointer", color: "#666", fontFamily: "'Courier Prime', 'Courier New', monospace", fontWeight: 700 }}>Invertir</button>
+                    <span style={{ fontSize: 9, color: "#999", marginLeft: 8, fontStyle: "italic" }}>Los ya exportados están en gris.</span>
+                  </div>
+                )}
 
-                <div style={{ background: "#fff", border: "1px solid #e0ddd8", borderRadius: 5, maxHeight: 400, overflow: "auto" }}>
+                <div style={{ background: "#fff", border: "1px solid #d0ccc6", borderRadius: 5, maxHeight: 400, overflow: "auto" }}>
                   <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11, fontFamily: "'Courier Prime', 'Courier New', monospace" }}>
                     <thead style={{ position: "sticky", top: 0, background: "#f0ede8", zIndex: 1 }}>
                       <tr>
-                        <th style={{ padding: "8px 6px", textAlign: "center", width: 30, borderBottom: "1px solid #d0ccc6" }}>✓</th>
-                        <th style={{ padding: "8px 6px", textAlign: "left", borderBottom: "1px solid #d0ccc6", fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase" }}>Nombre</th>
-                        <th style={{ padding: "8px 6px", textAlign: "center", borderBottom: "1px solid #d0ccc6", fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase" }}>Tipo</th>
-                        <th style={{ padding: "8px 6px", textAlign: "left", borderBottom: "1px solid #d0ccc6", fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase" }}>Puesto</th>
-                        <th style={{ padding: "8px 6px", textAlign: "right", borderBottom: "1px solid #d0ccc6", fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase" }}>Salario</th>
-                        <th style={{ padding: "8px 6px", textAlign: "left", borderBottom: "1px solid #d0ccc6", fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase" }}>Exportado</th>
+                        <th style={{ padding: "10px 6px", textAlign: "center", width: 32, borderBottom: "1px solid #d0ccc6", fontSize: 9 }}>✓</th>
+                        <th style={{ padding: "10px 6px", textAlign: "left", borderBottom: "1px solid #d0ccc6", fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", color: "#666", fontWeight: 700 }}>Perfil</th>
+                        <th style={{ padding: "10px 6px", textAlign: "center", borderBottom: "1px solid #d0ccc6", fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", color: "#666", width: 60, fontWeight: 700 }}>Tipo</th>
+                        <th style={{ padding: "10px 6px", textAlign: "left", borderBottom: "1px solid #d0ccc6", fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", color: "#666", fontWeight: 700 }}>Puesto</th>
+                        <th style={{ padding: "10px 6px", textAlign: "right", borderBottom: "1px solid #d0ccc6", fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", color: "#666", width: 90, fontWeight: 700 }}>Salario</th>
+                        <th style={{ padding: "10px 6px", textAlign: "left", borderBottom: "1px solid #d0ccc6", fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", color: "#666", fontWeight: 700 }}>Exportado</th>
                       </tr>
                     </thead>
                     <tbody>
                       {perfiles.length === 0 && (
-                        <tr><td colSpan={6} style={{ padding: 20, textAlign: "center", color: "#888" }}>No hay perfiles en este proyecto</td></tr>
+                        <tr><td colSpan={6} style={{ padding: 30, textAlign: "center", color: "#888", fontStyle: "italic" }}>No hay perfiles guardados en este proyecto.</td></tr>
                       )}
                       {perfiles.map(p => {
                         const yaExp = !!p.exportado_el;
                         const sel = seleccionados.has(p.id);
                         return (
-                          <tr key={p.id} style={{ borderBottom: "1px solid #f0ede8", background: yaExp ? "#f5f4f0" : "transparent", color: yaExp ? "#999" : "#1a1a1a", cursor: "pointer" }} onClick={() => toggleSel(p.id)}>
-                            <td style={{ padding: "6px", textAlign: "center" }}>
-                              <input type="checkbox" checked={sel} onChange={() => toggleSel(p.id)} onClick={e => e.stopPropagation()} />
+                          <tr key={p.id} style={{ borderBottom: "1px solid #f0ede8", background: yaExp ? "#f5f4f0" : (sel ? "#faf6ee" : "transparent"), color: yaExp ? "#999" : "#1a1a1a", cursor: "pointer" }} onClick={() => toggleSel(p.id)}>
+                            <td style={{ padding: "8px 6px", textAlign: "center" }}>
+                              <input type="checkbox" checked={sel} onChange={() => toggleSel(p.id)} onClick={e => e.stopPropagation()} style={{ cursor: "pointer" }} />
                             </td>
-                            <td style={{ padding: "6px 8px" }}>{p.nombre}</td>
-                            <td style={{ padding: "6px 8px", textAlign: "center", fontSize: 9 }}>{p.tab_id === "tab40" ? "40H" : "45H"}</td>
-                            <td style={{ padding: "6px 8px", fontSize: 10 }}>{p.datos?.puesto || ""}</td>
-                            <td style={{ padding: "6px 8px", textAlign: "right", fontSize: 10 }}>{p.datos?.salario45 ? Number(p.datos.salario45).toFixed(0) + " €" : ""}</td>
-                            <td style={{ padding: "6px 8px", fontSize: 9, color: "#888" }}>
-                              {yaExp ? `${new Date(p.exportado_el).toLocaleDateString("es-ES")} · ${p.exportado_por || "?"}` : "—"}
+                            <td style={{ padding: "8px", fontWeight: 600 }}>{p.nombre}</td>
+                            <td style={{ padding: "8px", textAlign: "center", fontSize: 9, color: yaExp ? "#aaa" : "#8a5030", fontWeight: 700 }}>{p.tab_id === "tab40" ? "40H" : "45H"}</td>
+                            <td style={{ padding: "8px", fontSize: 10 }}>{p.datos?.puesto || "—"}</td>
+                            <td style={{ padding: "8px", textAlign: "right", fontSize: 10 }}>{p.datos?.salario45 ? Number(p.datos.salario45).toFixed(0) + " €" : "—"}</td>
+                            <td style={{ padding: "8px", fontSize: 9, color: yaExp ? "#666" : "#bbb" }}>
+                              {yaExp ? (
+                                <div>
+                                  <div>{new Date(p.exportado_el).toLocaleDateString("es-ES")}</div>
+                                  <div style={{ fontSize: 8, color: "#888", marginTop: 1 }}>por {p.exportado_por || "?"}</div>
+                                </div>
+                              ) : "—"}
                             </td>
                           </tr>
                         );
@@ -8477,12 +8534,17 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
                   </table>
                 </div>
 
-                <div style={{ marginTop: 14, display: "flex", justifyContent: "flex-end", gap: 8 }}>
-                  <button onClick={exportar} disabled={seleccionados.size === 0}
-                    style={{ background: seleccionados.size === 0 ? "#ccc" : "#5a8a5a", color: "#fff", border: "none", padding: "10px 20px", borderRadius: 5, cursor: seleccionados.size === 0 ? "not-allowed" : "pointer", fontFamily: "'Courier Prime', 'Courier New', monospace", fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>
-                    📥 Exportar CSV ({seleccionados.size})
-                  </button>
-                </div>
+                {perfiles.length > 0 && (
+                  <div style={{ marginTop: 16, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+                    <div style={{ fontSize: 10, color: "#666" }}>
+                      Se descargará un archivo <strong>.csv</strong> compatible con Excel con {seleccionados.size} perfil{seleccionados.size !== 1 ? "es" : ""}.
+                    </div>
+                    <button onClick={exportar} disabled={seleccionados.size === 0}
+                      style={{ background: seleccionados.size === 0 ? "#ccc" : "#5a8a5a", color: "#fff", border: "none", padding: "12px 24px", borderRadius: 5, cursor: seleccionados.size === 0 ? "not-allowed" : "pointer", fontFamily: "'Courier Prime', 'Courier New', monospace", fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>
+                      📥 Exportar {seleccionados.size} perfil{seleccionados.size !== 1 ? "es" : ""}
+                    </button>
+                  </div>
+                )}
               </>
             )}
           </div>
