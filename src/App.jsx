@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v129";
+const APP_VERSION = "v131";
 
 // v97: Departamentos de un rodaje audiovisual (obligatorio en cada perfil)
 const DEPARTAMENTOS = [
@@ -1248,7 +1248,7 @@ function ImportadorAntiguos({ usuarioActual, tabId, onCerrar, onImportado }) {
 
 
 // ─── GESTOR DE PERFILES ──────────────────────────────────────────────────────
-function GestorPerfiles({ tabId, datosActuales, onCargarPerfil, onRegistrarAcciones }) {
+function GestorPerfiles({ tabId, datosActuales, onCargarPerfil, onRegistrarAcciones, onPerfilesActualizados, onPerfilEnEdicionCambio }) {
   const usuarioCtx = useContext(UsuarioContext);
   const proyectoActivoCtx = useContext(ProyectoContext); // v46
   const esAdmin = !!usuarioCtx?.es_admin;
@@ -1687,37 +1687,33 @@ function GestorPerfiles({ tabId, datosActuales, onCargarPerfil, onRegistrarAccio
     perfiles,
     cargando,
     perfilEnEdicion,
+    modificarPerfilActivo: modificarPerfil, // v131: sobrescribir perfil en edición
     borrarPerfilesSeleccionados: async (ids) => {
       let ok = 0, err = 0;
       const errores = [];
-      console.log("🗑 [BORRAR MÚLTIPLE] IDs recibidos:", ids);
-      console.log("🗑 [BORRAR MÚLTIPLE] perfiles en memoria:", perfiles.length);
       for (const id of ids) {
         const p = perfiles.find(x => x.supabaseId === id || x.key === id);
         if (!p) {
-          console.warn("🗑 No encontrado en memoria:", id);
           err++;
           errores.push(`ID ${id}: no encontrado`);
           continue;
         }
         try {
           if (p.fuente === "supabase" && p.supabaseId) {
-            console.log("🗑 Borrando de Supabase:", p.supabaseId, p.nombre);
             await borrarPerfilSupabase(p.supabaseId, esAdmin ? usuarioCtx.pin : null);
           } else {
-            console.log("🗑 Borrando local:", p.key, p.nombre);
             await storage.delete(p.key);
           }
           ok++;
         } catch (e) {
-          console.error("🗑 Fallo borrando", p.nombre, e);
+          console.warn("Fallo borrando", p.nombre, e);
           err++;
           errores.push(`${p.nombre}: ${e.message || e}`);
         }
       }
       await recargar();
       if (err > 0) {
-        alert(`Borrado incompleto:\n✓ ${ok} correctos\n✗ ${err} con error\n\nDetalles:\n${errores.slice(0, 5).join("\n")}${errores.length > 5 ? "\n..." : ""}\n\nMira la consola (F12) para más info.`);
+        alert(`Borrado incompleto:\n✓ ${ok} correctos\n✗ ${err} con error\n\nDetalles:\n${errores.slice(0, 5).join("\n")}${errores.length > 5 ? "\n..." : ""}`);
       } else if (ok > 0) {
         showMsg(`✓ ${ok} perfil${ok !== 1 ? "es" : ""} borrado${ok !== 1 ? "s" : ""}`);
       }
@@ -1753,6 +1749,16 @@ function GestorPerfiles({ tabId, datosActuales, onCargarPerfil, onRegistrarAccio
     },
   };
 
+  // v130: notificar al padre cuando la lista de perfiles cambia (para que React re-renderice el modal)
+  useEffect(() => {
+    if (onPerfilesActualizados) onPerfilesActualizados(perfiles);
+  }, [perfiles, onPerfilesActualizados]);
+
+  // v131: notificar al padre cuando cambia el perfil en edición
+  useEffect(() => {
+    if (onPerfilEnEdicionCambio) onPerfilEnEdicionCambio(perfilEnEdicion);
+  }, [perfilEnEdicion, onPerfilEnEdicionCambio]);
+
   // Publicar UNA sola vez al montar (o cuando onRegistrarAcciones cambie), con proxy estable
   useEffect(() => {
     if (!onRegistrarAcciones) return;
@@ -1766,6 +1772,7 @@ function GestorPerfiles({ tabId, datosActuales, onCargarPerfil, onRegistrarAccio
       borrarPerfilesSeleccionados: (ids) => accionesLiveRef.current.borrarPerfilesSeleccionados(ids),
       renombrarPerfil: (p, n) => accionesLiveRef.current.renombrarPerfil(p, n),
       duplicarPerfil: (p) => accionesLiveRef.current.duplicarPerfil(p),
+      modificarPerfilActivo: () => accionesLiveRef.current.modificarPerfilActivo(),
       // Getters para acceso dinámico a datos que cambian
       get perfiles() { return accionesLiveRef.current.perfiles; },
       get cargando() { return accionesLiveRef.current.cargando; },
@@ -3142,6 +3149,8 @@ function App45({ modoTab = "iruna45" }) {
   const [mostrarModalGuardar, setMostrarModalGuardar] = useState(false);
   const [nombreGuardarModal, setNombreGuardarModal] = useState("");
   const [accionesPerfiles, setAccionesPerfiles] = useState(null); // {guardarConNombre, cargarPerfil, exportarJSON, ...}
+  const [perfilesLista, setPerfilesLista] = useState([]); // v130: lista viva para re-render del modal
+  const [perfilEnEdicionEstado, setPerfilEnEdicionEstado] = useState(null); // v131: perfil actualmente cargado
   const proyectoActivoCtx = useContext(ProyectoContext); // v45
 
   // === FLAG PESTAÑA 40H ===
@@ -4161,6 +4170,8 @@ ${docHTML}
           <GestorPerfiles
             tabId={modoTab === "tab40" ? "40h" : "45h"}
             onRegistrarAcciones={setAccionesPerfiles}
+            onPerfilesActualizados={setPerfilesLista}
+            onPerfilEnEdicionCambio={setPerfilEnEdicionEstado}
             datosActuales={{
               proyecto, productora, nombre, puesto, codigoContable, departamento, esFijoDiscontinuo, hxPorRodaje40, salario45, horasRef, modoInverso45, objetivoSemanal45,
               fechaInicio, fechaFin, vacAcumulada, indemAcumulada, finiquitoAparte,
@@ -5149,7 +5160,7 @@ ${docHTML}
       {/* v98: Modal Cargar perfil (tarjetas) */}
       {mostrarModalCargar && accionesPerfiles && (
         <ModalCargarPerfil
-          perfiles={accionesPerfiles.perfiles || []}
+          perfiles={perfilesLista}
           cargando={accionesPerfiles.cargando}
           onCerrar={() => setMostrarModalCargar(false)}
           onCargar={(perfil) => { accionesPerfiles.cargarPerfil(perfil); setMostrarModalCargar(false); }}
@@ -5166,6 +5177,13 @@ ${docHTML}
           onDuplicar={async (perfil) => {
             if (accionesPerfiles.duplicarPerfil) {
               await accionesPerfiles.duplicarPerfil(perfil);
+            }
+          }}
+          perfilEnEdicion={perfilEnEdicionEstado}
+          onModificar={async () => {
+            if (accionesPerfiles.modificarPerfilActivo) {
+              await accionesPerfiles.modificarPerfilActivo();
+              setMostrarModalCargar(false);
             }
           }}
           tabActivo={modoTab === "tab40" ? "40h" : "45h"}
@@ -8731,7 +8749,7 @@ function CosteEmpresa() {
 // v98: MODAL CARGAR PERFIL (tarjetas grandes)
 // ═══════════════════════════════════════════════════════════════════════
 
-function ModalCargarPerfil({ perfiles, cargando, onCerrar, onCargar, onBorrarSeleccionados, onRenombrar, onDuplicar, tabActivo }) {
+function ModalCargarPerfil({ perfiles, cargando, onCerrar, onCargar, onBorrarSeleccionados, onRenombrar, onDuplicar, tabActivo, perfilEnEdicion, onModificar }) {
   const [seleccionados, setSeleccionados] = useState(new Set());
   const [filtroTipo, setFiltroTipo] = useState("todos"); // todos | 45h | 40h
   const [filtroDepto, setFiltroDepto] = useState("__todos__");
@@ -8826,10 +8844,29 @@ function ModalCargarPerfil({ perfiles, cargando, onCerrar, onCargar, onBorrarSel
               const depto = p.datos?.departamento || "";
               const salario = p.datos?.salario45 ? Number(p.datos.salario45) : 0;
               const fecha = p.timestamp ? new Date(p.timestamp).toLocaleDateString("es-ES") : "";
+              // v131: perfil actualmente en edición
+              const esEnEdicion = perfilEnEdicion && (
+                (perfilEnEdicion.supabaseId && perfilEnEdicion.supabaseId === p.supabaseId) ||
+                (perfilEnEdicion.key && perfilEnEdicion.key === p.key)
+              );
+              // v131: fechas alta/baja (formato ISO YYYY-MM-DD → DD/MM/YYYY)
+              const fmtFecha = (iso) => {
+                if (!iso) return null;
+                const parts = String(iso).split("-");
+                if (parts.length !== 3) return iso;
+                return `${parts[2]}/${parts[1]}/${parts[0]}`;
+              };
+              const fAlta = fmtFecha(p.datos?.fechaInicio);
+              const fBaja = fmtFecha(p.datos?.fechaFin);
               return (
                 <div key={id}
-                  style={{ background: sel ? "#faf6ee" : "#f2f5f7", border: sel ? "2px solid #4ec9b8" : "1px solid #d5d9dc", borderRadius: 6, padding: 12, transition: "all 0.15s", position: "relative" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+                  style={{ background: sel ? "#faf6ee" : "#f2f5f7", border: esEnEdicion ? "2px solid #4ec9b8" : (sel ? "2px solid #4ec9b8" : "1px solid #d5d9dc"), borderRadius: 6, padding: 12, transition: "all 0.15s", position: "relative" }}>
+                  {esEnEdicion && (
+                    <div style={{ position: "absolute", top: -8, left: 12, background: "#4ec9b8", color: "#0a0a0a", fontSize: 9, padding: "2px 8px", borderRadius: 3, letterSpacing: "0.08em", fontWeight: 700, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>
+                      EN EDICIÓN
+                    </div>
+                  )}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8, marginTop: esEnEdicion ? 4 : 0 }}>
                     <input type="checkbox" checked={sel} onChange={() => toggleSel(id)} style={{ cursor: "pointer", marginTop: 2 }} />
                     <span style={{ background: es40 ? "#6a3a9a" : "#4ec9b8", color: "#f2f5f7", fontSize: 8, padding: "2px 6px", borderRadius: 2, letterSpacing: "0.08em", fontWeight: 700 }}>
                       {es40 ? "40H" : "45H"}
@@ -8838,11 +8875,28 @@ function ModalCargarPerfil({ perfiles, cargando, onCerrar, onCargar, onBorrarSel
                   <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", marginBottom: 4, lineHeight: 1.2, wordBreak: "break-word" }}>{p.nombre}</div>
                   {p.datos?.puesto && <div style={{ fontSize: 10, color: "#666", marginBottom: 6, lineHeight: 1.3 }}>{p.datos.puesto}</div>}
                   {depto && <div style={{ fontSize: 9, color: "#4ec9b8", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 8, fontWeight: 700 }}>{depto}</div>}
+
+                  {/* v131: Fechas Alta / Baja */}
+                  {(fAlta || fBaja) && (
+                    <div style={{ borderTop: "1px solid #d5d9dc", paddingTop: 6, marginBottom: 6 }}>
+                      {fAlta && (
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#666" }}>
+                          <span>Alta:</span><span style={{ color: "#1a1a1a", fontWeight: 600 }}>{fAlta}</span>
+                        </div>
+                      )}
+                      {fBaja && (
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#666", marginTop: 2 }}>
+                          <span>Baja:</span><span style={{ color: "#1a1a1a", fontWeight: 600 }}>{fBaja}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <div style={{ borderTop: "1px solid #d5d9dc", paddingTop: 6, marginBottom: 8 }}>
                     <div style={{ fontSize: 9, color: "#888" }}>Salario pactado {es40 ? "40h" : "45h"}</div>
-                    <div title={`Guardado en BD: salario45 = ${p.datos?.salario45} (tipo ${typeof p.datos?.salario45})`} style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a" }}>{salario ? salario.toLocaleString("es-ES") + " €/mes" : "—"}</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a" }}>{salario ? salario.toLocaleString("es-ES") + " €/mes" : "—"}</div>
                   </div>
-                  {/* v101: 3 botones grandes abajo (Opción B) */}
+                  {/* Botones fila 1: Renombrar / Duplicar / (Modificar o Cargar) */}
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 4 }}>
                     <button
                       onClick={async () => {
@@ -8861,13 +8915,21 @@ function ModalCargarPerfil({ perfiles, cargando, onCerrar, onCargar, onBorrarSel
                       style={{ background: "transparent", color: "#666", border: "1px solid #ccc", padding: "6px 4px", borderRadius: 3, fontSize: 9, fontWeight: 700, cursor: "pointer", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}
                       title="Duplicar este perfil"
                     >📋 Duplicar</button>
-                    <button
-                      onClick={() => onCargar(p)}
-                      style={{ background: "#4ec9b8", color: "#f2f5f7", border: "none", padding: "6px 4px", borderRadius: 3, fontSize: 9, fontWeight: 700, cursor: "pointer", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}
-                      title="Cargar este perfil en el formulario"
-                    >📂 Cargar</button>
+                    {esEnEdicion ? (
+                      <button
+                        onClick={() => { if (onModificar) onModificar(); }}
+                        style={{ background: "#2196f3", color: "#fff", border: "none", padding: "6px 4px", borderRadius: 3, fontSize: 9, fontWeight: 700, cursor: "pointer", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}
+                        title="Sobrescribir este perfil con los datos actuales"
+                      >💾 Modificar</button>
+                    ) : (
+                      <button
+                        onClick={() => onCargar(p)}
+                        style={{ background: "#4ec9b8", color: "#0a0a0a", border: "none", padding: "6px 4px", borderRadius: 3, fontSize: 9, fontWeight: 700, cursor: "pointer", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}
+                        title="Cargar este perfil en el formulario"
+                      >📂 Cargar</button>
+                    )}
                   </div>
-                  {fecha && <div style={{ fontSize: 8, color: "#999", marginTop: 6, letterSpacing: "0.03em" }}>{fecha}{p.autor ? ` · por ${p.autor}` : ""}</div>}
+                  {fecha && <div style={{ fontSize: 8, color: "#999", marginTop: 6, letterSpacing: "0.03em", textAlign: "center" }}>{fecha}{p.autor ? ` · por ${p.autor}` : ""}</div>}
                 </div>
               );
             })}
