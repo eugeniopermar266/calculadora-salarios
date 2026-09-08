@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v120";
+const APP_VERSION = "v121";
 
 // v97: Departamentos de un rodaje audiovisual (obligatorio en cada perfil)
 const DEPARTAMENTOS = [
@@ -2735,7 +2735,9 @@ function DocumentoImprimible({
         <tbody>
           <tr>
             <td style={{ width: "45%", verticalAlign: "middle", padding: 0 }}>
-              <img src="/logo.png" alt="Bdprodtools" style={{ height: 50, width: "auto", display: "block" }} />
+              <div style={{ background: "#1a1a1a", padding: "10px 14px", borderRadius: 4, display: "inline-block" }}>
+                <img src="/logo.png" alt="Bdprodtools" style={{ height: 40, width: "auto", display: "block" }} />
+              </div>
             </td>
             <td style={{ width: "55%", verticalAlign: "middle", padding: 0, textAlign: "right" }}>
               <div style={{ fontSize: 8, color: "#888", letterSpacing: "0.3em", textTransform: "uppercase", marginBottom: 3 }}>
