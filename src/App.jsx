@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v116";
+const APP_VERSION = "v117";
 
 // v97: Departamentos de un rodaje audiovisual (obligatorio en cada perfil)
 const DEPARTAMENTOS = [
@@ -6611,17 +6611,17 @@ function PanelAdmin({ usuarioActual, onCerrar }) {
   const usuariosInactivos = usuarios.filter(u => u.activo === false);
   const usuariosOrdenados = [...usuariosActivos, ...usuariosInactivos];
 
-  const C = { padding: "8px 10px", fontSize: 11, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", borderBottom: "1px solid #eae7e2" };
+  const C = { padding: "8px 10px", fontSize: 11, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", borderBottom: "1px solid #eef1f3" };
   const TH = { ...C, fontSize: 9, letterSpacing: "0.12em", textTransform: "uppercase", color: "#666", fontWeight: 700, textAlign: "left", borderBottom: "1px solid #d5d9dc" };
-  const inp = { padding: "6px 8px", fontSize: 11, border: "1px solid #c0bcb5", borderRadius: 4, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", boxSizing: "border-box" };
-  const btn = (bg, color = "#fff") => ({ padding: "6px 12px", fontSize: 10, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", background: bg, color, border: "none", borderRadius: 4, cursor: "pointer" });
-  const btnSm = (bg, color = "#fff") => ({ padding: "4px 9px", fontSize: 9, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", background: bg, color, border: "none", borderRadius: 3, cursor: "pointer" });
+  const inp = { padding: "6px 8px", fontSize: 11, border: "1px solid #d5d9dc", borderRadius: 4, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", boxSizing: "border-box" };
+  const btn = (bg, color = "#fff") => ({ padding: "6px 12px", fontSize: 10, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", background: bg, color, border: "none", borderRadius: 4, cursor: "pointer" });
+  const btnSm = (bg, color = "#fff") => ({ padding: "4px 9px", fontSize: 9, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", background: bg, color, border: "none", borderRadius: 3, cursor: "pointer" });
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 1000, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: 20, overflowY: "auto" }}>
       <div style={{ background: "#dfe4e8", borderRadius: 10, padding: 24, maxWidth: 900, width: "100%", marginTop: 40, boxShadow: "0 20px 60px rgba(0,0,0,0.5)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-          <h2 style={{ margin: 0, fontSize: 14, letterSpacing: "0.15em", textTransform: "uppercase", color: "#1a1a1a", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>⚙ Gestión de Usuarios</h2>
+          <h2 style={{ margin: 0, fontSize: 14, letterSpacing: "0.15em", textTransform: "uppercase", color: "#1a1a1a", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>⚙ Gestión de Usuarios</h2>
           <button onClick={onCerrar} style={btn("#1a1a1a")}>✕ Cerrar</button>
         </div>
 
@@ -6629,15 +6629,15 @@ function PanelAdmin({ usuarioActual, onCerrar }) {
 
         <div style={{ marginBottom: 12 }}>
           {!mostrarNuevo ? (
-            <button onClick={() => setMostrarNuevo(true)} style={btn("#5a8a5a")}>+ Añadir usuario</button>
+            <button onClick={() => setMostrarNuevo(true)} style={btn("#4ec9b8")}>+ Añadir usuario</button>
           ) : (
             <div style={{ padding: 12, background: "#f2f5f7", borderRadius: 6, border: "1px solid #d5d9dc", display: "grid", gridTemplateColumns: "1fr 100px auto auto auto", gap: 8, alignItems: "center" }}>
               <input style={inp} placeholder="Nombre" value={nuevoForm.nombre} onChange={e => setNuevoForm({ ...nuevoForm, nombre: e.target.value })} />
               <input style={inp} placeholder="PIN" value={nuevoForm.pin} onChange={e => setNuevoForm({ ...nuevoForm, pin: e.target.value })} />
-              <label style={{ fontSize: 10, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", display: "flex", alignItems: "center", gap: 4 }}>
+              <label style={{ fontSize: 10, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", display: "flex", alignItems: "center", gap: 4 }}>
                 <input type="checkbox" checked={nuevoForm.es_admin} onChange={e => setNuevoForm({ ...nuevoForm, es_admin: e.target.checked })} /> Admin
               </label>
-              <button onClick={onAdd} style={btn("#5a8a5a")}>Guardar</button>
+              <button onClick={onAdd} style={btn("#4ec9b8")}>Guardar</button>
               <button onClick={() => { setMostrarNuevo(false); setNuevoForm({ nombre: "", pin: "", es_admin: false }); }} style={btn("#888")}>Cancelar</button>
             </div>
           )}
@@ -6672,14 +6672,14 @@ function PanelAdmin({ usuarioActual, onCerrar }) {
                         </td>
                         <td style={{ ...C, textAlign: "center", color: "#888", fontSize: 9 }}>—</td>
                         <td style={{ ...C, textAlign: "right" }}>
-                          <button onClick={onSaveEdit} style={{ ...btn("#5a8a5a"), marginRight: 4 }}>✓</button>
+                          <button onClick={onSaveEdit} style={{ ...btn("#4ec9b8"), marginRight: 4 }}>✓</button>
                           <button onClick={() => setEditando(null)} style={btn("#888")}>✕</button>
                         </td>
                       </tr>
                     );
                   }
                   return (
-                    <tr key={u.id} style={inactivo ? { opacity: 0.55, background: "#fafaf7" } : {}}>
+                    <tr key={u.id} style={inactivo ? { opacity: 0.55, background: "#f2f5f7" } : {}}>
                       <td style={{ ...C, fontWeight: u.id === usuarioActual.id ? 700 : 400, color: inactivo ? "#888" : "#1a1a1a" }}>
                         {u.nombre}
                         {u.id === usuarioActual.id && <span style={{ fontSize: 9, color: "#888", marginLeft: 6 }}>(tú)</span>}
@@ -6687,18 +6687,18 @@ function PanelAdmin({ usuarioActual, onCerrar }) {
                       <td style={{ ...C, color: inactivo ? "#aaa" : "#888" }}>••••</td>
                       <td style={{ ...C, textAlign: "center", fontSize: 10 }}>
                         {u.rol === "admin" || u.es_admin ? (
-                          <span style={{ background: "rgba(200,150,58,0.15)", color: "#4ec9b8", padding: "2px 7px", borderRadius: 3, fontSize: 9, fontWeight: 700, letterSpacing: "0.05em" }}>ADMIN</span>
+                          <span style={{ background: "#2196f3", color: "#fff", padding: "3px 10px", borderRadius: 5, fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", fontFamily: "'Inter', sans-serif" }}>ADMIN</span>
                         ) : u.rol === "coordinador" ? (
-                          <span style={{ background: "rgba(90,138,90,0.15)", color: "#3a6a3a", padding: "2px 7px", borderRadius: 3, fontSize: 9, fontWeight: 700, letterSpacing: "0.05em" }}>COORDINADOR</span>
+                          <span style={{ background: "rgba(78,201,184,0.15)", color: "#1a1a1a", padding: "3px 10px", borderRadius: 5, fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", fontFamily: "'Inter', sans-serif" }}>COORDINADOR</span>
                         ) : (
-                          <span style={{ color: "#999", fontSize: 9 }}>user</span>
+                          <span style={{ background: "#f2f5f7", color: "#666", padding: "3px 10px", borderRadius: 5, fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", fontFamily: "'Inter', sans-serif", border: "1px solid #d5d9dc" }}>USER</span>
                         )}
                       </td>
                       <td style={{ ...C, textAlign: "center" }}>
                         {inactivo ? (
-                          <span style={{ background: "rgba(136,136,136,0.15)", color: "#666", padding: "2px 7px", borderRadius: 3, fontSize: 9, fontWeight: 700, letterSpacing: "0.05em" }}>⊘ INACTIVO</span>
+                          <span style={{ background: "#f2f5f7", color: "#888", padding: "3px 10px", borderRadius: 5, fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", fontFamily: "'Inter', sans-serif", border: "1px solid #d5d9dc" }}>⊘ INACTIVO</span>
                         ) : (
-                          <span style={{ background: "rgba(90,138,90,0.15)", color: "#2a6e2a", padding: "2px 7px", borderRadius: 3, fontSize: 9, fontWeight: 700, letterSpacing: "0.05em" }}>✓ ACTIVO</span>
+                          <span style={{ background: "rgba(78,201,184,0.2)", color: "#1a1a1a", padding: "3px 10px", borderRadius: 5, fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", fontFamily: "'Inter', sans-serif" }}>✓ ACTIVO</span>
                         )}
                       </td>
                       <td style={{ ...C, textAlign: "right", whiteSpace: "nowrap" }}>
@@ -6720,7 +6720,7 @@ function PanelAdmin({ usuarioActual, onCerrar }) {
           </div>
         )}
 
-        <div style={{ marginTop: 14, fontSize: 9, color: "#888", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", letterSpacing: "0.05em", textAlign: "center" }}>
+        <div style={{ marginTop: 14, fontSize: 9, color: "#888", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", letterSpacing: "0.05em", textAlign: "center" }}>
           {usuariosActivos.length} activo{usuariosActivos.length !== 1 ? "s" : ""} · {usuariosInactivos.length} inactivo{usuariosInactivos.length !== 1 ? "s" : ""} · {usuarios.length} total{usuarios.length !== 1 ? "es" : ""}
         </div>
       </div>
@@ -6764,7 +6764,7 @@ function PanelLogs({ usuarioActual, onCerrar }) {
   };
 
   const tipoLabel = (t) => {
-    if (t === "login") return { txt: "🔓 LOGIN", color: "#5a8a5a" };
+    if (t === "login") return { txt: "🔓 LOGIN", color: "#4ec9b8" };
     if (t === "export_csv") return { txt: "📄 CSV", color: "#4ec9b8" };
     if (t === "export_pdf") return { txt: "📑 PDF", color: "#a04545" };
     return { txt: t, color: "#666" };
@@ -6801,10 +6801,10 @@ function PanelLogs({ usuarioActual, onCerrar }) {
     } catch (err) { alert("Error: " + err.message); }
   };
 
-  const C = { padding: "7px 10px", fontSize: 10.5, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", borderBottom: "1px solid #eae7e2", verticalAlign: "top" };
+  const C = { padding: "7px 10px", fontSize: 10.5, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", borderBottom: "1px solid #eef1f3", verticalAlign: "top" };
   const TH = { ...C, fontSize: 9, letterSpacing: "0.12em", textTransform: "uppercase", color: "#666", fontWeight: 700, textAlign: "left", borderBottom: "1px solid #d5d9dc", whiteSpace: "nowrap" };
-  const inp = { padding: "6px 8px", fontSize: 11, border: "1px solid #c0bcb5", borderRadius: 4, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", background: "#f2f5f7" };
-  const btn = (bg, color = "#fff") => ({ padding: "6px 12px", fontSize: 10, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", background: bg, color, border: "none", borderRadius: 4, cursor: "pointer" });
+  const inp = { padding: "6px 8px", fontSize: 11, border: "1px solid #d5d9dc", borderRadius: 4, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", background: "#f2f5f7" };
+  const btn = (bg, color = "#fff") => ({ padding: "6px 12px", fontSize: 10, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", background: bg, color, border: "none", borderRadius: 4, cursor: "pointer" });
 
   // Lista de usuarios únicos para el dropdown
   const usuariosUnicos = [...new Set(logs.map(l => l.usuario_nombre).filter(Boolean))].sort();
@@ -6813,7 +6813,7 @@ function PanelLogs({ usuarioActual, onCerrar }) {
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 1000, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: 20, overflowY: "auto" }}>
       <div style={{ background: "#dfe4e8", borderRadius: 10, padding: 24, maxWidth: 1000, width: "100%", marginTop: 40, boxShadow: "0 20px 60px rgba(0,0,0,0.5)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-          <h2 style={{ margin: 0, fontSize: 14, letterSpacing: "0.15em", textTransform: "uppercase", color: "#1a1a1a", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>📊 Logs de Actividad</h2>
+          <h2 style={{ margin: 0, fontSize: 14, letterSpacing: "0.15em", textTransform: "uppercase", color: "#1a1a1a", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>📊 Logs de Actividad</h2>
           <button onClick={onCerrar} style={btn("#1a1a1a")}>✕ Cerrar</button>
         </div>
 
@@ -6838,7 +6838,7 @@ function PanelLogs({ usuarioActual, onCerrar }) {
           </select>
           <button onClick={recargar} style={btn("#888")}>🔄 Refrescar</button>
           <div style={{ flex: 1 }} />
-          <button onClick={exportarLogsCSV} style={btn("#5a8a5a")} disabled={logs.length === 0}>↓ Exportar CSV</button>
+          <button onClick={exportarLogsCSV} style={btn("#4ec9b8")} disabled={logs.length === 0}>↓ Exportar CSV</button>
           <button onClick={limpiarAntiguos} style={btn("#a04545")}>🗑 Limpiar +30d</button>
         </div>
 
@@ -6874,7 +6874,7 @@ function PanelLogs({ usuarioActual, onCerrar }) {
           </div>
         )}
 
-        <div style={{ marginTop: 12, fontSize: 9, color: "#888", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", letterSpacing: "0.05em", textAlign: "center" }}>
+        <div style={{ marginTop: 12, fontSize: 9, color: "#888", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", letterSpacing: "0.05em", textAlign: "center" }}>
           Mostrando {logs.length} registro{logs.length !== 1 ? "s" : ""}
         </div>
       </div>
@@ -7076,7 +7076,7 @@ function PanelPuestos({ usuarioActual, onCerrar }) {
   };
   const modalStyle = {
     background: "#dfe4e8", borderRadius: 8, maxWidth: 1100, width: "100%",
-    fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", color: "#1a1a1a",
+    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", color: "#1a1a1a",
     boxShadow: "0 10px 40px rgba(0,0,0,0.5)",
   };
   const headerStyle = {
@@ -7087,14 +7087,14 @@ function PanelPuestos({ usuarioActual, onCerrar }) {
   const btnStyle = {
     background: "transparent", color: "#4ec9b8", border: "1px solid #4ec9b8",
     padding: "5px 12px", borderRadius: 4, cursor: "pointer",
-    fontSize: 10, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace",
+    fontSize: 10, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
     fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase",
   };
   const btnDanger = { ...btnStyle, color: "#c85050", borderColor: "#c85050" };
-  const btnOk = { ...btnStyle, color: "#5a8a5a", borderColor: "#5a8a5a" };
+  const btnOk = { ...btnStyle, color: "#4ec9b8", borderColor: "#4ec9b8" };
   const inp = {
-    padding: "7px 10px", border: "1px solid #c0bcb5", borderRadius: 4,
-    fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize: 11, background: "#f2f5f7",
+    padding: "7px 10px", border: "1px solid #d5d9dc", borderRadius: 4,
+    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontSize: 11, background: "#f2f5f7",
   };
 
   return (
@@ -7105,17 +7105,17 @@ function PanelPuestos({ usuarioActual, onCerrar }) {
             <div style={{ fontSize: 9, color: "#4ec9b8", letterSpacing: "0.2em", textTransform: "uppercase" }}>Panel admin</div>
             <div style={{ fontSize: 14, fontWeight: 700, marginTop: 2 }}>📋 Puestos COAC</div>
           </div>
-          <button onClick={onCerrar} style={{ background: "transparent", color: "#aaa", border: "1px solid #444", padding: "6px 14px", borderRadius: 4, cursor: "pointer", fontSize: 10, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>Cerrar</button>
+          <button onClick={onCerrar} style={{ background: "transparent", color: "#aaa", border: "1px solid #444", padding: "6px 14px", borderRadius: 4, cursor: "pointer", fontSize: 10, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>Cerrar</button>
         </div>
 
         <div style={{ padding: 20 }}>
           {error && <div style={{ background: "#fde6e6", border: "1px solid #d8a0a0", color: "#7a2020", padding: "10px 14px", borderRadius: 4, marginBottom: 14, fontSize: 11 }}>{error}</div>}
-          {mensaje && <div style={{ background: mensaje.tipo === "ok" ? "#e6f4e6" : "#fde6e6", border: `1px solid ${mensaje.tipo === "ok" ? "#a0d0a0" : "#d8a0a0"}`, color: mensaje.tipo === "ok" ? "#2a5a2a" : "#7a2020", padding: "10px 14px", borderRadius: 4, marginBottom: 14, fontSize: 11 }}>{mensaje.texto}</div>}
+          {mensaje && <div style={{ background: mensaje.tipo === "ok" ? "#e6f4e6" : "#fde6e6", border: `1px solid ${mensaje.tipo === "ok" ? "#4ec9b8" : "#d8a0a0"}`, color: mensaje.tipo === "ok" ? "#2a5a2a" : "#7a2020", padding: "10px 14px", borderRadius: 4, marginBottom: 14, fontSize: 11 }}>{mensaje.texto}</div>}
 
           {/* Preview de importación */}
           {previewImport && (
             <div style={{ background: "#fff3d6", border: "2px solid #4ec9b8", borderRadius: 6, padding: 16, marginBottom: 18 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "#7a5a2a", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 10 }}>⚠ Confirmar importación</div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#1a1a1a", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 10 }}>⚠ Confirmar importación</div>
               <div style={{ fontSize: 12, marginBottom: 10 }}>
                 Archivo: <strong>{previewImport.nombreArchivo}</strong><br/>
                 Puestos a cargar: <strong>{previewImport.puestos.length}</strong><br/>
@@ -7166,7 +7166,7 @@ function PanelPuestos({ usuarioActual, onCerrar }) {
           {/* Formulario nuevo */}
           {mostrarFormNuevo && (
             <div style={{ background: "#f2f5f7", border: "1px solid #4ec9b8", borderRadius: 6, padding: 14, marginBottom: 14 }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: "#7a5a2a", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 8 }}>Nuevo puesto</div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: "#1a1a1a", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 8 }}>Nuevo puesto</div>
               <div style={{ display: "grid", gridTemplateColumns: "150px 1fr 1fr auto", gap: 8 }}>
                 <input type="text" placeholder="Código" value={formNuevo.codigo} onChange={e => setFormNuevo({ ...formNuevo, codigo: e.target.value })} style={inp} />
                 <input type="text" placeholder="Nombre" value={formNuevo.nombre} onChange={e => setFormNuevo({ ...formNuevo, nombre: e.target.value })} style={inp} />
@@ -7193,7 +7193,7 @@ function PanelPuestos({ usuarioActual, onCerrar }) {
                 </div>
               ) : (
                 puestosFiltrados.map(p => editandoId === p.id ? (
-                  <div key={p.id} style={{ display: "grid", gridTemplateColumns: "130px 1fr 1fr 110px", gap: 8, padding: "7px 12px", borderBottom: "1px solid #eae7e2", background: "#fff8e6", alignItems: "center" }}>
+                  <div key={p.id} style={{ display: "grid", gridTemplateColumns: "130px 1fr 1fr 110px", gap: 8, padding: "7px 12px", borderBottom: "1px solid #eef1f3", background: "#fff8e6", alignItems: "center" }}>
                     <input type="text" value={formEdit.codigo} onChange={e => setFormEdit({ ...formEdit, codigo: e.target.value })} style={{ ...inp, padding: "4px 6px" }} />
                     <input type="text" value={formEdit.nombre} onChange={e => setFormEdit({ ...formEdit, nombre: e.target.value })} style={{ ...inp, padding: "4px 6px" }} />
                     <input type="text" value={formEdit.categoria} onChange={e => setFormEdit({ ...formEdit, categoria: e.target.value })} list="cats-edit" style={{ ...inp, padding: "4px 6px" }} />
@@ -7206,8 +7206,8 @@ function PanelPuestos({ usuarioActual, onCerrar }) {
                     </div>
                   </div>
                 ) : (
-                  <div key={p.id} style={{ display: "grid", gridTemplateColumns: "130px 1fr 1fr 110px", gap: 8, padding: "7px 12px", borderBottom: "1px solid #eae7e2", fontSize: 11, alignItems: "center" }}>
-                    <div style={{ color: "#888", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>{p.codigo}</div>
+                  <div key={p.id} style={{ display: "grid", gridTemplateColumns: "130px 1fr 1fr 110px", gap: 8, padding: "7px 12px", borderBottom: "1px solid #eef1f3", fontSize: 11, alignItems: "center" }}>
+                    <div style={{ color: "#888", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>{p.codigo}</div>
                     <div style={{ fontWeight: 700 }}>{p.nombre}</div>
                     <div style={{ color: "#666", fontSize: 10 }}>{p.categoria}</div>
                     <div style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}>
@@ -7225,7 +7225,7 @@ function PanelPuestos({ usuarioActual, onCerrar }) {
             {categorias.length > 0 && ` · ${categorias.length} categorías`}
           </div>
 
-          <div style={{ marginTop: 14, padding: "10px 14px", background: "#fafaf7", borderRadius: 4, border: "1px solid #d5d9dc", fontSize: 10, color: "#666", lineHeight: 1.6 }}>
+          <div style={{ marginTop: 14, padding: "10px 14px", background: "#f2f5f7", borderRadius: 4, border: "1px solid #d5d9dc", fontSize: 10, color: "#666", lineHeight: 1.6 }}>
             <strong style={{ color: "#444" }}>Formato Excel:</strong> El importador acepta el formato original del Listado COAC: columna A "CODIGO CONTABLE", columna B "EQUIPO TECNICO", con filas de categoría intercaladas (código vacío, nombre = categoría).<br/>
             <strong style={{ color: "#a04545" }}>⚠ Importar REEMPLAZA todos los puestos existentes.</strong> Exporta primero un backup si quieres conservarlos.
           </div>
@@ -8732,11 +8732,11 @@ function ModalCargarPerfil({ perfiles, cargando, onCerrar, onCargar, onBorrarSel
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 100, display: "flex", justifyContent: "center", alignItems: "flex-start", padding: 20, overflow: "auto" }} onClick={onCerrar}>
-      <div style={{ background: "#e8ecef", borderRadius: 8, padding: 24, maxWidth: 1100, width: "100%", maxHeight: "90vh", overflow: "auto", fontFamily: "'Courier Prime', 'Courier New', monospace" }} onClick={e => e.stopPropagation()}>
+      <div style={{ background: "#e8ecef", borderRadius: 8, padding: 24, maxWidth: 1100, width: "100%", maxHeight: "90vh", overflow: "auto", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }} onClick={e => e.stopPropagation()}>
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, paddingBottom: 12, borderBottom: "2px solid #4ec9b8" }}>
           <h2 style={{ margin: 0, fontSize: 15, letterSpacing: "0.15em", textTransform: "uppercase", color: "#1a1a1a", fontWeight: 700 }}>📂 Cargar perfil</h2>
-          <button onClick={onCerrar} style={{ background: "#f2f5f7", border: "1px solid #4ec9b8", padding: "6px 14px", borderRadius: 4, cursor: "pointer", fontSize: 11, color: "#4ec9b8", fontFamily: "'Courier Prime', 'Courier New', monospace", fontWeight: 700 }}>✕ Cerrar</button>
+          <button onClick={onCerrar} style={{ background: "#f2f5f7", border: "1px solid #4ec9b8", padding: "6px 14px", borderRadius: 4, cursor: "pointer", fontSize: 11, color: "#4ec9b8", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontWeight: 700 }}>✕ Cerrar</button>
         </div>
 
         {/* Filtros y acciones */}
@@ -8745,7 +8745,7 @@ function ModalCargarPerfil({ perfiles, cargando, onCerrar, onCargar, onBorrarSel
             <span style={{ fontSize: 10, color: "#666", letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 700 }}>Tipo:</span>
             {["todos", "45h", "40h"].map(t => (
               <button key={t} onClick={() => setFiltroTipo(t)}
-                style={{ padding: "6px 14px", fontSize: 10, border: `1px solid ${filtroTipo === t ? "#4ec9b8" : "#ccc"}`, borderRadius: 4, background: filtroTipo === t ? "#4ec9b8" : "#f2f5f7", color: filtroTipo === t ? "#f2f5f7" : "#666", cursor: "pointer", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", fontFamily: "'Courier Prime', 'Courier New', monospace" }}>
+                style={{ padding: "6px 14px", fontSize: 10, border: `1px solid ${filtroTipo === t ? "#4ec9b8" : "#ccc"}`, borderRadius: 4, background: filtroTipo === t ? "#4ec9b8" : "#f2f5f7", color: filtroTipo === t ? "#f2f5f7" : "#666", cursor: "pointer", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>
                 {t}
               </button>
             ))}
@@ -8753,7 +8753,7 @@ function ModalCargarPerfil({ perfiles, cargando, onCerrar, onCargar, onBorrarSel
           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
             <span style={{ fontSize: 10, color: "#666", letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 700 }}>Depto:</span>
             <select value={filtroDepto} onChange={(e) => setFiltroDepto(e.target.value)}
-              style={{ padding: "6px 10px", fontSize: 11, border: "1px solid #4ec9b8", borderRadius: 4, background: "#f2f5f7", fontFamily: "'Courier Prime', 'Courier New', monospace", color: "#1a1a1a", cursor: "pointer" }}>
+              style={{ padding: "6px 10px", fontSize: 11, border: "1px solid #4ec9b8", borderRadius: 4, background: "#f2f5f7", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", color: "#1a1a1a", cursor: "pointer" }}>
               <option value="__todos__">Todos</option>
               {conteoDeptos["__sin__"] > 0 && <option value="__sin__">— Sin depto — ({conteoDeptos["__sin__"]})</option>}
               {DEPARTAMENTOS.map(d => conteoDeptos[d] > 0 ? <option key={d} value={d}>{d} ({conteoDeptos[d]})</option> : null)}
@@ -8762,13 +8762,13 @@ function ModalCargarPerfil({ perfiles, cargando, onCerrar, onCargar, onBorrarSel
           <div style={{ flex: 1 }}></div>
           {perfilesFiltrados.length > 0 && (
             <>
-              <button onClick={seleccionarTodos} style={{ fontSize: 10, padding: "5px 12px", border: "1px solid #4ec9b8", borderRadius: 4, background: "#f2f5f7", cursor: "pointer", color: "#4ec9b8", fontFamily: "'Courier Prime', 'Courier New', monospace", fontWeight: 700 }}>Todos</button>
-              <button onClick={deseleccionarTodos} style={{ fontSize: 10, padding: "5px 12px", border: "1px solid #ccc", borderRadius: 4, background: "#f2f5f7", cursor: "pointer", color: "#666", fontFamily: "'Courier Prime', 'Courier New', monospace", fontWeight: 700 }}>Ninguno</button>
+              <button onClick={seleccionarTodos} style={{ fontSize: 10, padding: "5px 12px", border: "1px solid #4ec9b8", borderRadius: 4, background: "#f2f5f7", cursor: "pointer", color: "#4ec9b8", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontWeight: 700 }}>Todos</button>
+              <button onClick={deseleccionarTodos} style={{ fontSize: 10, padding: "5px 12px", border: "1px solid #ccc", borderRadius: 4, background: "#f2f5f7", cursor: "pointer", color: "#666", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontWeight: 700 }}>Ninguno</button>
             </>
           )}
           {seleccionados.size > 0 && (
             <button onClick={borrarSeleccionados} disabled={borrando}
-              style={{ padding: "8px 14px", fontSize: 10, border: "1px solid #c04040", borderRadius: 4, background: "#c04040", color: "#f2f5f7", cursor: borrando ? "wait" : "pointer", fontWeight: 700, letterSpacing: "0.08em", fontFamily: "'Courier Prime', 'Courier New', monospace" }}>
+              style={{ padding: "8px 14px", fontSize: 10, border: "1px solid #c04040", borderRadius: 4, background: "#c04040", color: "#f2f5f7", cursor: borrando ? "wait" : "pointer", fontWeight: 700, letterSpacing: "0.08em", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>
               🗑 Borrar {seleccionados.size}
             </button>
           )}
@@ -8811,7 +8811,7 @@ function ModalCargarPerfil({ perfiles, cargando, onCerrar, onCargar, onBorrarSel
                         if (!nuevo || !nuevo.trim() || nuevo.trim() === p.nombre) return;
                         if (onRenombrar) await onRenombrar(p, nuevo.trim());
                       }}
-                      style={{ background: "transparent", color: "#666", border: "1px solid #ccc", padding: "6px 4px", borderRadius: 3, fontSize: 9, fontWeight: 700, cursor: "pointer", fontFamily: "'Courier Prime', 'Courier New', monospace" }}
+                      style={{ background: "transparent", color: "#666", border: "1px solid #ccc", padding: "6px 4px", borderRadius: 3, fontSize: 9, fontWeight: 700, cursor: "pointer", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}
                       title="Renombrar el nombre del perfil guardado"
                     >✎ Renombrar</button>
                     <button
@@ -8819,12 +8819,12 @@ function ModalCargarPerfil({ perfiles, cargando, onCerrar, onCargar, onBorrarSel
                         if (!confirm(`¿Duplicar "${p.nombre}" como "${p.nombre} (copia)"?`)) return;
                         if (onDuplicar) await onDuplicar(p);
                       }}
-                      style={{ background: "transparent", color: "#666", border: "1px solid #ccc", padding: "6px 4px", borderRadius: 3, fontSize: 9, fontWeight: 700, cursor: "pointer", fontFamily: "'Courier Prime', 'Courier New', monospace" }}
+                      style={{ background: "transparent", color: "#666", border: "1px solid #ccc", padding: "6px 4px", borderRadius: 3, fontSize: 9, fontWeight: 700, cursor: "pointer", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}
                       title="Duplicar este perfil"
                     >📋 Duplicar</button>
                     <button
                       onClick={() => onCargar(p)}
-                      style={{ background: "#5a8a5a", color: "#f2f5f7", border: "none", padding: "6px 4px", borderRadius: 3, fontSize: 9, fontWeight: 700, cursor: "pointer", fontFamily: "'Courier Prime', 'Courier New', monospace" }}
+                      style={{ background: "#4ec9b8", color: "#f2f5f7", border: "none", padding: "6px 4px", borderRadius: 3, fontSize: 9, fontWeight: 700, cursor: "pointer", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}
                       title="Cargar este perfil en el formulario"
                     >📂 Cargar</button>
                   </div>
@@ -9203,14 +9203,14 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 100, display: "flex", justifyContent: "center", alignItems: "flex-start", padding: 20, overflow: "auto" }}>
-      <div style={{ background: "#e8ecef", borderRadius: 8, padding: 24, maxWidth: 900, width: "100%", maxHeight: "90vh", overflow: "auto", fontFamily: "'Courier Prime', 'Courier New', monospace" }}>
+      <div style={{ background: "#e8ecef", borderRadius: 8, padding: 24, maxWidth: 900, width: "100%", maxHeight: "90vh", overflow: "auto", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, paddingBottom: 12, borderBottom: "2px solid #4ec9b8" }}>
           <h2 style={{ margin: 0, fontSize: 14, letterSpacing: "0.15em", textTransform: "uppercase", color: "#1a1a1a", fontWeight: 700 }}>📊 Exportar listado de perfiles</h2>
-          <button onClick={onCerrar} style={{ background: "#f2f5f7", border: "1px solid #4ec9b8", padding: "6px 14px", borderRadius: 4, cursor: "pointer", fontSize: 11, color: "#4ec9b8", fontFamily: "'Courier Prime', 'Courier New', monospace", fontWeight: 700 }}>✕ Cerrar</button>
+          <button onClick={onCerrar} style={{ background: "#f2f5f7", border: "1px solid #4ec9b8", padding: "6px 14px", borderRadius: 4, cursor: "pointer", fontSize: 11, color: "#4ec9b8", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontWeight: 700 }}>✕ Cerrar</button>
         </div>
 
         {mensaje && (
-          <div style={{ padding: "10px 14px", marginBottom: 14, borderRadius: 4, background: mensaje.tipo === "ok" ? "#e6f4e6" : (mensaje.tipo === "info" ? "#e8eef7" : "#fce8e8"), color: mensaje.tipo === "ok" ? "#2a6e2a" : (mensaje.tipo === "info" ? "#1a1a1a" : "#c00"), fontSize: 11, border: `1px solid ${mensaje.tipo === "ok" ? "#a0d0a0" : (mensaje.tipo === "info" ? "#a0b8d8" : "#e0a0a0")}` }}>{mensaje.texto}</div>
+          <div style={{ padding: "10px 14px", marginBottom: 14, borderRadius: 4, background: mensaje.tipo === "ok" ? "#e6f4e6" : (mensaje.tipo === "info" ? "#e8eef7" : "#fce8e8"), color: mensaje.tipo === "ok" ? "#2a6e2a" : (mensaje.tipo === "info" ? "#1a1a1a" : "#c00"), fontSize: 11, border: `1px solid ${mensaje.tipo === "ok" ? "#4ec9b8" : (mensaje.tipo === "info" ? "#4ec9b8" : "#e0a0a0")}` }}>{mensaje.texto}</div>
         )}
         {error && (
           <div style={{ padding: "10px 14px", marginBottom: 14, borderRadius: 4, background: "#fce8e8", color: "#c00", fontSize: 11, border: "1px solid #e0a0a0" }}>⚠ {error}</div>
@@ -9226,7 +9226,7 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
                 {proyectos.length === 0 && <div style={{ fontSize: 11, color: "#888", padding: 20, textAlign: "center" }}>No hay proyectos disponibles.</div>}
                 {proyectos.map(p => (
                   <button key={p.id} onClick={() => cargarPerfiles(p)}
-                    style={{ background: "#f2f5f7", border: "1px solid #d5d9dc", borderRadius: 5, padding: "12px 16px", cursor: "pointer", textAlign: "left", fontFamily: "'Courier Prime', 'Courier New', monospace", transition: "all 0.15s", display: "flex", justifyContent: "space-between", alignItems: "center" }}
+                    style={{ background: "#f2f5f7", border: "1px solid #d5d9dc", borderRadius: 5, padding: "12px 16px", cursor: "pointer", textAlign: "left", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", transition: "all 0.15s", display: "flex", justifyContent: "space-between", alignItems: "center" }}
                     onMouseEnter={e => { e.currentTarget.style.borderColor = "#4ec9b8"; e.currentTarget.style.background = "#faf6ee"; }}
                     onMouseLeave={e => { e.currentTarget.style.borderColor = "#d5d9dc"; e.currentTarget.style.background = "#f2f5f7"; }}
                   >
@@ -9251,7 +9251,7 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
                   <strong>{perfiles.length}</strong> perfil{perfiles.length !== 1 ? "es" : ""} · <strong>{seleccionados.size}</strong> seleccionado{seleccionados.size !== 1 ? "s" : ""}
                 </div>
               </div>
-              <button onClick={() => { setProyectoSel(null); setPerfiles([]); setSeleccionados(new Set()); setMensaje(null); setError(null); }} style={{ background: "#f2f5f7", border: "1px solid #ccc", padding: "6px 12px", borderRadius: 4, cursor: "pointer", fontSize: 10, fontFamily: "'Courier Prime', 'Courier New', monospace", color: "#666", fontWeight: 700 }}>← Cambiar proyecto</button>
+              <button onClick={() => { setProyectoSel(null); setPerfiles([]); setSeleccionados(new Set()); setMensaje(null); setError(null); }} style={{ background: "#f2f5f7", border: "1px solid #ccc", padding: "6px 12px", borderRadius: 4, cursor: "pointer", fontSize: 10, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", color: "#666", fontWeight: 700 }}>← Cambiar proyecto</button>
             </div>
 
             {cargando ? <div style={{ padding: 20, textAlign: "center", color: "#888" }}>Cargando perfiles…</div> : (
@@ -9259,9 +9259,9 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
                 {perfiles.length > 0 && (
                   <div style={{ display: "flex", gap: 6, marginBottom: 10, alignItems: "center", flexWrap: "wrap" }}>
                     <span style={{ fontSize: 10, color: "#666", letterSpacing: "0.05em", marginRight: 4 }}>Selección:</span>
-                    <button onClick={seleccionarTodos} style={{ fontSize: 10, padding: "5px 12px", border: "1px solid #4ec9b8", borderRadius: 4, background: "#f2f5f7", cursor: "pointer", color: "#4ec9b8", fontFamily: "'Courier Prime', 'Courier New', monospace", fontWeight: 700 }}>Todos</button>
-                    <button onClick={deseleccionarTodos} style={{ fontSize: 10, padding: "5px 12px", border: "1px solid #ccc", borderRadius: 4, background: "#f2f5f7", cursor: "pointer", color: "#666", fontFamily: "'Courier Prime', 'Courier New', monospace", fontWeight: 700 }}>Ninguno</button>
-                    <button onClick={invertirSeleccion} style={{ fontSize: 10, padding: "5px 12px", border: "1px solid #ccc", borderRadius: 4, background: "#f2f5f7", cursor: "pointer", color: "#666", fontFamily: "'Courier Prime', 'Courier New', monospace", fontWeight: 700 }}>Invertir</button>
+                    <button onClick={seleccionarTodos} style={{ fontSize: 10, padding: "5px 12px", border: "1px solid #4ec9b8", borderRadius: 4, background: "#f2f5f7", cursor: "pointer", color: "#4ec9b8", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontWeight: 700 }}>Todos</button>
+                    <button onClick={deseleccionarTodos} style={{ fontSize: 10, padding: "5px 12px", border: "1px solid #ccc", borderRadius: 4, background: "#f2f5f7", cursor: "pointer", color: "#666", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontWeight: 700 }}>Ninguno</button>
+                    <button onClick={invertirSeleccion} style={{ fontSize: 10, padding: "5px 12px", border: "1px solid #ccc", borderRadius: 4, background: "#f2f5f7", cursor: "pointer", color: "#666", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontWeight: 700 }}>Invertir</button>
                     <span style={{ fontSize: 9, color: "#999", marginLeft: 8, fontStyle: "italic" }}>Los ya exportados están en gris.</span>
                   </div>
                 )}
@@ -9270,7 +9270,7 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
                 {perfiles.length > 0 && (
                   <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 10, flexWrap: "wrap" }}>
                     <label style={{ fontSize: 10, color: "#666", letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 700 }}>Filtrar:</label>
-                    <select value={filtroDepto} onChange={(e) => setFiltroDepto(e.target.value)} style={{ padding: "5px 10px", fontSize: 11, border: "1px solid #4ec9b8", borderRadius: 4, background: "#f2f5f7", fontFamily: "'Courier Prime', 'Courier New', monospace", cursor: "pointer", color: "#1a1a1a" }}>
+                    <select value={filtroDepto} onChange={(e) => setFiltroDepto(e.target.value)} style={{ padding: "5px 10px", fontSize: 11, border: "1px solid #4ec9b8", borderRadius: 4, background: "#f2f5f7", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", cursor: "pointer", color: "#1a1a1a" }}>
                       <option value="__todos__">Todos los departamentos</option>
                       <option value="__sin__">— Sin departamento —</option>
                       {DEPARTAMENTOS.map(d => {
@@ -9283,7 +9283,7 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
                 )}
 
                 <div style={{ background: "#f2f5f7", border: "1px solid #d5d9dc", borderRadius: 5, maxHeight: 400, overflow: "auto" }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11, fontFamily: "'Courier Prime', 'Courier New', monospace" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>
                     <thead style={{ position: "sticky", top: 0, background: "#dfe4e8", zIndex: 1 }}>
                       <tr>
                         <th style={{ padding: "10px 6px", textAlign: "center", width: 32, borderBottom: "1px solid #d5d9dc", fontSize: 9 }}>✓</th>
@@ -9345,7 +9345,7 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
                       </div>
                     </div>
                     <button onClick={exportar} disabled={seleccionados.size === 0}
-                      style={{ background: seleccionados.size === 0 ? "#ccc" : "#5a8a5a", color: "#f2f5f7", border: "none", padding: "12px 24px", borderRadius: 5, cursor: seleccionados.size === 0 ? "not-allowed" : "pointer", fontFamily: "'Courier Prime', 'Courier New', monospace", fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>
+                      style={{ background: seleccionados.size === 0 ? "#ccc" : "#4ec9b8", color: "#f2f5f7", border: "none", padding: "12px 24px", borderRadius: 5, cursor: seleccionados.size === 0 ? "not-allowed" : "pointer", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>
                       📥 Exportar {seleccionados.size} perfil{seleccionados.size !== 1 ? "es" : ""}
                     </button>
                   </div>
@@ -10608,29 +10608,29 @@ function PanelFestivos({ usuarioActual, onCerrar, onCambios }) {
   const modal = {
     background: "#e8ecef", padding: 20, borderRadius: 6, maxWidth: 900, width: "92%",
     maxHeight: "88vh", overflowY: "auto", color: "#1a1a1a",
-    fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", border: "1px solid #4ec9b8",
+    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", border: "1px solid #4ec9b8",
   };
   const btnGold = {
     background: "#4ec9b8", color: "#f2f5f7", border: "none",
     padding: "6px 12px", borderRadius: 4, cursor: "pointer",
-    fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize: 11, fontWeight: 700,
+    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontSize: 11, fontWeight: 700,
     letterSpacing: "0.1em", textTransform: "uppercase",
   };
   const btnGhost = {
     background: "transparent", color: "#4ec9b8", border: "1px solid #4ec9b8",
     padding: "6px 12px", borderRadius: 4, cursor: "pointer",
-    fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize: 10, fontWeight: 700,
+    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontSize: 10, fontWeight: 700,
     letterSpacing: "0.1em", textTransform: "uppercase",
   };
   const inp = {
     padding: "6px 8px", border: "1px solid #d5d9dc", borderRadius: 4,
-    fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize: 12, background: "#f2f5f7",
+    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontSize: 12, background: "#f2f5f7",
     color: "#1a1a1a", colorScheme: "light",
   };
   const tipoColores = {
     nacional: "#8a3a3a",
     autonomico: "#1a1a1a",
-    territorial: "#7a5a2a",
+    territorial: "#1a1a1a",
     local: "#5a7a3a",
   };
   const fmtFecha = (f) => {
@@ -10646,7 +10646,7 @@ function PanelFestivos({ usuarioActual, onCerrar, onCambios }) {
       <div style={modal} onClick={e => e.stopPropagation()}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, borderBottom: "1px solid #d5d9dc", paddingBottom: 10 }}>
           <h2 style={{ margin: 0, fontSize: 14, letterSpacing: "0.15em", textTransform: "uppercase", color: "#1a1a1a" }}>📅 Calendario de Festivos</h2>
-          <button onClick={onCerrar} style={{ background: "transparent", color: "#888", border: "1px solid #ccc", padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>Cerrar</button>
+          <button onClick={onCerrar} style={{ background: "transparent", color: "#888", border: "1px solid #ccc", padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>Cerrar</button>
         </div>
 
         {error && <div style={{ background: "#fee", color: "#900", padding: 8, borderRadius: 4, marginBottom: 10, fontSize: 11 }}>Error: {error}</div>}
@@ -10668,7 +10668,7 @@ function PanelFestivos({ usuarioActual, onCerrar, onCambios }) {
                   padding: "6px 10px",
                   borderRadius: 3,
                   cursor: "pointer",
-                  fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace",
+                  fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
                   fontSize: 10,
                   fontWeight: 700,
                   letterSpacing: "0.08em",
@@ -10706,7 +10706,7 @@ function PanelFestivos({ usuarioActual, onCerrar, onCambios }) {
                 <option value="local">Local</option>
               </select>
               {nuevoForm.tipo === "nacional" ? (
-                <div style={{ fontSize: 10, color: "#7a5a2a", fontStyle: "italic", padding: "0 4px" }}>
+                <div style={{ fontSize: 10, color: "#1a1a1a", fontStyle: "italic", padding: "0 4px" }}>
                   Se creará en las 4 comunidades
                 </div>
               ) : (
@@ -10741,7 +10741,7 @@ function PanelFestivos({ usuarioActual, onCerrar, onCambios }) {
                   <option value="local">Local</option>
                 </select>
                 {editando.tipo === "nacional" ? (
-                  <div style={{ fontSize: 10, color: "#7a5a2a", fontStyle: "italic", padding: "0 4px" }}>
+                  <div style={{ fontSize: 10, color: "#1a1a1a", fontStyle: "italic", padding: "0 4px" }}>
                     Se aplica en las 4 comunidades
                   </div>
                 ) : (
@@ -10754,7 +10754,7 @@ function PanelFestivos({ usuarioActual, onCerrar, onCambios }) {
               </div>
             ) : (
               <div style={{ display: "grid", gridTemplateColumns: "180px 1fr auto auto auto", gap: 8, alignItems: "center" }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: "#1a1a1a", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#1a1a1a", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>
                   {fmtFecha(f.fecha)}
                 </div>
                 <div style={{ fontSize: 12, color: "#1a1a1a" }}>{f.nombre}</div>
