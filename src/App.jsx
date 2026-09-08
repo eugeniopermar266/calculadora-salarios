@@ -1585,17 +1585,27 @@ function GestorPerfiles({ tabId, datosActuales, onCargarPerfil, onRegistrarAccio
   };
 
   // v132: modificar cualquier perfil (sobrescribir con datos actuales)
+  // v137: el nombre del perfil sigue SIEMPRE a los datos del trabajador,
+  //       para que la tarjeta y su contenido no se descuadren.
   const modificarPerfilEspecifico = async (perfil) => {
     if (!perfil) return { ok: false };
     const fechaOriginal = perfil.timestamp
       ? new Date(perfil.timestamp).toLocaleString("es-ES")
       : "fecha desconocida";
+    const nombreAutoDe = (d) => d?.nombre
+      ? `${d.nombre} · ${d.puesto || ""}`.trim().replace(/·\s*$/, "").trim()
+      : "";
+    const autoNuevo = nombreAutoDe(datosActuales);
+    const nombreFinal = autoNuevo || perfil.nombre;
+    const avisoNombre = nombreFinal !== perfil.nombre
+      ? `\n\nEl perfil pasará a llamarse:\n"${nombreFinal}"`
+      : "";
     const confirmar = confirm(
-      `Este perfil se guardó el ${fechaOriginal}\n\n¿Sobrescribir "${perfil.nombre}" con los datos actuales?\n\n(Los datos anteriores se perderán)`
+      `Este perfil se guardó el ${fechaOriginal}\n\n¿Sobrescribir "${perfil.nombre}" con los datos actuales?${avisoNombre}\n\n(Los datos anteriores se perderán)`
     );
     if (!confirmar) return { ok: false };
     const payload = {
-      nombre: perfil.nombre,
+      nombre: nombreFinal,
       tabId,
       timestamp: Date.now(),
       autor: usuarioCtx?.nombre || null,
@@ -1620,7 +1630,7 @@ function GestorPerfiles({ tabId, datosActuales, onCargarPerfil, onRegistrarAccio
       if (perfilEnEdicion && (perfilEnEdicion.key === perfil.key || (perfilEnEdicion.supabaseId && perfilEnEdicion.supabaseId === perfil.supabaseId))) {
         setPerfilEnEdicion(prev => prev ? { ...prev, ...payload } : prev);
       }
-      showMsg(`✓ Modificado: ${perfil.nombre}`);
+      showMsg(`✓ Modificado: ${nombreFinal}`);
       return { ok: true };
     } catch (err) {
       showMsg("Error al modificar", "error");
