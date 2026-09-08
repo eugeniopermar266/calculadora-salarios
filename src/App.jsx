@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v100";
+const APP_VERSION = "v101";
 
 // v97: Departamentos de un rodaje audiovisual (obligatorio en cada perfil)
 const DEPARTAMENTOS = [
@@ -1700,6 +1700,34 @@ function GestorPerfiles({ tabId, datosActuales, onCargarPerfil, onRegistrarAccio
       await recargar();
       return { ok, err };
     },
+    // v101: renombrar (solo nombre del perfil guardado)
+    renombrarPerfil: async (perfil, nuevoNombre) => {
+      const nombreNuevo = (nuevoNombre || "").trim();
+      if (!nombreNuevo || nombreNuevo === perfil.nombre) return { ok: false };
+      try {
+        if (perfil.fuente === "supabase" && perfil.supabaseId) {
+          await actualizarPerfilSupabase(perfil.supabaseId, { nombre: nombreNuevo }, esAdmin ? usuarioCtx.pin : null);
+        } else {
+          const nuevoPayload = { ...perfil, nombre: nombreNuevo };
+          delete nuevoPayload.key;
+          delete nuevoPayload.fuente;
+          delete nuevoPayload.supabaseId;
+          delete nuevoPayload.proyectoId;
+          await storage.set(perfil.key, JSON.stringify(nuevoPayload));
+        }
+        await recargar();
+        return { ok: true };
+      } catch (err) {
+        console.error("Error al renombrar", err);
+        return { ok: false, err };
+      }
+    },
+    // v101: duplicar perfil
+    duplicarPerfil: async (perfil) => {
+      const fakeEvent = { stopPropagation: () => {} };
+      await duplicarPerfil(perfil, fakeEvent);
+      await recargar();
+    },
   };
 
   // Publicar UNA sola vez al montar (o cuando onRegistrarAcciones cambie), con proxy estable
@@ -1713,6 +1741,8 @@ function GestorPerfiles({ tabId, datosActuales, onCargarPerfil, onRegistrarAccio
       importarDesdeArchivo: (f) => accionesLiveRef.current.importarDesdeArchivo(f),
       recargar: () => accionesLiveRef.current.recargar(),
       borrarPerfilesSeleccionados: (ids) => accionesLiveRef.current.borrarPerfilesSeleccionados(ids),
+      renombrarPerfil: (p, n) => accionesLiveRef.current.renombrarPerfil(p, n),
+      duplicarPerfil: (p) => accionesLiveRef.current.duplicarPerfil(p),
       // Getters para acceso dinámico a datos que cambian
       get perfiles() { return accionesLiveRef.current.perfiles; },
       get cargando() { return accionesLiveRef.current.cargando; },
@@ -1722,7 +1752,22 @@ function GestorPerfiles({ tabId, datosActuales, onCargarPerfil, onRegistrarAccio
   }, [onRegistrarAcciones]);
 
   return (
-    <div style={{ background:"#fff", border:"1px solid #e0ddd8", borderRadius:8, padding:14, marginBottom:20, position:"relative" }}>
+    <div style={{ background:"#fff", border:"1px solid #e0ddd8", borderRadius:8, padding:"12px 14px", marginBottom:20 }}>
+      <div style={{ fontSize:10, letterSpacing:"0.2em", color:"#b8864a", textTransform:"uppercase", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+        <span>▸ Perfiles Guardados {perfiles.length > 0 && <span style={{ color:"#888", marginLeft:4 }}>({perfiles.length})</span>}{cargando && <span style={{ color:"#888", marginLeft:6, fontSize:8 }}>· cargando…</span>}</span>
+        <span style={{ fontSize:8, color:"#999", fontStyle:"italic", letterSpacing:"0.05em", textTransform:"none" }}>usa la barra superior ↑</span>
+      </div>
+      {mensaje && (
+        <div style={{ marginTop:8, padding:"6px 10px", borderRadius:4, fontSize:10, fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",
+          background: mensaje.tipo === "error" ? "#fdf0f0" : "#f0f8f0",
+          color: mensaje.tipo === "error" ? "#b02020" : "#2a7a50",
+          border: `1px solid ${mensaje.tipo === "error" ? "#e8c0c0" : "#c0e0c0"}` }}>
+          {mensaje.texto}
+        </div>
+      )}
+      {/* v101: bloque legacy oculto — botones/guardar/lista/importador viejos */}
+      {false && (
+      <>
       <div style={{ fontSize:10, letterSpacing:"0.2em", color:"#b8864a", textTransform:"uppercase", marginBottom:10, paddingBottom:8, borderBottom:"1px solid #e0ddd8" }}>
         ▸ Perfiles Guardados {perfiles.length > 0 && <span style={{ color:"#888", marginLeft:6 }}>({perfiles.length})</span>}
       </div>
@@ -1909,6 +1954,8 @@ function GestorPerfiles({ tabId, datosActuales, onCargarPerfil, onRegistrarAccio
             setTimeout(() => setMostrarLista(true), 100);
           }}
         />
+      )}
+      </>
       )}
     </div>
   );
@@ -5045,6 +5092,16 @@ ${docHTML}
           onBorrarSeleccionados={async (ids) => {
             if (accionesPerfiles.borrarPerfilesSeleccionados) {
               await accionesPerfiles.borrarPerfilesSeleccionados(ids);
+            }
+          }}
+          onRenombrar={async (perfil, nuevoNombre) => {
+            if (accionesPerfiles.renombrarPerfil) {
+              return await accionesPerfiles.renombrarPerfil(perfil, nuevoNombre);
+            }
+          }}
+          onDuplicar={async (perfil) => {
+            if (accionesPerfiles.duplicarPerfil) {
+              await accionesPerfiles.duplicarPerfil(perfil);
             }
           }}
           tabActivo={modoTab === "tab40" ? "40h" : "45h"}
@@ -8436,7 +8493,7 @@ function CosteEmpresa() {
 // v98: MODAL CARGAR PERFIL (tarjetas grandes)
 // ═══════════════════════════════════════════════════════════════════════
 
-function ModalCargarPerfil({ perfiles, cargando, onCerrar, onCargar, onBorrarSeleccionados, tabActivo }) {
+function ModalCargarPerfil({ perfiles, cargando, onCerrar, onCargar, onBorrarSeleccionados, onRenombrar, onDuplicar, tabActivo }) {
   const [seleccionados, setSeleccionados] = useState(new Set());
   const [filtroTipo, setFiltroTipo] = useState("todos"); // todos | 45h | 40h
   const [filtroDepto, setFiltroDepto] = useState("__todos__");
@@ -8533,10 +8590,9 @@ function ModalCargarPerfil({ perfiles, cargando, onCerrar, onCargar, onBorrarSel
               const fecha = p.timestamp ? new Date(p.timestamp).toLocaleDateString("es-ES") : "";
               return (
                 <div key={id}
-                  style={{ background: sel ? "#faf6ee" : "#fff", border: sel ? "2px solid #b8864a" : "1px solid #d0ccc6", borderRadius: 6, padding: 12, cursor: "pointer", transition: "all 0.15s", position: "relative" }}
-                  onClick={() => onCargar(p)}>
+                  style={{ background: sel ? "#faf6ee" : "#fff", border: sel ? "2px solid #b8864a" : "1px solid #d0ccc6", borderRadius: 6, padding: 12, transition: "all 0.15s", position: "relative" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
-                    <input type="checkbox" checked={sel} onChange={() => toggleSel(id)} onClick={e => e.stopPropagation()} style={{ cursor: "pointer", marginTop: 2 }} />
+                    <input type="checkbox" checked={sel} onChange={() => toggleSel(id)} style={{ cursor: "pointer", marginTop: 2 }} />
                     <span style={{ background: es40 ? "#6a3a9a" : "#b8864a", color: "#fff", fontSize: 8, padding: "2px 6px", borderRadius: 2, letterSpacing: "0.08em", fontWeight: 700 }}>
                       {es40 ? "40H" : "45H"}
                     </span>
@@ -8544,12 +8600,34 @@ function ModalCargarPerfil({ perfiles, cargando, onCerrar, onCargar, onBorrarSel
                   <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", marginBottom: 4, lineHeight: 1.2, wordBreak: "break-word" }}>{p.nombre}</div>
                   {p.datos?.puesto && <div style={{ fontSize: 10, color: "#666", marginBottom: 6, lineHeight: 1.3 }}>{p.datos.puesto}</div>}
                   {depto && <div style={{ fontSize: 9, color: "#8a5030", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 8, fontWeight: 700 }}>{depto}</div>}
-                  <div style={{ borderTop: "1px solid #e0d4b8", paddingTop: 6, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <div>
-                      <div style={{ fontSize: 9, color: "#888" }}>Salario</div>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a" }}>{salario ? salario.toLocaleString("es-ES") + " €/mes" : "—"}</div>
-                    </div>
-                    <div style={{ background: sel ? "#5a8a5a" : "transparent", color: sel ? "#fff" : "#5a8a5a", border: sel ? "none" : "1px solid #5a8a5a", padding: "5px 12px", borderRadius: 3, fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 700 }}>Cargar →</div>
+                  <div style={{ borderTop: "1px solid #e0d4b8", paddingTop: 6, marginBottom: 8 }}>
+                    <div style={{ fontSize: 9, color: "#888" }}>Salario</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a" }}>{salario ? salario.toLocaleString("es-ES") + " €/mes" : "—"}</div>
+                  </div>
+                  {/* v101: 3 botones grandes abajo (Opción B) */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 4 }}>
+                    <button
+                      onClick={async () => {
+                        const nuevo = prompt(`Renombrar perfil:\n\n(Solo cambia el nombre con el que se guarda el perfil, NO el nombre del trabajador)`, p.nombre);
+                        if (!nuevo || !nuevo.trim() || nuevo.trim() === p.nombre) return;
+                        if (onRenombrar) await onRenombrar(p, nuevo.trim());
+                      }}
+                      style={{ background: "transparent", color: "#666", border: "1px solid #ccc", padding: "6px 4px", borderRadius: 3, fontSize: 9, fontWeight: 700, cursor: "pointer", fontFamily: "'Courier Prime', 'Courier New', monospace" }}
+                      title="Renombrar el nombre del perfil guardado"
+                    >✎ Renombrar</button>
+                    <button
+                      onClick={async () => {
+                        if (!confirm(`¿Duplicar "${p.nombre}" como "${p.nombre} (copia)"?`)) return;
+                        if (onDuplicar) await onDuplicar(p);
+                      }}
+                      style={{ background: "transparent", color: "#666", border: "1px solid #ccc", padding: "6px 4px", borderRadius: 3, fontSize: 9, fontWeight: 700, cursor: "pointer", fontFamily: "'Courier Prime', 'Courier New', monospace" }}
+                      title="Duplicar este perfil"
+                    >📋 Duplicar</button>
+                    <button
+                      onClick={() => onCargar(p)}
+                      style={{ background: "#5a8a5a", color: "#fff", border: "none", padding: "6px 4px", borderRadius: 3, fontSize: 9, fontWeight: 700, cursor: "pointer", fontFamily: "'Courier Prime', 'Courier New', monospace" }}
+                      title="Cargar este perfil en el formulario"
+                    >📂 Cargar</button>
                   </div>
                   {fecha && <div style={{ fontSize: 8, color: "#999", marginTop: 6, letterSpacing: "0.03em" }}>{fecha}{p.autor ? ` · por ${p.autor}` : ""}</div>}
                 </div>
