@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v94";
+const APP_VERSION = "v94-debug";
 
 // v73: importe fijo por jornada especial (se paga POR ENCIMA del salario pactado)
 const IMPORTE_JORNADA_ESPECIAL = 20;
@@ -8280,6 +8280,24 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
       console.log("[Exportar] Cargando perfiles del proyecto:", p.id, p.nombre, "esAdmin:", esAdmin, "esCoordinador:", esCoordinador);
       // v93: si es admin pasar adminPin, si es coordinador NO pasa admin pin (RLS le da acceso por asignación)
       const adminPin = esAdmin ? usuarioActual.pin : null;
+
+      // v94: DIAGNÓSTICO - ver todos los perfiles del sistema (solo admin) para comparar proyecto_id
+      if (esAdmin) {
+        try {
+          const todos45 = await listarPerfilesSupabase({ tabId: "iruna45", verTodos: true, adminPin });
+          const todos40 = await listarPerfilesSupabase({ tabId: "tab40", verTodos: true, adminPin });
+          console.log("[Exportar] TOTAL en Supabase 45H:", todos45?.length, "40H:", todos40?.length);
+          if (todos45 && todos45.length > 0) {
+            console.log("[Exportar] Ejemplo perfil 45H:", { id: todos45[0].id, nombre: todos45[0].nombre, proyecto_id: todos45[0].proyecto_id, tipo_proyecto_id: typeof todos45[0].proyecto_id });
+            const conEsteProy = todos45.filter(x => String(x.proyecto_id) === String(p.id));
+            console.log("[Exportar] Perfiles 45H con proyecto_id ==", p.id, "→", conEsteProy.length);
+            if (todos45.length > 0 && conEsteProy.length === 0) {
+              console.log("[Exportar] Todos los proyecto_id 45H:", [...new Set(todos45.map(x => x.proyecto_id))]);
+            }
+          }
+        } catch (dx) { console.warn("[Exportar] Diagnóstico falló:", dx); }
+      }
+
       const [p45, p40] = await Promise.all([
         listarPerfilesSupabase({ tabId: "iruna45", proyectoId: p.id, adminPin }),
         listarPerfilesSupabase({ tabId: "tab40", proyectoId: p.id, adminPin }),
