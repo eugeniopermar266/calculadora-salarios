@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v115";
+const APP_VERSION = "v116";
 
 // v97: Departamentos de un rodaje audiovisual (obligatorio en cada perfil)
 const DEPARTAMENTOS = [
@@ -992,7 +992,7 @@ function Field({ label, value, onChange, onBlur, type = "number", prefix, hint, 
         </label>
       )}
       <div style={{ position: "relative", minWidth: 0 }}>
-        {prefix && <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "#4ec9b8", fontWeight: 700, fontSize: 13, fontFamily: "'Courier Prime', 'Courier New', monospace" }}>{prefix}</span>}
+        {prefix && <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "#1a1a1a", fontWeight: 700, fontSize: 13, fontFamily: "'Inter', -apple-system, sans-serif" }}>{prefix}</span>}
         <input
           type={type === "date" ? "date" : type === "text" ? "text" : "number"}
           value={value}
@@ -1008,7 +1008,7 @@ function Field({ label, value, onChange, onBlur, type = "number", prefix, hint, 
             border: `1px solid ${readOnly ? "#4ec9b8" : "#d5d9dc"}`,
             borderRadius: 4,
             color: readOnly ? "#666" : "#1a1a1a",
-            fontFamily: "'Courier Prime', 'Courier New', monospace",
+            fontFamily: "'Inter', -apple-system, sans-serif",
             fontSize: small ? 13 : 14,
             padding: prefix ? (small ? "7px 8px 7px 22px" : "9px 10px 9px 26px") : (small ? "7px 10px" : "9px 12px"),
             outline: "none", boxSizing: "border-box", transition: "border-color 0.2s",
@@ -1022,8 +1022,8 @@ function Field({ label, value, onChange, onBlur, type = "number", prefix, hint, 
           }}
         />
       </div>
-      {hint && <p style={{ margin: "3px 0 0", fontSize: 9, color: "#777", fontFamily: "'Courier Prime', 'Courier New', monospace" }}>{hint}</p>}
-      {readOnly && lockHint && <p style={{ margin: "3px 0 0", fontSize: 9, color: "#4ec9b8", fontFamily: "'Courier Prime', 'Courier New', monospace", fontStyle: "italic" }}>{lockHint}</p>}
+      {hint && <p style={{ margin: "4px 0 0", fontSize: 10, color: "#1a1a1a", fontFamily: "'Inter', -apple-system, sans-serif", fontWeight: 500 }}>{hint}</p>}
+      {readOnly && lockHint && <p style={{ margin: "4px 0 0", fontSize: 10, color: "#1a1a1a", fontFamily: "'Inter', -apple-system, sans-serif", fontStyle: "italic", fontWeight: 500 }}>{lockHint}</p>}
     </div>
   );
 }
@@ -1033,11 +1033,11 @@ function Toggle({ label, sublabel, value, onChange }) {
     <div onClick={() => onChange(!value)} style={{
       display: "flex", justifyContent: "space-between", alignItems: "center",
       padding: "11px 13px", background: "#dfe4e8", borderRadius: 6,
-      border: `1px solid ${value ? "#c8963a" : "#d5d9dc"}`, marginBottom: 10, cursor: "pointer",
+      border: `1px solid ${value ? "#4ec9b8" : "#d5d9dc"}`, marginBottom: 10, cursor: "pointer",
     }}>
       <div>
-        <div style={{ fontSize: 11, color: value ? "#7a5a2a" : "#999", fontFamily: "'Courier Prime', 'Courier New', monospace", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 700 }}>{label}</div>
-        {sublabel && <div style={{ fontSize: 9, color: "#777", marginTop: 2, fontFamily: "'Courier Prime', 'Courier New', monospace" }}>{sublabel}</div>}
+        <div style={{ fontSize: 11, color: value ? "#1a1a1a" : "#666", fontFamily: "'Inter', -apple-system, sans-serif", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 700 }}>{label}</div>
+        {sublabel && <div style={{ fontSize: 10, color: "#666", marginTop: 3, fontFamily: "'Inter', -apple-system, sans-serif", fontWeight: 500 }}>{sublabel}</div>}
       </div>
       <div style={{ position: "relative", width: 38, height: 20, flexShrink: 0, marginLeft: 12 }}>
         <div style={{ width: "100%", height: "100%", borderRadius: 10, background: value ? "#4ec9b8" : "#222", transition: "background 0.25s" }} />
@@ -1051,24 +1051,25 @@ function Row({ label, value, sub, highlight, green, muted }) {
   return (
     <div style={{
       display: "flex", justifyContent: "space-between", alignItems: "baseline",
-      padding: highlight ? "11px 14px" : "7px 0",
-      background: highlight ? "rgba(184,134,74,0.08)" : "transparent",
-      borderRadius: highlight ? 4 : 0,
-      borderBottom: highlight ? "none" : "1px solid #191919",
+      padding: highlight ? "14px 18px" : "8px 0",
+      background: highlight ? "#f2f5f7" : "transparent",
+      borderRadius: highlight ? 8 : 0,
+      border: highlight ? "1px solid #d5d9dc" : "none",
+      borderBottom: highlight ? "1px solid #d5d9dc" : "1px solid #e8ecef",
       marginBottom: highlight ? 6 : 0,
     }}>
-      <span style={{ fontSize: highlight ? 11 : 10, letterSpacing: "0.07em", textTransform: "uppercase", color: highlight ? "#7a5a2a" : muted ? "#999" : "#1a1a1a", fontFamily: "'Courier Prime', 'Courier New', monospace", fontWeight: highlight ? 700 : 400 }}>
+      <span style={{ fontSize: highlight ? 12 : 11, letterSpacing: "0.08em", textTransform: "uppercase", color: highlight ? "#1a1a1a" : muted ? "#888" : "#1a1a1a", fontFamily: "'Inter', -apple-system, sans-serif", fontWeight: highlight ? 700 : 500 }}>
         {label}
-        {sub && <span style={{ display: "block", fontSize: 9, color: "#888", marginTop: 2 }}>{sub}</span>}
+        {sub && <span style={{ display: "block", fontSize: 10, color: "#888", marginTop: 3, fontWeight: 400, textTransform: "none", letterSpacing: "0.02em" }}>{sub}</span>}
       </span>
-      <span style={{ fontSize: highlight ? 17 : 13, fontWeight: highlight ? 700 : 500, color: green ? "#1a7a58" : highlight ? "#4ec9b8" : muted ? "#999" : "#1a1a1a", fontFamily: "'Courier Prime', 'Courier New', monospace" }}>
+      <span style={{ fontSize: highlight ? 20 : 13, fontWeight: highlight ? 800 : 600, color: green ? "#1a7a58" : muted ? "#888" : "#1a1a1a", fontFamily: "'Inter', -apple-system, sans-serif", letterSpacing: highlight ? "-0.01em" : "0" }}>
         {value}
       </span>
     </div>
   );
 }
 
-function Div() { return <div style={{ height: 1, background: "#e8e4de", margin: "8px 0" }} />; }
+function Div() { return <div style={{ height: 1, background: "#e8ecef", margin: "8px 0" }} />; }
 
 // ═══════════════════════════════════════════════════════════════════════
 // IMPORTADOR DE PERFILES ANTIGUOS (v46) — solo admin
@@ -1753,10 +1754,10 @@ function GestorPerfiles({ tabId, datosActuales, onCargarPerfil, onRegistrarAccio
 
   return (
     <div style={{ background:"#f2f5f7", border:"1px solid #d5d9dc", borderRadius:8, padding:"12px 14px", marginBottom:20 }}>
-      <div style={{ fontSize:12, letterSpacing:"0.15em", color:"#1a1a1a", textTransform:"uppercase", display:"flex", justifyContent:"space-between", alignItems:"center", fontFamily:"'Inter', -apple-system, sans-serif", fontWeight: 700 }}>
-        <span>▸ Perfiles Guardados {perfiles.length > 0 && <span style={{ color:"#666", marginLeft:4, fontWeight: 500 }}>({perfiles.length})</span>}{cargando && <span style={{ color:"#666", marginLeft:6, fontSize:10, fontWeight: 400, fontStyle:"italic" }}>· cargando…</span>}</span>
-        <span style={{ fontSize:10, color:"#999", fontStyle:"italic", letterSpacing:"0.05em", textTransform:"none", fontFamily:"'Inter', sans-serif", fontWeight: 400 }}>usa la barra superior ↑</span>
+      <div style={{ fontSize:12, letterSpacing:"0.15em", color:"#1a1a1a", textTransform:"uppercase", fontFamily:"'Inter', -apple-system, sans-serif", fontWeight: 700 }}>
+        ▸ Perfiles Guardados{perfiles.length > 0 && <span style={{ color:"#1a1a1a", marginLeft:6, fontWeight: 700 }}> ({perfiles.length})</span>}{cargando && <span style={{ color:"#666", marginLeft:6, fontSize:10, fontWeight: 400, fontStyle:"italic" }}>· cargando…</span>}
       </div>
+      <div style={{ marginTop:8, fontSize:10, color:"#999", fontStyle:"italic", letterSpacing:"0.05em", textTransform:"none", fontFamily:"'Inter', sans-serif", fontWeight: 400 }}>usa la barra superior ↑</div>
       {mensaje && (
         <div style={{ marginTop:8, padding:"6px 10px", borderRadius:4, fontSize:10, fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",
           background: mensaje.tipo === "error" ? "#fdf0f0" : "#f0f8f0",
@@ -3986,7 +3987,7 @@ ${docHTML}
     <div style={{ color:"#1a1a1a", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", padding:"32px 32px" }}>
 
       {/* v113: Header rediseñado con logo Bdprodtools + Payroll cost calculator + botones nueva estética */}
-      <div style={{ maxWidth:1800, margin:"0 auto 24px" }}>
+      <div style={{ maxWidth:2100, margin:"0 auto 24px" }}>
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center",
                       background:"#1a1a1a", borderRadius:10, padding:"24px 28px",
                       border: "1px solid rgba(255,255,255,0.05)" }}>
@@ -4132,7 +4133,7 @@ ${docHTML}
         </div>
       </div>
 
-      <div className="print-grid" style={{ maxWidth:1800, margin:"0 auto", display:"grid", gridTemplateColumns:"340px minmax(0, 1fr)", gap:20 }}>
+      <div className="print-grid" style={{ maxWidth:2100, margin:"0 auto", display:"grid", gridTemplateColumns:"340px minmax(0, 1fr)", gap:20 }}>
 
         {/* COLUMNA IZQUIERDA */}
         <div className="no-print">
@@ -4723,7 +4724,7 @@ ${docHTML}
 
               {/* Nota informativa. En 45H siempre se muestra. En 40H solo si vacaciones NO van al final */}
               {(!es40h || !vacAcumulada) && (
-                <div style={{ background:"rgba(78,201,184,0.08)", padding:"12px 16px", borderRadius:8, border:"1px solid rgba(78,201,184,0.25)", marginBottom:20, fontSize:12, color:"#1a1a1a", fontFamily:"'Inter', -apple-system, sans-serif", lineHeight:1.5 }}>
+                <div style={{ background:"#f2f5f7", padding:"12px 16px", borderRadius:8, border:"1px solid #d5d9dc", marginBottom:20, fontSize:12, color:"#1a1a1a", fontFamily:"'Inter', -apple-system, sans-serif", lineHeight:1.5 }}>
                   <strong style={{ color:"#1a1a1a", fontWeight: 700 }}>Nota:</strong> {es40h
                     ? "Salario en contrato es la suma del salario base + las vacaciones."
                     : "El salario que figura en contrato es la suma del salario base 40h más las vacaciones."}
@@ -4753,8 +4754,8 @@ ${docHTML}
                 <div style={{ ...ST, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
                   <span>▸ Nómina {es40h ? "40h" : "45h"} por Mes <BadgeBrutos /></span>
                   <span style={{ display:"flex", gap:5 }}>
-                    {vacAcumulada   && <span style={{ fontSize:8, background:"rgba(184,134,74,0.12)", color:"#8a5e20", borderRadius:3, padding:"2px 6px" }}>VAC AL FINAL</span>}
-                    {indemAcumulada && <span style={{ fontSize:8, background:"rgba(184,134,74,0.12)", color:"#8a5e20", borderRadius:3, padding:"2px 6px" }}>INDEM AL FINAL</span>}
+                    {vacAcumulada   && <span style={{ fontSize:10, background:"#f2f5f7", color:"#1a1a1a", border:"1px solid #d5d9dc", borderRadius:5, padding:"3px 8px", fontFamily:"'Inter', sans-serif", fontWeight: 600, letterSpacing:"0.05em" }}>VAC AL FINAL</span>}
+                    {indemAcumulada && <span style={{ fontSize:10, background:"#f2f5f7", color:"#1a1a1a", border:"1px solid #d5d9dc", borderRadius:5, padding:"3px 8px", fontFamily:"'Inter', sans-serif", fontWeight: 600, letterSpacing:"0.05em" }}>INDEM AL FINAL</span>}
                   </span>
                 </div>
                 <div style={{ overflowX:"auto" }}>
@@ -5071,7 +5072,7 @@ ${docHTML}
       </div>
 
       {/* Botones de exportación al pie */}
-      <div className="no-print" style={{ maxWidth: 1800, margin: "20px auto 0", display: "flex", justifyContent: "center", gap: 10 }}>
+      <div className="no-print" style={{ maxWidth: 2100, margin: "20px auto 0", display: "flex", justifyContent: "center", gap: 10 }}>
         <button
           onClick={exportarCSV45}
           disabled={!p || desglose45.length === 0}
@@ -5193,7 +5194,7 @@ ${docHTML}
       {/* Banner de error/confirmación de exportación */}
       {exportError && (
         <div className="no-print" style={{
-          maxWidth: 1800, margin: "12px auto 0", padding: "10px 16px",
+          maxWidth: 2100, margin: "12px auto 0", padding: "10px 16px",
           background: exportError.tipo === "ok" ? "#e8f5e8" : "#fdf0f0",
           border: `1px solid ${exportError.tipo === "ok" ? "#c0e0c0" : "#e8c0c0"}`,
           borderRadius: 5, color: exportError.tipo === "ok" ? "#2a7a50" : "#b02020",
@@ -5203,10 +5204,10 @@ ${docHTML}
         </div>
       )}
 
-      <div style={{ maxWidth:1800, margin:"12px auto 0", textAlign:"center", fontSize:8, color:"#aaa", letterSpacing:"0.1em", textTransform:"uppercase" }}>
+      <div style={{ maxWidth:2100, margin:"12px auto 0", textAlign:"center", fontSize:8, color:"#aaa", letterSpacing:"0.1em", textTransform:"uppercase" }}>
         P40 = P45 ÷ (1 + 0,89286/30×7/40×1,5 × h) · Base = P40 × 0,89286 · Vac = Base ÷ 11,478452 · Plus Actividad = máx(0, P45×fracc − cobro)
       </div>
-      <div style={{ maxWidth: 1800, margin: "8px auto 0", textAlign: "center", fontSize: 7, color: "#bbb", letterSpacing: "0.05em" }}>
+      <div style={{ maxWidth: 2100, margin: "8px auto 0", textAlign: "center", fontSize: 7, color: "#bbb", letterSpacing: "0.05em" }}>
         {DISCLAIMER_PDF}
       </div>
 
