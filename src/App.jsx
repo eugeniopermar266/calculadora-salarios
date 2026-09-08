@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v121";
+const APP_VERSION = "v122";
 
 // v97: Departamentos de un rodaje audiovisual (obligatorio en cada perfil)
 const DEPARTAMENTOS = [
@@ -580,8 +580,8 @@ function PuestoSelector({ puesto, codigoContable, onPuesto, onCodigoContable }) 
     else onCodigoContable(""); // texto libre = sin código
   };
 
-  const inp = { padding: "11px 13px", fontSize: 13, border: "1px solid #c0bcb5", borderRadius: 6, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", boxSizing: "border-box", width: "100%", outline: "none", background: "#fafaf7", color: "#1a1a1a" };
-  const LS = { display: "block", fontSize: 10, color: "#666", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 6, fontWeight: 700, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace" };
+  const inp = { padding: "11px 14px", fontSize: 13, border: "1px solid #d5d9dc", borderRadius: 6, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", boxSizing: "border-box", width: "100%", outline: "none", background: "#f2f5f7", color: "#1a1a1a", fontWeight: 500 };
+  const LS = { display: "block", fontSize: 10, color: "#666", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 8, fontWeight: 700, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" };
 
   return (
     <div style={{ marginBottom: 14 }}>
@@ -594,16 +594,18 @@ function PuestoSelector({ puesto, codigoContable, onPuesto, onCodigoContable }) 
           onChange={e => onInputChange(e.target.value)}
           onFocus={() => setMostrarLista(true)}
           placeholder="Escribe para filtrar o elige de la lista..."
-          style={inp}
+          style={{ ...inp, paddingRight: 40 }}
           autoComplete="off"
         />
         <button
           type="button"
           onClick={() => setMostrarLista(!mostrarLista)}
-          style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", background: "transparent", border: "none", cursor: "pointer", padding: "4px 8px", fontSize: 12, color: "#666" }}
+          style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", background: "transparent", border: "none", cursor: "pointer", padding: "4px 8px", color: "#666", display: "flex", alignItems: "center", justifyContent: "center" }}
           tabIndex={-1}
         >
-          {mostrarLista ? "▲" : "▼"}
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: mostrarLista ? "rotate(180deg)" : "none", transition: "transform 0.15s" }}>
+            <polyline points="6 9 12 15 18 9"/>
+          </svg>
         </button>
       </div>
 
@@ -612,35 +614,36 @@ function PuestoSelector({ puesto, codigoContable, onPuesto, onCodigoContable }) 
           ref={listaRef}
           style={{
             position: "relative", zIndex: 100, marginTop: 4,
-            background: "#f2f5f7", border: "1px solid #c0bcb5", borderRadius: 6,
-            maxHeight: 320, overflowY: "auto", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace",
-            boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+            background: "#fff", border: "1px solid #d5d9dc", borderRadius: 8,
+            maxHeight: 320, overflowY: "auto", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+            boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
           }}
         >
           {puestosFiltrados.length === 0 ? (
-            <div style={{ padding: 14, textAlign: "center", color: "#888", fontSize: 11, fontStyle: "italic" }}>
+            <div style={{ padding: 16, textAlign: "center", color: "#888", fontSize: 12, fontStyle: "italic" }}>
               Sin resultados. Puedes escribir libremente este puesto sin código.
             </div>
           ) : (
             Object.entries(grupos).map(([cat, items]) => (
               <div key={cat}>
-                <div style={{ padding: "6px 12px", background: "#dfe4e8", fontSize: 9, color: "#7a5a2a", letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 700, borderBottom: "1px solid #d5d9dc", position: "sticky", top: 0 }}>
-                  {cat} <span style={{ color: "#aaa", fontWeight: 400, marginLeft: 4 }}>({items.length})</span>
+                <div style={{ padding: "8px 14px", background: "#f2f5f7", fontSize: 10, color: "#1a1a1a", letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 700, borderBottom: "1px solid #d5d9dc", position: "sticky", top: 0, display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{ width: 5, height: 5, background: "#4ec9b8", borderRadius: "50%" }}></div>
+                  {cat} <span style={{ color: "#999", fontWeight: 400, marginLeft: 4 }}>({items.length})</span>
                 </div>
                 {items.map(p => (
                   <div
                     key={p.codigo}
                     onClick={() => seleccionar(p)}
                     style={{
-                      padding: "7px 14px", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center",
-                      borderBottom: "1px solid #dfe4e8", fontSize: 11,
-                      background: p.nombre === puesto ? "rgba(184,134,74,0.1)" : "transparent",
+                      padding: "9px 14px", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center",
+                      borderBottom: "1px solid #eef1f3", fontSize: 12,
+                      background: p.nombre === puesto ? "rgba(78,201,184,0.12)" : "transparent",
                     }}
-                    onMouseEnter={e => e.currentTarget.style.background = "rgba(184,134,74,0.15)"}
-                    onMouseLeave={e => e.currentTarget.style.background = p.nombre === puesto ? "rgba(184,134,74,0.1)" : "transparent"}
+                    onMouseEnter={e => e.currentTarget.style.background = "rgba(78,201,184,0.15)"}
+                    onMouseLeave={e => e.currentTarget.style.background = p.nombre === puesto ? "rgba(78,201,184,0.12)" : "transparent"}
                   >
-                    <span style={{ color: "#1a1a1a", fontWeight: p.nombre === puesto ? 700 : 400 }}>{p.nombre}</span>
-                    <span style={{ color: "#888", fontSize: 10, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>{p.codigo}</span>
+                    <span style={{ color: "#1a1a1a", fontWeight: p.nombre === puesto ? 700 : 500 }}>{p.nombre}</span>
+                    <span style={{ color: p.nombre === puesto ? "#666" : "#999", fontSize: 10, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontWeight: p.nombre === puesto ? 600 : 400 }}>{p.codigo}</span>
                   </div>
                 ))}
               </div>
@@ -657,10 +660,10 @@ function PuestoSelector({ puesto, codigoContable, onPuesto, onCodigoContable }) 
           value={codigoContable || ""}
           readOnly
           placeholder="— se rellena automáticamente al elegir un puesto —"
-          style={{ ...inp, background: codigoContable ? "#dfe4e8" : "#fafaf7", color: codigoContable ? "#1a1a1a" : "#aaa", fontWeight: codigoContable ? 700 : 400, cursor: "default" }}
+          style={{ ...inp, background: codigoContable ? "#dfe4e8" : "#f2f5f7", color: codigoContable ? "#1a1a1a" : "#aaa", fontWeight: codigoContable ? 700 : 400, cursor: "default" }}
         />
         {!codigoContable && busqueda && (
-          <div style={{ fontSize: 9, color: "#a07030", marginTop: 4, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontStyle: "italic" }}>
+          <div style={{ fontSize: 10, color: "#a07030", marginTop: 4, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontStyle: "italic" }}>
             ℹ Puesto no estándar (sin código contable asignado)
           </div>
         )}
@@ -1399,6 +1402,8 @@ function GestorPerfiles({ tabId, datosActuales, onCargarPerfil, onRegistrarAccio
   };
 
   const guardarPerfil = async () => {
+    // v122: LOG DIAGNÓSTICO — verificar qué salario45 se está guardando
+    console.log("🔍 [GUARDAR PERFIL] salario45 =", datosActuales.salario45, "tipo:", typeof datosActuales.salario45);
     // Si el usuario no escribió nada, usar el placeholder sugerido como nombre
     let nombre = nombrePerfil.trim();
     if (!nombre) {
@@ -4177,7 +4182,10 @@ ${docHTML}
               if (d.departamento !== undefined) setDepartamento(d.departamento); // v97
               if (d.esFijoDiscontinuo !== undefined) setEsFijoDiscontinuo(d.esFijoDiscontinuo);
               if (d.hxPorRodaje40 !== undefined) setHxPorRodaje40(d.hxPorRodaje40);
-              if (d.salario45 !== undefined) setSalario45(d.salario45);
+              if (d.salario45 !== undefined) {
+                console.log("🔍 [CARGAR PERFIL] salario45 en perfil =", d.salario45, "tipo:", typeof d.salario45);
+                setSalario45(d.salario45);
+              }
               if (d.horasRef !== undefined) setHorasRef(d.horasRef);
               if (d.modoInverso45 !== undefined) setModoInverso45(d.modoInverso45);
               if (d.objetivoSemanal45 !== undefined) setObjetivoSemanal45(d.objetivoSemanal45);
@@ -5153,10 +5161,13 @@ ${docHTML}
       {/* v98: Modal Guardar perfil */}
       {mostrarModalGuardar && accionesPerfiles && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 100, display: "flex", justifyContent: "center", alignItems: "center", padding: 20 }} onClick={() => setMostrarModalGuardar(false)}>
-          <div style={{ background: "#e8ecef", borderRadius: 8, padding: 24, maxWidth: 500, width: "100%", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }} onClick={e => e.stopPropagation()}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, paddingBottom: 12, borderBottom: "2px solid #5a8a5a" }}>
-              <h2 style={{ margin: 0, fontSize: 14, letterSpacing: "0.15em", textTransform: "uppercase", color: "#1a1a1a", fontWeight: 700 }}>💾 Guardar perfil</h2>
-              <button onClick={() => setMostrarModalGuardar(false)} style={{ background: "#f2f5f7", border: "1px solid #ccc", padding: "6px 12px", borderRadius: 4, cursor: "pointer", fontSize: 11, color: "#666", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontWeight: 700 }}>✕ Cerrar</button>
+          <div style={{ background: "#e8ecef", borderRadius: 12, padding: 24, maxWidth: 500, width: "100%", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", boxShadow: "0 20px 60px rgba(0,0,0,0.5)" }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, paddingBottom: 14, borderBottom: "1px solid #d5d9dc" }}>
+              <h2 style={{ margin: 0, fontSize: 14, letterSpacing: "0.15em", textTransform: "uppercase", color: "#1a1a1a", fontWeight: 700, display: "flex", alignItems: "center", gap: 10 }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4ec9b8" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                Guardar perfil
+              </h2>
+              <button onClick={() => setMostrarModalGuardar(false)} style={{ background: "#0a0a0a", color: "#fff", border: "1px solid rgba(255,255,255,0.15)", padding: "8px 16px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase" }}>✕ Cerrar</button>
             </div>
             <label style={{ display: "block", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "#666", marginBottom: 6, fontWeight: 700 }}>Nombre del perfil</label>
             <input
@@ -5170,11 +5181,11 @@ ${docHTML}
                 }
               }}
               autoFocus
-              style={{ width: "100%", padding: "10px 12px", fontSize: 13, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", border: "1px solid #d5d9dc", borderRadius: 5, color: "#1a1a1a", background: "#f2f5f7", outline: "none", boxSizing: "border-box" }}
+              style={{ width: "100%", padding: "11px 14px", fontSize: 13, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", border: "1px solid #d5d9dc", borderRadius: 6, color: "#1a1a1a", background: "#fff", outline: "none", boxSizing: "border-box", fontWeight: 500 }}
             />
-            <div style={{ fontSize: 9, color: "#999", marginTop: 4, fontStyle: "italic" }}>Puedes editar el nombre sugerido. Escribir NO borra el texto (edítalo como quieras).</div>
-            <div style={{ marginTop: 16, display: "flex", justifyContent: "flex-end", gap: 8 }}>
-              <button onClick={() => setMostrarModalGuardar(false)} style={{ background: "transparent", border: "1px solid #ccc", padding: "10px 18px", borderRadius: 5, cursor: "pointer", fontSize: 11, color: "#666", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>Cancelar</button>
+            <div style={{ fontSize: 10, color: "#999", marginTop: 6, fontStyle: "italic" }}>Puedes editar el nombre sugerido. Escribir NO borra el texto (edítalo como quieras).</div>
+            <div style={{ marginTop: 20, display: "flex", justifyContent: "flex-end", gap: 8 }}>
+              <button onClick={() => setMostrarModalGuardar(false)} style={{ background: "transparent", border: "1px solid #b0b8bc", padding: "10px 20px", borderRadius: 6, cursor: "pointer", fontSize: 11, color: "#555", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase" }}>Cancelar</button>
               <button
                 onClick={async () => {
                   if (!nombreGuardarModal.trim()) { alert("Escribe un nombre"); return; }
@@ -5182,8 +5193,11 @@ ${docHTML}
                   setMostrarModalGuardar(false);
                 }}
                 disabled={!nombreGuardarModal.trim()}
-                style={{ background: nombreGuardarModal.trim() ? "#5a8a5a" : "#ccc", color: "#f2f5f7", border: "none", padding: "10px 18px", borderRadius: 5, cursor: nombreGuardarModal.trim() ? "pointer" : "not-allowed", fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}
-              >💾 Guardar</button>
+                style={{ background: nombreGuardarModal.trim() ? "#4ec9b8" : "#ccc", color: nombreGuardarModal.trim() ? "#0a0a0a" : "#888", border: "none", padding: "10px 20px", borderRadius: 6, cursor: nombreGuardarModal.trim() ? "pointer" : "not-allowed", fontSize: 11, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", display: "flex", alignItems: "center", gap: 6 }}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                Guardar
+              </button>
             </div>
           </div>
         </div>
