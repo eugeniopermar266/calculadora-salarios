@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v97";
+const APP_VERSION = "v98";
 
 // v97: Departamentos de un rodaje audiovisual (obligatorio en cada perfil)
 const DEPARTAMENTOS = [
@@ -1244,7 +1244,7 @@ function ImportadorAntiguos({ usuarioActual, tabId, onCerrar, onImportado }) {
 
 
 // ─── GESTOR DE PERFILES ──────────────────────────────────────────────────────
-function GestorPerfiles({ tabId, datosActuales, onCargarPerfil }) {
+function GestorPerfiles({ tabId, datosActuales, onCargarPerfil, onRegistrarAcciones }) {
   const usuarioCtx = useContext(UsuarioContext);
   const proyectoActivoCtx = useContext(ProyectoContext); // v46
   const esAdmin = !!usuarioCtx?.es_admin;
@@ -1651,6 +1651,55 @@ function GestorPerfiles({ tabId, datosActuales, onCargarPerfil }) {
     background: fondo, color, border: `1px solid ${color === "#1a1a1a" ? "#d0ccc6" : color}`,
     borderRadius: 4, cursor: "pointer", whiteSpace: "nowrap",
   });
+
+  // v98: publicar handlers al App45 para que la barra negra pueda usarlos
+  useEffect(() => {
+    if (onRegistrarAcciones) {
+      onRegistrarAcciones({
+        guardarConNombre: async (nombre) => {
+          setNombrePerfil(nombre);
+          // Esperar al siguiente tick para que setNombrePerfil se aplique
+          await new Promise(r => setTimeout(r, 30));
+          await guardarPerfil();
+        },
+        cargarPerfil: (perfil) => cargarPerfil(perfil),
+        exportarJSON,
+        importarDesdeArchivo: (file) => {
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+            try {
+              const data = JSON.parse(ev.target.result);
+              if (data.datos) { onCargarPerfil(data.datos); showMsg("✓ Importado"); }
+              else throw new Error("Formato inválido");
+            } catch (err) { showMsg("Archivo inválido", "error"); console.error(err); }
+          };
+          reader.readAsText(file);
+        },
+        recargar,
+        perfiles,
+        cargando,
+        perfilEnEdicion,
+        borrarPerfilesSeleccionados: async (ids) => {
+          let ok = 0, err = 0;
+          for (const id of ids) {
+            const p = perfiles.find(x => x.supabaseId === id || x.key === id);
+            if (!p) continue;
+            try {
+              if (p.fuente === "supabase" && p.supabaseId) {
+                await borrarPerfilSupabase(p.supabaseId, esAdmin ? usuarioCtx.pin : null);
+              } else {
+                await storage.delete(p.key);
+              }
+              ok++;
+            } catch (e) { console.warn("Fallo borrando", p.nombre, e); err++; }
+          }
+          await recargar();
+          return { ok, err };
+        },
+      });
+    }
+  }, [perfiles, cargando, perfilEnEdicion, onRegistrarAcciones]);
 
   return (
     <div style={{ background:"#fff", border:"1px solid #e0ddd8", borderRadius:8, padding:14, marginBottom:20, position:"relative" }}>
@@ -3000,6 +3049,11 @@ function App45({ modoTab = "iruna45" }) {
   const esAdmin = !!usuarioSesion?.es_admin; // v84: para mostrar box Coste Empresa a admins
   const esCoordinadorApp45 = usuarioSesion?.rol === "coordinador"; // v93
   const [mostrarExportarListado, setMostrarExportarListado] = useState(false); // v93
+  // v98: nuevos modales de perfiles en la barra
+  const [mostrarModalCargar, setMostrarModalCargar] = useState(false);
+  const [mostrarModalGuardar, setMostrarModalGuardar] = useState(false);
+  const [nombreGuardarModal, setNombreGuardarModal] = useState("");
+  const [accionesPerfiles, setAccionesPerfiles] = useState(null); // {guardarConNombre, cargarPerfil, exportarJSON, ...}
   const proyectoActivoCtx = useContext(ProyectoContext); // v45
 
   // === FLAG PESTAÑA 40H ===
@@ -3879,7 +3933,47 @@ ${docHTML}
             <div style={{ fontSize:9, letterSpacing:"0.25em", color:"#b8864a", textTransform:"uppercase", marginBottom:4 }}>Desglose Salarial · {es40h ? "40 Horas" : "45 Horas"}</div>
             <div style={{ fontSize:18, fontWeight:700, letterSpacing:"0.07em", color:"#f0e6d0", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>CALCULADORA DE SALARIOS</div>
             {(nombre||puesto) && <div style={{ fontSize:12, color:"#b8864a", marginTop:4, fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>{[nombre,puesto].filter(Boolean).join(" · ")}</div>}
-            <div className="no-print" style={{ display: "flex", gap: 6, marginTop: 8, justifyContent: "flex-end" }}>
+            <div className="no-print" style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8, justifyContent: "flex-end" }}>
+              {/* v98: 5 botones de perfiles */}
+              <button
+                onClick={() => { setMostrarModalCargar(true); if (accionesPerfiles?.recargar) accionesPerfiles.recargar(); }}
+                style={{ padding: "6px 10px", fontSize: 9, fontFamily: "'Courier Prime', 'Courier New', monospace", letterSpacing: "0.08em", textTransform: "uppercase", borderRadius: 3, cursor: "pointer", fontWeight: 700, border: "1px solid #5a8a5a", background: "#5a8a5a", color: "#fff" }}
+                title="Cargar un perfil guardado"
+              >📂 Cargar</button>
+              <button
+                onClick={() => {
+                  // Sugerir nombre
+                  const partes = [proyecto, productora, nombre, puesto].filter(Boolean);
+                  const sug = partes.join(" · ") || "Nuevo perfil";
+                  setNombreGuardarModal(sug);
+                  setMostrarModalGuardar(true);
+                }}
+                style={{ padding: "6px 10px", fontSize: 9, fontFamily: "'Courier Prime', 'Courier New', monospace", letterSpacing: "0.08em", textTransform: "uppercase", borderRadius: 3, cursor: "pointer", fontWeight: 700, border: "1px solid #5a8a5a", background: "transparent", color: "#a0d0a0" }}
+                title="Guardar el perfil actual"
+              >💾 Guardar</button>
+              <label
+                style={{ padding: "6px 10px", fontSize: 9, fontFamily: "'Courier Prime', 'Courier New', monospace", letterSpacing: "0.08em", textTransform: "uppercase", borderRadius: 3, cursor: "pointer", fontWeight: 700, border: "1px solid #6a7a9a", background: "transparent", color: "#a0b8d8", display: "inline-block" }}
+                title="Importar perfil desde archivo JSON"
+              >
+                📥 Importar
+                <input type="file" accept=".json,application/json" onChange={(e) => { if (accionesPerfiles?.importarDesdeArchivo && e.target.files[0]) { accionesPerfiles.importarDesdeArchivo(e.target.files[0]); e.target.value = ""; } }} style={{ display: "none" }} />
+              </label>
+              <button
+                onClick={() => accionesPerfiles?.exportarJSON && accionesPerfiles.exportarJSON()}
+                style={{ padding: "6px 10px", fontSize: 9, fontFamily: "'Courier Prime', 'Courier New', monospace", letterSpacing: "0.08em", textTransform: "uppercase", borderRadius: 3, cursor: "pointer", fontWeight: 700, border: "1px solid #6a7a9a", background: "transparent", color: "#a0b8d8" }}
+                title="Descargar el perfil actual como JSON"
+              >📤 JSON</button>
+              <button
+                onClick={() => {
+                  if (!confirm("¿Vaciar TODOS los campos del perfil actual?\n\nSe perderán los datos no guardados.")) return;
+                  // Recargar con datos vacíos
+                  window.location.reload();
+                }}
+                style={{ padding: "6px 10px", fontSize: 9, fontFamily: "'Courier Prime', 'Courier New', monospace", letterSpacing: "0.08em", textTransform: "uppercase", borderRadius: 3, cursor: "pointer", fontWeight: 700, border: "1px solid #a08050", background: "transparent", color: "#e0b878" }}
+                title="Vaciar todos los campos"
+              >🧹 Limpiar</button>
+              {/* Separador vertical */}
+              <div style={{ width: 1, background: "#444", margin: "0 2px" }}></div>
               <button
                 onClick={exportarCSV45}
                 disabled={!p || desglose45.length === 0}
@@ -3935,6 +4029,7 @@ ${docHTML}
 
           <GestorPerfiles
             tabId={modoTab === "tab40" ? "40h" : "45h"}
+            onRegistrarAcciones={setAccionesPerfiles}
             datosActuales={{
               proyecto, productora, nombre, puesto, codigoContable, departamento, esFijoDiscontinuo, hxPorRodaje40, salario45, horasRef, modoInverso45, objetivoSemanal45,
               fechaInicio, fechaFin, vacAcumulada, indemAcumulada, finiquitoAparte,
@@ -4918,6 +5013,61 @@ ${docHTML}
       {/* v93: Modal exportar listado */}
       {mostrarExportarListado && (esAdmin || esCoordinadorApp45) && (
         <PanelExportarListado usuarioActual={usuarioSesion} onCerrar={() => setMostrarExportarListado(false)} />
+      )}
+
+      {/* v98: Modal Cargar perfil (tarjetas) */}
+      {mostrarModalCargar && accionesPerfiles && (
+        <ModalCargarPerfil
+          perfiles={accionesPerfiles.perfiles || []}
+          cargando={accionesPerfiles.cargando}
+          onCerrar={() => setMostrarModalCargar(false)}
+          onCargar={(perfil) => { accionesPerfiles.cargarPerfil(perfil); setMostrarModalCargar(false); }}
+          onBorrarSeleccionados={async (ids) => {
+            if (accionesPerfiles.borrarPerfilesSeleccionados) {
+              await accionesPerfiles.borrarPerfilesSeleccionados(ids);
+            }
+          }}
+          tabActivo={modoTab === "tab40" ? "40h" : "45h"}
+        />
+      )}
+
+      {/* v98: Modal Guardar perfil */}
+      {mostrarModalGuardar && accionesPerfiles && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 100, display: "flex", justifyContent: "center", alignItems: "center", padding: 20 }} onClick={() => setMostrarModalGuardar(false)}>
+          <div style={{ background: "#faf7f2", borderRadius: 8, padding: 24, maxWidth: 500, width: "100%", fontFamily: "'Courier Prime', 'Courier New', monospace" }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, paddingBottom: 12, borderBottom: "2px solid #5a8a5a" }}>
+              <h2 style={{ margin: 0, fontSize: 14, letterSpacing: "0.15em", textTransform: "uppercase", color: "#1a1a1a", fontWeight: 700 }}>💾 Guardar perfil</h2>
+              <button onClick={() => setMostrarModalGuardar(false)} style={{ background: "#fff", border: "1px solid #ccc", padding: "6px 12px", borderRadius: 4, cursor: "pointer", fontSize: 11, color: "#666", fontFamily: "'Courier Prime', 'Courier New', monospace", fontWeight: 700 }}>✕ Cerrar</button>
+            </div>
+            <label style={{ display: "block", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "#666", marginBottom: 6, fontWeight: 700 }}>Nombre del perfil</label>
+            <input
+              type="text"
+              value={nombreGuardarModal}
+              onChange={(e) => setNombreGuardarModal(e.target.value)}
+              onKeyDown={async (e) => {
+                if (e.key === "Enter" && nombreGuardarModal.trim()) {
+                  await accionesPerfiles.guardarConNombre(nombreGuardarModal.trim());
+                  setMostrarModalGuardar(false);
+                }
+              }}
+              autoFocus
+              style={{ width: "100%", padding: "10px 12px", fontSize: 13, fontFamily: "'Courier Prime', 'Courier New', monospace", border: "1px solid #d0ccc6", borderRadius: 5, color: "#1a1a1a", background: "#fff", outline: "none", boxSizing: "border-box" }}
+            />
+            <div style={{ fontSize: 9, color: "#999", marginTop: 4, fontStyle: "italic" }}>Puedes editar el nombre sugerido. Escribir NO borra el texto (edítalo como quieras).</div>
+            <div style={{ marginTop: 16, display: "flex", justifyContent: "flex-end", gap: 8 }}>
+              <button onClick={() => setMostrarModalGuardar(false)} style={{ background: "transparent", border: "1px solid #ccc", padding: "10px 18px", borderRadius: 5, cursor: "pointer", fontSize: 11, color: "#666", fontFamily: "'Courier Prime', 'Courier New', monospace", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>Cancelar</button>
+              <button
+                onClick={async () => {
+                  if (!nombreGuardarModal.trim()) { alert("Escribe un nombre"); return; }
+                  await accionesPerfiles.guardarConNombre(nombreGuardarModal.trim());
+                  setMostrarModalGuardar(false);
+                }}
+                disabled={!nombreGuardarModal.trim()}
+                style={{ background: nombreGuardarModal.trim() ? "#5a8a5a" : "#ccc", color: "#fff", border: "none", padding: "10px 18px", borderRadius: 5, cursor: nombreGuardarModal.trim() ? "pointer" : "not-allowed", fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "'Courier Prime', 'Courier New', monospace" }}
+              >💾 Guardar</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Banner de error/confirmación de exportación */}
@@ -8261,6 +8411,136 @@ function CosteEmpresa() {
   );
 }
 
+
+// ═══════════════════════════════════════════════════════════════════════
+// v98: MODAL CARGAR PERFIL (tarjetas grandes)
+// ═══════════════════════════════════════════════════════════════════════
+
+function ModalCargarPerfil({ perfiles, cargando, onCerrar, onCargar, onBorrarSeleccionados, tabActivo }) {
+  const [seleccionados, setSeleccionados] = useState(new Set());
+  const [filtroTipo, setFiltroTipo] = useState("todos"); // todos | 45h | 40h
+  const [filtroDepto, setFiltroDepto] = useState("__todos__");
+  const [borrando, setBorrando] = useState(false);
+
+  const perfilesFiltrados = perfiles.filter(p => {
+    if (filtroTipo !== "todos" && p.tabId !== filtroTipo) return false;
+    if (filtroDepto === "__todos__") return true;
+    if (filtroDepto === "__sin__") return !p.datos?.departamento;
+    return (p.datos?.departamento || "") === filtroDepto;
+  });
+
+  const toggleSel = (id) => {
+    const nueva = new Set(seleccionados);
+    if (nueva.has(id)) nueva.delete(id); else nueva.add(id);
+    setSeleccionados(nueva);
+  };
+
+  const seleccionarTodos = () => setSeleccionados(new Set(perfilesFiltrados.map(p => p.supabaseId || p.key)));
+  const deseleccionarTodos = () => setSeleccionados(new Set());
+
+  const borrarSeleccionados = async () => {
+    if (seleccionados.size === 0) return;
+    if (!confirm(`¿Borrar ${seleccionados.size} perfil${seleccionados.size !== 1 ? "es" : ""} seleccionado${seleccionados.size !== 1 ? "s" : ""}?\n\nEsta acción NO se puede deshacer.`)) return;
+    setBorrando(true);
+    await onBorrarSeleccionados([...seleccionados]);
+    setSeleccionados(new Set());
+    setBorrando(false);
+  };
+
+  // Contar por departamento
+  const conteoDeptos = {};
+  perfiles.forEach(p => {
+    const d = p.datos?.departamento || "__sin__";
+    conteoDeptos[d] = (conteoDeptos[d] || 0) + 1;
+  });
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 100, display: "flex", justifyContent: "center", alignItems: "flex-start", padding: 20, overflow: "auto" }} onClick={onCerrar}>
+      <div style={{ background: "#faf7f2", borderRadius: 8, padding: 24, maxWidth: 1100, width: "100%", maxHeight: "90vh", overflow: "auto", fontFamily: "'Courier Prime', 'Courier New', monospace" }} onClick={e => e.stopPropagation()}>
+
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, paddingBottom: 12, borderBottom: "2px solid #b8864a" }}>
+          <h2 style={{ margin: 0, fontSize: 15, letterSpacing: "0.15em", textTransform: "uppercase", color: "#1a1a1a", fontWeight: 700 }}>📂 Cargar perfil</h2>
+          <button onClick={onCerrar} style={{ background: "#fff", border: "1px solid #b8864a", padding: "6px 14px", borderRadius: 4, cursor: "pointer", fontSize: 11, color: "#8a5030", fontFamily: "'Courier Prime', 'Courier New', monospace", fontWeight: 700 }}>✕ Cerrar</button>
+        </div>
+
+        {/* Filtros y acciones */}
+        <div style={{ display: "flex", gap: 12, marginBottom: 14, alignItems: "center", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <span style={{ fontSize: 10, color: "#666", letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 700 }}>Tipo:</span>
+            {["todos", "45h", "40h"].map(t => (
+              <button key={t} onClick={() => setFiltroTipo(t)}
+                style={{ padding: "6px 14px", fontSize: 10, border: `1px solid ${filtroTipo === t ? "#b8864a" : "#ccc"}`, borderRadius: 4, background: filtroTipo === t ? "#b8864a" : "#fff", color: filtroTipo === t ? "#fff" : "#666", cursor: "pointer", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", fontFamily: "'Courier Prime', 'Courier New', monospace" }}>
+                {t}
+              </button>
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <span style={{ fontSize: 10, color: "#666", letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 700 }}>Depto:</span>
+            <select value={filtroDepto} onChange={(e) => setFiltroDepto(e.target.value)}
+              style={{ padding: "6px 10px", fontSize: 11, border: "1px solid #b8864a", borderRadius: 4, background: "#fff", fontFamily: "'Courier Prime', 'Courier New', monospace", color: "#1a1a1a", cursor: "pointer" }}>
+              <option value="__todos__">Todos</option>
+              {conteoDeptos["__sin__"] > 0 && <option value="__sin__">— Sin depto — ({conteoDeptos["__sin__"]})</option>}
+              {DEPARTAMENTOS.map(d => conteoDeptos[d] > 0 ? <option key={d} value={d}>{d} ({conteoDeptos[d]})</option> : null)}
+            </select>
+          </div>
+          <div style={{ flex: 1 }}></div>
+          {perfilesFiltrados.length > 0 && (
+            <>
+              <button onClick={seleccionarTodos} style={{ fontSize: 10, padding: "5px 12px", border: "1px solid #b8864a", borderRadius: 4, background: "#fff", cursor: "pointer", color: "#8a5030", fontFamily: "'Courier Prime', 'Courier New', monospace", fontWeight: 700 }}>Todos</button>
+              <button onClick={deseleccionarTodos} style={{ fontSize: 10, padding: "5px 12px", border: "1px solid #ccc", borderRadius: 4, background: "#fff", cursor: "pointer", color: "#666", fontFamily: "'Courier Prime', 'Courier New', monospace", fontWeight: 700 }}>Ninguno</button>
+            </>
+          )}
+          {seleccionados.size > 0 && (
+            <button onClick={borrarSeleccionados} disabled={borrando}
+              style={{ padding: "8px 14px", fontSize: 10, border: "1px solid #c04040", borderRadius: 4, background: "#c04040", color: "#fff", cursor: borrando ? "wait" : "pointer", fontWeight: 700, letterSpacing: "0.08em", fontFamily: "'Courier Prime', 'Courier New', monospace" }}>
+              🗑 Borrar {seleccionados.size}
+            </button>
+          )}
+        </div>
+
+        {cargando ? <div style={{ padding: 40, textAlign: "center", color: "#888" }}>Cargando perfiles…</div> : perfilesFiltrados.length === 0 ? (
+          <div style={{ padding: 40, textAlign: "center", color: "#888", fontStyle: "italic" }}>
+            {perfiles.length === 0 ? "No hay perfiles guardados." : "Ningún perfil coincide con los filtros."}
+          </div>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 10 }}>
+            {perfilesFiltrados.map(p => {
+              const id = p.supabaseId || p.key;
+              const sel = seleccionados.has(id);
+              const es40 = p.tabId === "40h";
+              const depto = p.datos?.departamento || "";
+              const salario = p.datos?.salario45 ? Number(p.datos.salario45) : 0;
+              const fecha = p.timestamp ? new Date(p.timestamp).toLocaleDateString("es-ES") : "";
+              return (
+                <div key={id}
+                  style={{ background: sel ? "#faf6ee" : "#fff", border: sel ? "2px solid #b8864a" : "1px solid #d0ccc6", borderRadius: 6, padding: 12, cursor: "pointer", transition: "all 0.15s", position: "relative" }}
+                  onClick={() => onCargar(p)}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+                    <input type="checkbox" checked={sel} onChange={() => toggleSel(id)} onClick={e => e.stopPropagation()} style={{ cursor: "pointer", marginTop: 2 }} />
+                    <span style={{ background: es40 ? "#6a3a9a" : "#b8864a", color: "#fff", fontSize: 8, padding: "2px 6px", borderRadius: 2, letterSpacing: "0.08em", fontWeight: 700 }}>
+                      {es40 ? "40H" : "45H"}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", marginBottom: 4, lineHeight: 1.2, wordBreak: "break-word" }}>{p.nombre}</div>
+                  {p.datos?.puesto && <div style={{ fontSize: 10, color: "#666", marginBottom: 6, lineHeight: 1.3 }}>{p.datos.puesto}</div>}
+                  {depto && <div style={{ fontSize: 9, color: "#8a5030", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 8, fontWeight: 700 }}>{depto}</div>}
+                  <div style={{ borderTop: "1px solid #e0d4b8", paddingTop: 6, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div>
+                      <div style={{ fontSize: 9, color: "#888" }}>Salario</div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a" }}>{salario ? salario.toLocaleString("es-ES") + " €/mes" : "—"}</div>
+                    </div>
+                    <div style={{ background: sel ? "#5a8a5a" : "transparent", color: sel ? "#fff" : "#5a8a5a", border: sel ? "none" : "1px solid #5a8a5a", padding: "5px 12px", borderRadius: 3, fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 700 }}>Cargar →</div>
+                  </div>
+                  {fecha && <div style={{ fontSize: 8, color: "#999", marginTop: 6, letterSpacing: "0.03em" }}>{fecha}{p.autor ? ` · por ${p.autor}` : ""}</div>}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 // ═══════════════════════════════════════════════════════════════════════
 // v92: EXPORTAR LISTADO DE PERFILES A EXCEL
