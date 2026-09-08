@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v93";
+const APP_VERSION = "v94";
 
 // v73: importe fijo por jornada especial (se paga POR ENCIMA del salario pactado)
 const IMPORTE_JORNADA_ESPECIAL = 20;
@@ -3838,6 +3838,21 @@ ${docHTML}
                 }}
                 title="Abrir vista de PDF (Guardar HTML / Imprimir / Cerrar)"
               >🖨 PDF</button>
+              {/* v94: Exportar Listado (solo admin/coordinador) */}
+              {(esAdmin || esCoordinadorApp45) && (
+                <button
+                  onClick={() => setMostrarExportarListado(true)}
+                  style={{
+                    padding: "6px 12px", fontSize: 9, fontFamily: "'Courier Prime', 'Courier New', monospace",
+                    letterSpacing: "0.1em", textTransform: "uppercase", borderRadius: 3,
+                    cursor: "pointer", fontWeight: 700,
+                    border: "1px solid #5a8a5a",
+                    background: "#5a8a5a",
+                    color: "#fff",
+                  }}
+                  title="Exportar listado de perfiles del proyecto a Excel/CSV"
+                >📊 Listado</button>
+              )}
             </div>
           </div>
         </div>
