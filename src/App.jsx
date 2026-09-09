@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v138";
+const APP_VERSION = "v139";
 
 // v97: Departamentos de un rodaje audiovisual (obligatorio en cada perfil)
 const DEPARTAMENTOS = [
@@ -3245,6 +3245,7 @@ function App45({ modoTab = "iruna45" }) {
   const [objetivoSemanal45,setObjetivoSemanal45]=useState(1500);
   const [fechaInicio,      setFechaInicio]     = useState(proyectoActivoCtx?.__calendario?.fecha_inicio || "2026-01-05");
   const [fechaFin,         setFechaFin]        = useState(proyectoActivoCtx?.__calendario?.fecha_fin || "2026-03-20");
+  const [fechasPendientes, setFechasPendientes] = useState(false); // v139: perfil guardado sin fechas conocidas
   const [horasPorMes,      setHorasPorMes]     = useState([]);
   const [vacDiasPorMes,    setVacDiasPorMes]   = useState([]);
   const [festivosPorMes,   setFestivosPorMes]  = useState([]);
@@ -3566,11 +3567,26 @@ function App45({ modoTab = "iruna45" }) {
     setFechaFin(nueva);
   };
 
+  // v139: al activar, vacía las fechas (cálculos a "—"); al desactivar, restaura las últimas válidas
+  const togglearFechasPendientes = (activar) => {
+    if (activar) {
+      if (fechaInicio) setFechaInicioAnterior(fechaInicio);
+      if (fechaFin) setFechaFinAnterior(fechaFin);
+      setFechaInicio("");
+      setFechaFin("");
+    } else {
+      setFechaInicio(fechaInicioAnterior || proyectoActivoCtx?.__calendario?.fecha_inicio || "2026-01-05");
+      setFechaFin(fechaFinAnterior || proyectoActivoCtx?.__calendario?.fecha_fin || "2026-03-20");
+    }
+    setFechasPendientes(activar);
+  };
+
   // v63: validar al perder el foco (blur). Si falla, avisar y revertir a valor válido más cercano.
   const [fechaInicioAnterior, setFechaInicioAnterior] = useState(fechaInicio);
   const [fechaFinAnterior, setFechaFinAnterior] = useState(fechaFin);
 
   const validarFechaInicioBlur = (nueva) => {
+    if (fechasPendientes) return; // v139: sin fechas, no se valida
     if (!nueva || !/^\d{4}-\d{2}-\d{2}$/.test(nueva)) { setFechaInicio(fechaInicioAnterior); return; }
     const anio = parseInt(nueva.slice(0, 4), 10);
     if (anio < 2000 || anio > 2100) { alert("Año fuera de rango razonable"); setFechaInicio(fechaInicioAnterior); return; }
@@ -3582,6 +3598,7 @@ function App45({ modoTab = "iruna45" }) {
   };
 
   const validarFechaFinBlur = (nueva) => {
+    if (fechasPendientes) return; // v139: sin fechas, no se valida
     if (!nueva || !/^\d{4}-\d{2}-\d{2}$/.test(nueva)) { setFechaFin(fechaFinAnterior); return; }
     const anio = parseInt(nueva.slice(0, 4), 10);
     if (anio < 2000 || anio > 2100) { alert("Año fuera de rango razonable"); setFechaFin(fechaFinAnterior); return; }
@@ -4263,7 +4280,7 @@ ${docHTML}
             onPerfilEnEdicionCambio={setPerfilEnEdicionEstado}
             datosActuales={{
               proyecto, productora, nombre, puesto, codigoContable, departamento, esFijoDiscontinuo, hxPorRodaje40, salario45, horasRef, modoInverso45, objetivoSemanal45,
-              fechaInicio, fechaFin, vacAcumulada, indemAcumulada, finiquitoAparte,
+              fechaInicio, fechaFin, fechasPendientes, vacAcumulada, indemAcumulada, finiquitoAparte,
               horasPorMes, vacDiasPorMes, festivosPorMes, jornadasEspecialesPorMes, festivosActivos, comidaDiasPorMes,
               plusHerramienta, plusCoche, plusVivienda, plusSeguroVida, plusComida,
               // Snapshot de resultados calculados (para Coste Empresa)
@@ -4305,6 +4322,7 @@ ${docHTML}
               if (d.objetivoSemanal45 !== undefined) setObjetivoSemanal45(d.objetivoSemanal45);
               if (d.fechaInicio !== undefined) setFechaInicio(d.fechaInicio);
               if (d.fechaFin !== undefined) setFechaFin(d.fechaFin);
+              setFechasPendientes(!!d.fechasPendientes); // v139
               if (d.vacAcumulada !== undefined) setVacAcumulada(d.vacAcumulada);
               if (d.indemAcumulada !== undefined) setIndemAcumulada(d.indemAcumulada);
               if (d.finiquitoAparte !== undefined) setFiniquitoAparte(d.finiquitoAparte); // v90
@@ -4524,7 +4542,16 @@ ${docHTML}
                 )}
               </div>
             )}
-            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, overflow:"hidden" }}>
+            <label style={{ display:"flex", alignItems:"center", gap:8, marginBottom:8, cursor:"pointer", fontSize:11, color: fechasPendientes ? "#b26a00" : "#666", fontWeight: fechasPendientes ? 700 : 500 }}>
+              <input type="checkbox" checked={fechasPendientes} onChange={(e) => togglearFechasPendientes(e.target.checked)} style={{ cursor:"pointer" }} />
+              Fechas pendientes (guardar sin fechas)
+            </label>
+            {fechasPendientes && (
+              <div style={{ marginBottom:8, padding:"8px 10px", background:"#fdf3e3", border:"1px solid #e8c98a", borderRadius:6, fontSize:10, color:"#8a5a00", lineHeight:1.4 }}>
+                Sin fechas no hay cálculo: los importes salen a "—". Cuando las sepas, abre el perfil con ✎ Modificar, desmarca esta casilla, pon las fechas y pulsa Guardar cambios.
+              </div>
+            )}
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, overflow:"hidden", opacity: fechasPendientes ? 0.45 : 1, pointerEvents: fechasPendientes ? "none" : "auto" }}>
               <Field
                 label="Inicio" value={fechaInicio} onChange={setFechaInicioSeguro} onBlur={validarFechaInicioBlur} type="date" hint="Primer día"
                 min={proyectoActivoCtx?.__calendario?.fecha_inicio || undefined}
@@ -9004,7 +9031,12 @@ function ModalCargarPerfil({ perfiles, cargando, onCerrar, onCargar, onBorrarSel
                   {depto && <div style={{ fontSize: 9, color: "#4ec9b8", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 8, fontWeight: 700 }}>{depto}</div>}
 
                   {/* v131: Fechas Alta / Baja */}
-                  {(fAlta || fBaja) && (
+                  {/* v139: perfil guardado sin fechas */}
+                  {p.datos?.fechasPendientes ? (
+                    <div style={{ borderTop: "1px solid #d5d9dc", paddingTop: 6, marginBottom: 6 }}>
+                      <div style={{ fontSize: 10, color: "#b26a00", fontWeight: 700 }}>⏳ Pendiente de fechas</div>
+                    </div>
+                  ) : (fAlta || fBaja) && (
                     <div style={{ borderTop: "1px solid #d5d9dc", paddingTop: 6, marginBottom: 6 }}>
                       {fAlta && (
                         <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#666" }}>
