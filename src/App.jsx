@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v137";
+const APP_VERSION = "v138";
 
 // v97: Departamentos de un rodaje audiovisual (obligatorio en cada perfil)
 const DEPARTAMENTOS = [
@@ -1478,12 +1478,17 @@ function GestorPerfiles({ tabId, datosActuales, onCargarPerfil, onRegistrarAccio
     }
   };
 
-  const cargarPerfil = (perfil) => {
+  // v138: Cargar = solo trae los datos (al guardar crea perfil nuevo).
+  //       Modificar = carga enlazado a esa tarjeta (al guardar sobrescribe).
+  const cargarPerfil = (perfil, enlazar = false) => {
     onCargarPerfil(perfil.datos);
-    setPerfilEnEdicion(perfil); // v53: guardamos referencia para poder modificar
+    setPerfilEnEdicion(enlazar ? perfil : null);
     setMostrarLista(false);
-    showMsg(`✓ Cargado: ${perfil.nombre}`);
+    showMsg(enlazar ? `✎ Editando: ${perfil.nombre}` : `✓ Cargado: ${perfil.nombre}`);
   };
+
+  const abrirParaModificar = (perfil) => cargarPerfil(perfil, true);
+  const salirEdicion = () => setPerfilEnEdicion(null);
 
   const eliminarPerfil = async (perfil, e) => {
     e.stopPropagation();
@@ -1729,7 +1734,9 @@ function GestorPerfiles({ tabId, datosActuales, onCargarPerfil, onRegistrarAccio
       await new Promise(r => setTimeout(r, 30));
       await guardarPerfil();
     },
-    cargarPerfil: (perfil) => cargarPerfil(perfil),
+    cargarPerfil: (perfil, enlazar) => cargarPerfil(perfil, enlazar),
+    abrirParaModificar: (perfil) => abrirParaModificar(perfil),
+    salirEdicion,
     exportarJSON,
     importarDesdeArchivo: (file) => {
       if (!file) return;
@@ -1826,7 +1833,9 @@ function GestorPerfiles({ tabId, datosActuales, onCargarPerfil, onRegistrarAccio
     // Proxy: mantiene la misma identidad de objeto pero delega a accionesLiveRef.current
     const proxy = {
       guardarConNombre: (n) => accionesLiveRef.current.guardarConNombre(n),
-      cargarPerfil: (p) => accionesLiveRef.current.cargarPerfil(p),
+      cargarPerfil: (p, enlazar) => accionesLiveRef.current.cargarPerfil(p, enlazar),
+      abrirParaModificar: (p) => accionesLiveRef.current.abrirParaModificar(p),
+      salirEdicion: () => accionesLiveRef.current.salirEdicion(),
       exportarJSON: () => accionesLiveRef.current.exportarJSON(),
       importarDesdeArchivo: (f) => accionesLiveRef.current.importarDesdeArchivo(f),
       recargar: () => accionesLiveRef.current.recargar(),
@@ -4091,6 +4100,24 @@ ${docHTML}
             <div style={{ fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontSize:24, fontWeight:500, letterSpacing:"-0.01em", color:"#f0f0f0" }}>Payroll cost calculator</div>
             {(nombre||puesto) && <div style={{ fontFamily: "'Inter', sans-serif", fontSize:12, color:"#888", marginTop:6 }}>{[nombre,puesto].filter(Boolean).join(" · ")}</div>}
             <div className="no-print" style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 14, justifyContent: "flex-end", alignItems: "center" }}>
+              {/* v138: modo edición — guardar encima de la tarjeta abierta o salir */}
+              {perfilEnEdicionEstado && (
+                <div style={{ display: "flex", alignItems: "center", gap: 6, background: "rgba(78,201,184,0.12)", border: "1px solid rgba(78,201,184,0.35)", borderRadius: 6, padding: "5px 8px", marginRight: 4 }}>
+                  <span style={{ fontSize: 10, color: "#4ec9b8", fontWeight: 600, letterSpacing: "0.03em", maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    Editando: {perfilEnEdicionEstado.nombre}
+                  </span>
+                  <button
+                    onClick={async () => { if (accionesPerfiles?.modificarPerfilActivo) await accionesPerfiles.modificarPerfilActivo(); }}
+                    style={{ padding: "6px 12px", fontSize: 11, fontFamily: "'Inter', sans-serif", borderRadius: 5, cursor: "pointer", fontWeight: 600, border: "none", background: "#4ec9b8", color: "#0a0a0a" }}
+                    title="Guardar los cambios encima de este mismo perfil"
+                  >Guardar cambios</button>
+                  <button
+                    onClick={() => { if (accionesPerfiles?.salirEdicion) accionesPerfiles.salirEdicion(); }}
+                    style={{ padding: "6px 10px", fontSize: 11, fontFamily: "'Inter', sans-serif", borderRadius: 5, cursor: "pointer", fontWeight: 600, border: "1px solid rgba(255,255,255,0.2)", background: "transparent", color: "#ddd" }}
+                    title="Salir del modo edición (los datos siguen en el formulario)"
+                  >Salir</button>
+                </div>
+              )}
               {/* v113: Cargar (turquesa sólido — acción principal) */}
               <button
                 onClick={() => { setMostrarModalCargar(true); if (accionesPerfiles?.recargar) accionesPerfiles.recargar(); }}
@@ -5249,9 +5276,10 @@ ${docHTML}
             }
           }}
           onModificarEspecifico={async (perfil) => {
-            if (accionesPerfiles.modificarPerfilEspecifico) {
-              const res = await accionesPerfiles.modificarPerfilEspecifico(perfil);
-              if (res?.ok) setMostrarModalCargar(false);
+            // v138: Modificar abre el perfil enlazado; el guardado ocurre luego
+            if (accionesPerfiles.abrirParaModificar) {
+              accionesPerfiles.abrirParaModificar(perfil);
+              setMostrarModalCargar(false);
             }
           }}
           tabActivo={modoTab === "tab40" ? "40h" : "45h"}
@@ -9019,8 +9047,8 @@ function ModalCargarPerfil({ perfiles, cargando, onCerrar, onCargar, onBorrarSel
                     <button
                       onClick={async () => { if (onModificarEspecifico) await onModificarEspecifico(p); }}
                       style={{ background: "#2196f3", color: "#fff", border: "none", padding: "7px 4px", borderRadius: 3, fontSize: 9, fontWeight: 700, cursor: "pointer", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}
-                      title="Sobrescribir este perfil con los datos actuales del formulario"
-                    >💾 Modificar</button>
+                      title="Abrir este perfil para editarlo y guardar encima"
+                    >✎ Modificar</button>
                     <button
                       onClick={() => onCargar(p)}
                       style={{ background: "#4ec9b8", color: "#0a0a0a", border: "none", padding: "7px 4px", borderRadius: 3, fontSize: 9, fontWeight: 700, cursor: "pointer", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}
