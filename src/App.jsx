@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v139";
+const APP_VERSION = "v140";
 
 // v97: Departamentos de un rodaje audiovisual (obligatorio en cada perfil)
 const DEPARTAMENTOS = [
@@ -5210,9 +5210,26 @@ ${docHTML}
               </div>
             </>
           ) : (
-            <div style={{ ...P, textAlign:"center", padding:"80px 24px" }}>
-              <div style={{ fontSize:36, marginBottom:12, opacity:0.3 }}>📋</div>
-              <div style={{ fontSize:10, color:"#bbb", letterSpacing:"0.15em", textTransform:"uppercase" }}>Introduce el salario y las fechas<br/>para calcular el desglose</div>
+            <div style={{ ...P, textAlign:"center", padding:"64px 24px" }}>
+              <div style={{ width:46, height:46, margin:"0 auto 16px", borderRadius:10, display:"flex", alignItems:"center", justifyContent:"center",
+                            background: fechasPendientes ? "#fdf3e3" : "#eaf6f3",
+                            border: `1px solid ${fechasPendientes ? "#e8c98a" : "#c7e8e0"}` }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={fechasPendientes ? "#b26a00" : "#4ec9b8"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  {fechasPendientes ? (
+                    <><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></>
+                  ) : (
+                    <><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></>
+                  )}
+                </svg>
+              </div>
+              <div style={{ fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontSize:12, letterSpacing:"0.15em", textTransform:"uppercase", fontWeight:700, color:"#1a1a1a", marginBottom:8 }}>
+                {fechasPendientes ? "Pendiente de fechas" : "Sin datos suficientes"}
+              </div>
+              <div style={{ fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontSize:12, color:"#666", lineHeight:1.6, maxWidth:430, margin:"0 auto" }}>
+                {fechasPendientes
+                  ? "El perfil se puede guardar así. Cuando conozcas las fechas, ábrelo con Modificar, desmarca «Fechas pendientes» y pulsa Guardar cambios."
+                  : "Introduce el salario y las fechas de inicio y fin para calcular el desglose."}
+              </div>
             </div>
           )}
         </div>
