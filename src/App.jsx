@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v140";
+const APP_VERSION = "v141";
 
 // v97: Departamentos de un rodaje audiovisual (obligatorio en cada perfil)
 const DEPARTAMENTOS = [
@@ -1019,6 +1019,10 @@ function Field({ label, value, onChange, onBlur, type = "number", prefix, hint, 
             cursor: readOnly ? "not-allowed" : "text",
           }}
           onFocus={e => { if (!readOnly) e.target.style.borderColor = "#4ec9b8"; }}
+          // v141: la rueda del ratón sobre un input numérico enfocado cambiaba el valor
+          // (scroll de página = -1 € por muesca). Lo mismo con las flechas arriba/abajo.
+          onWheel={e => { if (e.target === document.activeElement) e.target.blur(); }}
+          onKeyDown={e => { if (type !== "date" && type !== "text" && (e.key === "ArrowUp" || e.key === "ArrowDown")) e.preventDefault(); }}
           onBlur={e  => {
             if (!readOnly) e.target.style.borderColor = "#2a2a2a";
             if (onBlur) onBlur(e.target.value);
