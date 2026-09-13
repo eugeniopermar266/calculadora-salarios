@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v143";
+const APP_VERSION = "v144";
 
 // v97: Departamentos de un rodaje audiovisual (obligatorio en cada perfil)
 const DEPARTAMENTOS = [
@@ -9278,10 +9278,13 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
     return (p.datos?.departamento || "") === filtroDepto;
   }).sort((a, b) => {
     // v136: ordenación
+    // v144: estos perfiles vienen crudos de Supabase y no traen "timestamp";
+    //       la fecha real está en created_at.
+    const ts = (x) => x.timestamp || (x.created_at ? new Date(x.created_at).getTime() : 0);
     const colator = new Intl.Collator("es", { sensitivity: "base", numeric: true });
     switch (orden) {
-      case "recientes":     return (b.timestamp || 0) - (a.timestamp || 0);
-      case "antiguos":      return (a.timestamp || 0) - (b.timestamp || 0);
+      case "recientes":     return ts(b) - ts(a);
+      case "antiguos":      return ts(a) - ts(b);
       case "nombre_asc":    return colator.compare(a.nombre || "", b.nombre || "");
       case "nombre_desc":   return colator.compare(b.nombre || "", a.nombre || "");
       case "salario_desc":  return (Number(b.datos?.salario45) || 0) - (Number(a.datos?.salario45) || 0);
