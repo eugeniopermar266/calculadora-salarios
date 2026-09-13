@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v141";
+const APP_VERSION = "v143";
 
 // v97: Departamentos de un rodaje audiovisual (obligatorio en cada perfil)
 const DEPARTAMENTOS = [
@@ -1307,9 +1307,10 @@ function GestorPerfiles({ tabId, datosActuales, onCargarPerfil, onRegistrarAccio
       try {
         // v46: Cargar de Supabase (fuente principal) + localStorage (respaldo)
         // Admin puede ver todos los proyectos con toggle
-        const supTabId = tabId === "45h" ? "45h" : tabId === "40h" ? "40h" : tabId;
+        // v142: se traen los perfiles de AMBAS pestañas (45h y 40h). El filtro
+        // TIPO del modal Cargar Perfil es quien decide qué se muestra.
         const perfilesSup = await listarPerfilesSupabase({
-          tabId: supTabId,
+          tabId: null,
           proyectoId: proyectoActivoCtx?.id || null,
           verTodos: esAdmin && verTodosProyectos,
           adminPin: esAdmin ? usuarioCtx.pin : null,
@@ -1354,13 +1355,11 @@ function GestorPerfiles({ tabId, datosActuales, onCargarPerfil, onRegistrarAccio
             return { key: k, fuente: "local", ...data };
           } catch { return null; }
         }));
-        const localFiltrado = listaLocal.filter(Boolean).filter(p => {
-          if (!tabId) return true;
-          if (p.tabId === tabId) return true;
-          if (!p.tabId && tabId === "45h") return true;
-          if (!p.tabId && tabId === "40h" && p.key && p.key.startsWith("perfil_40h_")) return true;
-          return false;
-        });
+        // v142: sin filtro por pestaña — se conservan los de 45h y 40h
+        const localFiltrado = listaLocal.filter(Boolean).map(p => ({
+          ...p,
+          tabId: p.tabId || (p.key && p.key.startsWith("perfil_40h_") ? "40h" : "45h"),
+        }));
 
         // v95: SIMPLIFICADO — Supabase como única fuente visible.
         // localStorage se mantiene solo como respaldo silencioso si Supabase falla.
@@ -1485,6 +1484,13 @@ function GestorPerfiles({ tabId, datosActuales, onCargarPerfil, onRegistrarAccio
   // v138: Cargar = solo trae los datos (al guardar crea perfil nuevo).
   //       Modificar = carga enlazado a esa tarjeta (al guardar sobrescribe).
   const cargarPerfil = (perfil, enlazar = false) => {
+    // v142: los perfiles de la otra pestaña ya se listan; avisamos antes de cargarlos
+    if (perfil.tabId && tabId && perfil.tabId !== tabId) {
+      const ok = confirm(
+        `Este perfil es de ${perfil.tabId.toUpperCase()} y estás en la pestaña ${tabId.toUpperCase()}.\n\n¿Cargarlo igualmente?\n\n(Los cálculos se harán con el modelo de ${tabId.toUpperCase()})`
+      );
+      if (!ok) return;
+    }
     onCargarPerfil(perfil.datos);
     setPerfilEnEdicion(enlazar ? perfil : null);
     setMostrarLista(false);
@@ -9040,7 +9046,7 @@ function ModalCargarPerfil({ perfiles, cargando, onCerrar, onCargar, onBorrarSel
               const fBaja = fmtFecha(p.datos?.fechaFin);
               return (
                 <div key={id}
-                  style={{ background: sel ? "#faf6ee" : "#f2f5f7", border: sel ? "2px solid #4ec9b8" : "1px solid #d5d9dc", borderRadius: 6, padding: 12, transition: "all 0.15s", position: "relative" }}>
+                  style={{ background: sel ? "#eaf6f3" : "#f2f5f7", border: sel ? "2px solid #4ec9b8" : "1px solid #d5d9dc", borderRadius: 6, padding: 12, transition: "all 0.15s", position: "relative" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
                     <input type="checkbox" checked={sel} onChange={() => toggleSel(id)} style={{ cursor: "pointer", marginTop: 2 }} />
                     <span style={{ background: es40 ? "#6a3a9a" : "#4ec9b8", color: "#f2f5f7", fontSize: 8, padding: "2px 6px", borderRadius: 2, letterSpacing: "0.08em", fontWeight: 700 }}>
@@ -9502,7 +9508,7 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
       <div style={{ background: "#e8ecef", borderRadius: 8, padding: 24, maxWidth: 900, width: "100%", maxHeight: "90vh", overflow: "auto", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, paddingBottom: 12, borderBottom: "2px solid #4ec9b8" }}>
           <h2 style={{ margin: 0, fontSize: 14, letterSpacing: "0.15em", textTransform: "uppercase", color: "#1a1a1a", fontWeight: 700 }}>📊 Exportar listado de perfiles</h2>
-          <button onClick={onCerrar} style={{ background: "#f2f5f7", border: "1px solid #4ec9b8", padding: "6px 14px", borderRadius: 4, cursor: "pointer", fontSize: 11, color: "#4ec9b8", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontWeight: 700 }}>✕ Cerrar</button>
+          <button onClick={onCerrar} style={{ background: "#fff", border: "1px solid #4ec9b8", padding: "6px 14px", borderRadius: 4, cursor: "pointer", fontSize: 11, color: "#4ec9b8", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontWeight: 700 }}>✕ Cerrar</button>
         </div>
 
         {mensaje && (
@@ -9514,7 +9520,7 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
 
         {!proyectoSel ? (
           <div>
-            <div style={{ fontSize: 11, color: "#666", marginBottom: 12, letterSpacing: "0.05em", padding: "10px 12px", background: "#f4f0e8", borderRadius: 4, border: "1px solid #d5d9dc" }}>
+            <div style={{ fontSize: 11, color: "#666", marginBottom: 12, letterSpacing: "0.05em", padding: "10px 12px", background: "#f2f5f7", borderRadius: 4, border: "1px solid #d5d9dc" }}>
               <strong style={{ color: "#4ec9b8" }}>Paso 1:</strong> Elige el proyecto del que quieres exportar los perfiles.
             </div>
             {cargando ? <div style={{ padding: 20, textAlign: "center", color: "#888" }}>Cargando proyectos…</div> : (
@@ -9523,7 +9529,7 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
                 {proyectos.map(p => (
                   <button key={p.id} onClick={() => cargarPerfiles(p)}
                     style={{ background: "#f2f5f7", border: "1px solid #d5d9dc", borderRadius: 5, padding: "12px 16px", cursor: "pointer", textAlign: "left", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", transition: "all 0.15s", display: "flex", justifyContent: "space-between", alignItems: "center" }}
-                    onMouseEnter={e => { e.currentTarget.style.borderColor = "#4ec9b8"; e.currentTarget.style.background = "#faf6ee"; }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = "#4ec9b8"; e.currentTarget.style.background = "#eaf6f3"; }}
                     onMouseLeave={e => { e.currentTarget.style.borderColor = "#d5d9dc"; e.currentTarget.style.background = "#f2f5f7"; }}
                   >
                     <div>
@@ -9539,7 +9545,7 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
           </div>
         ) : (
           <div>
-            <div style={{ background: "#f4f0e8", padding: "12px 14px", borderRadius: 5, marginBottom: 14, border: "1px solid #d5d9dc", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+            <div style={{ background: "#f2f5f7", padding: "12px 14px", borderRadius: 5, marginBottom: 14, border: "1px solid #d5d9dc", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
               <div>
                 <div style={{ fontSize: 9, color: "#888", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 2 }}>Proyecto seleccionado</div>
                 <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a" }}>{proyectoSel.nombre}</div>
@@ -9554,11 +9560,11 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
               <>
                 {perfiles.length > 0 && (
                   <div style={{ display: "flex", gap: 6, marginBottom: 10, alignItems: "center", flexWrap: "wrap" }}>
-                    <span style={{ fontSize: 10, color: "#666", letterSpacing: "0.05em", marginRight: 4 }}>Selección:</span>
-                    <button onClick={seleccionarTodos} style={{ fontSize: 10, padding: "5px 12px", border: "1px solid #4ec9b8", borderRadius: 4, background: "#f2f5f7", cursor: "pointer", color: "#4ec9b8", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontWeight: 700 }}>Todos</button>
-                    <button onClick={deseleccionarTodos} style={{ fontSize: 10, padding: "5px 12px", border: "1px solid #ccc", borderRadius: 4, background: "#f2f5f7", cursor: "pointer", color: "#666", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontWeight: 700 }}>Ninguno</button>
-                    <button onClick={invertirSeleccion} style={{ fontSize: 10, padding: "5px 12px", border: "1px solid #ccc", borderRadius: 4, background: "#f2f5f7", cursor: "pointer", color: "#666", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontWeight: 700 }}>Invertir</button>
-                    <span style={{ fontSize: 9, color: "#999", marginLeft: 8, fontStyle: "italic" }}>Los ya exportados están en gris.</span>
+                    <span style={{ fontSize: 10, color: "#666", letterSpacing: "0.05em", marginRight: 4, textTransform: "uppercase", fontWeight: 700 }}>Selección:</span>
+                    <button onClick={seleccionarTodos} style={{ fontSize: 10, padding: "6px 14px", border: "1px solid #4ec9b8", borderRadius: 4, background: "#4ec9b8", cursor: "pointer", color: "#0a0a0a", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>Todos</button>
+                    <button onClick={deseleccionarTodos} style={{ fontSize: 10, padding: "6px 14px", border: "1px solid #ccc", borderRadius: 4, background: "#fff", cursor: "pointer", color: "#666", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>Ninguno</button>
+                    <button onClick={invertirSeleccion} style={{ fontSize: 10, padding: "6px 14px", border: "1px solid #ccc", borderRadius: 4, background: "#fff", cursor: "pointer", color: "#666", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>Invertir</button>
+                    <span style={{ fontSize: 9, color: "#888", marginLeft: 8, fontStyle: "italic" }}>Los ya exportados están en gris.</span>
                   </div>
                 )}
 
@@ -9566,7 +9572,7 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
                 {perfiles.length > 0 && (
                   <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 10, flexWrap: "wrap" }}>
                     <label style={{ fontSize: 10, color: "#666", letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 700 }}>Filtrar:</label>
-                    <select value={filtroDepto} onChange={(e) => setFiltroDepto(e.target.value)} style={{ padding: "5px 10px", fontSize: 11, border: "1px solid #4ec9b8", borderRadius: 4, background: "#f2f5f7", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", cursor: "pointer", color: "#1a1a1a" }}>
+                    <select value={filtroDepto} onChange={(e) => setFiltroDepto(e.target.value)} style={{ padding: "5px 10px", fontSize: 11, border: "1px solid #4ec9b8", borderRadius: 4, background: "#fff", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", cursor: "pointer", color: "#1a1a1a" }}>
                       <option value="__todos__">Todos los departamentos</option>
                       <option value="__sin__">— Sin departamento —</option>
                       {DEPARTAMENTOS.map(d => {
@@ -9613,7 +9619,7 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
                         const sel = seleccionados.has(p.id);
                         const depto = p.datos?.departamento || "";
                         return (
-                          <tr key={p.id} style={{ borderBottom: "1px solid #dfe4e8", background: yaExp ? "#f5f4f0" : (sel ? "#faf6ee" : "transparent"), color: yaExp ? "#999" : "#1a1a1a", cursor: "pointer" }} onClick={() => toggleSel(p.id)}>
+                          <tr key={p.id} style={{ borderBottom: "1px solid #dfe4e8", background: yaExp ? "#e3e7ea" : (sel ? "#eaf6f3" : "transparent"), color: yaExp ? "#777" : "#1a1a1a", cursor: "pointer" }} onClick={() => toggleSel(p.id)}>
                             <td style={{ padding: "8px 6px", textAlign: "center" }}>
                               <input type="checkbox" checked={sel} onChange={() => toggleSel(p.id)} onClick={e => e.stopPropagation()} style={{ cursor: "pointer" }} />
                             </td>
@@ -9622,7 +9628,7 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
                             <td style={{ padding: "8px", fontSize: 10 }}>{p.datos?.puesto || "—"}</td>
                             <td style={{ padding: "8px", fontSize: 10, color: depto ? "#1a1a1a" : "#c04040", fontStyle: depto ? "normal" : "italic" }}>{depto || "sin depto"}</td>
                             <td style={{ padding: "8px", textAlign: "right", fontSize: 10 }}>{p.datos?.salario45 ? Number(p.datos.salario45).toFixed(0) + " €" : "—"}</td>
-                            <td style={{ padding: "8px", fontSize: 9, color: yaExp ? "#666" : "#bbb" }}>
+                            <td style={{ padding: "8px", fontSize: 9, color: yaExp ? "#555" : "#999" }}>
                               {yaExp ? (
                                 <div>
                                   <div>{new Date(p.exportado_el).toLocaleDateString("es-ES")}</div>
@@ -9654,7 +9660,7 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
                       </div>
                     </div>
                     <button onClick={exportar} disabled={seleccionados.size === 0}
-                      style={{ background: seleccionados.size === 0 ? "#ccc" : "#4ec9b8", color: "#f2f5f7", border: "none", padding: "12px 24px", borderRadius: 5, cursor: seleccionados.size === 0 ? "not-allowed" : "pointer", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>
+                      style={{ background: seleccionados.size === 0 ? "#ccc" : "#4ec9b8", color: "#0a0a0a", border: "none", padding: "12px 24px", borderRadius: 5, cursor: seleccionados.size === 0 ? "not-allowed" : "pointer", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>
                       📥 Exportar {seleccionados.size} perfil{seleccionados.size !== 1 ? "es" : ""}
                     </button>
                   </div>
