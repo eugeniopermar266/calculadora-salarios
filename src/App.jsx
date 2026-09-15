@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v146";
+const APP_VERSION = "v147";
 
 // v97: Departamentos de un rodaje audiovisual (obligatorio en cada perfil)
 const DEPARTAMENTOS = [
@@ -5158,7 +5158,7 @@ ${docHTML}
                       <Div />
                       <details open style={{ padding:"14px 18px", background:"#e3f2fd", borderRadius:8, border:"1px solid #90caf9" }}>
                         <summary style={{ cursor:"pointer", fontSize:12, color:"#1a1a1a", letterSpacing:"0.12em", textTransform:"uppercase", fontWeight:800, marginBottom:2, outline:"none", fontFamily:"'Inter', -apple-system, sans-serif" }}>
-                          ▸ Coste Empresa (vista rápida) <span style={{ fontSize:10, color:"#1565c0", marginLeft:8, letterSpacing:"0.05em", fontWeight: 600 }}>solo admin · solo SS</span>
+                          ▸ Coste Empresa (vista rápida) <span style={{ fontSize:10, color:"#1565c0", marginLeft:8, letterSpacing:"0.05em", fontWeight: 600 }}>solo SS</span>
                         </summary>
                         <div style={{ marginTop:12, display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:10 }}>
                           <div style={{ padding:"14px 16px", background:"#fff", borderRadius:8, border:"1px solid #bbdefb" }}>
@@ -11435,6 +11435,21 @@ export default function App() {
             // Confirmado: el usuario ya no existe o cambió el PIN
             localStorage.removeItem(AUTH_KEY);
             setUsuario(null);
+            return;
+          }
+          // v147: refrescar permisos. Antes, si un admin cambiaba el rol de
+          // alguien, su navegador seguía con el rol viejo hasta que cerraba
+          // sesión a mano. Ahora se actualiza solo al abrir la app.
+          const rolNuevo = u.rol || (u.es_admin ? "admin" : "user");
+          const rolViejo = parsed.rol || (parsed.es_admin ? "admin" : "user");
+          if (rolNuevo !== rolViejo || !!u.es_admin !== !!parsed.es_admin) {
+            setUsuario(prev => prev ? { ...prev, es_admin: u.es_admin, rol: rolNuevo } : prev);
+            try {
+              const actual = JSON.parse(localStorage.getItem(AUTH_KEY) || "{}");
+              localStorage.setItem(AUTH_KEY, JSON.stringify({
+                ...actual, es_admin: u.es_admin, rol: rolNuevo,
+              }));
+            } catch {}
           }
         })
         .catch(() => { /* error de red: dejar al usuario dentro */ });
