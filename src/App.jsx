@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v144";
+const APP_VERSION = "v145";
 
 // v97: Departamentos de un rodaje audiovisual (obligatorio en cada perfil)
 const DEPARTAMENTOS = [
@@ -2766,28 +2766,36 @@ function DocumentoImprimible({
     letterSpacing: "0.18em", textTransform: "uppercase",
     color: "#1a1a1a", paddingBottom: 2,
   };
+  // v145: paleta neutra del PDF — fuera cremas heredados, bordes con más contraste
+  const PDF_BORDE  = "#a8b0b6";   // v145: antes #d5d9dc / #d8d4ce
+  const PDF_FONDO  = "#e8ecef";   // v145: antes #fafaf7 / #fdf8f0
+  const PDF_AZUL   = "#e3eefa";   // v145: fondo de las filas de total
+  const PDF_AZUL_B = "#b4cde6";   // v145: borde de las filas de total
   const tdHead = {
-    padding: "5px 6px", fontSize: 7,
+    padding: "5px 6px", fontSize: 8,              // v145: 7 -> 8 para que se lea
     letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 700,
-    color: "#666", background: "#f2f5f7",
-    border: "1px solid #d8d4ce",
+    color: "#333", background: PDF_FONDO,          // v145: #666 -> #333
+    border: `1px solid ${PDF_BORDE}`,
   };
   const tdCell = (extra = {}) => ({
     padding: "4px 6px", fontSize: 9,
-    border: "1px solid #d5d9dc",
+    border: `1px solid ${PDF_BORDE}`,
     fontFamily: "'Courier Prime', 'Courier New', monospace",
     ...extra,
   });
   const tdLabel = {
     padding: "5px 8px", fontSize: 9,
-    background: "#fafaf7",
-    border: "1px solid #d5d9dc",
+    background: PDF_FONDO,
+    border: `1px solid ${PDF_BORDE}`,
     color: "#1a1a1a",
+    fontWeight: 700,                               // v145: valores en negrita
     fontFamily: "'Courier Prime', 'Courier New', monospace",
   };
   const tdValue = {
     padding: "5px 8px", fontSize: 9,
-    border: "1px solid #d5d9dc",
+    border: `1px solid ${PDF_BORDE}`,
+    color: "#1a1a1a",
+    fontWeight: 700,                               // v145: valores en negrita
     fontFamily: "'Courier Prime', 'Courier New', monospace",
   };
 
@@ -2841,29 +2849,33 @@ function DocumentoImprimible({
       <div style={{ position: "relative", zIndex: 1 }}>
 
       {/* ═══ CABECERA ═══ */}
-      <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 14 }}>
-        <tbody>
-          <tr>
-            <td style={{ width: "45%", verticalAlign: "middle", padding: 0 }}>
-              <div style={{ background: "#1a1a1a", padding: "10px 14px", borderRadius: 4, display: "inline-block" }}>
-                <img src="/logo.png" alt="Bdprodtools" style={{ height: 40, width: "auto", display: "block" }} />
-              </div>
-            </td>
-            <td style={{ width: "55%", verticalAlign: "middle", padding: 0, textAlign: "right" }}>
-              <div style={{ fontSize: 8, color: "#888", letterSpacing: "0.3em", textTransform: "uppercase", marginBottom: 3 }}>
-                Desglose Salarial · {es40h ? "40 Horas" : "45 Horas"}
-              </div>
-              <div style={{ fontSize: 16, fontWeight: 700, letterSpacing: "0.05em", color: "#1a1a1a", marginBottom: 5 }}>
-                CALCULADORA DE SALARIOS
-              </div>
-              <div style={{ fontSize: 9, color: "#1a1a1a", letterSpacing: "0.05em" }}>
-                <span style={{ background: "#1a1a1a", color: "#f2f5f7", padding: "1px 4px", marginRight: 4, fontSize: 7 }}>📁</span>
-                {(proyecto || "—") + " · " + (productora || "—")}
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      {/* v145: cabecera convertida en banner de marca (logo 58px + filo turquesa) */}
+      <div style={{ marginBottom: 14, WebkitPrintColorAdjust: "exact", printColorAdjust: "exact" }}>
+        <div style={{
+          background: "#1a1a1a", padding: "18px 20px",
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          borderRadius: "4px 4px 0 0",
+        }}>
+          <img src="/logo.png" alt="Bdprodtools" style={{ height: 58, width: "auto", display: "block" }} />
+          <div style={{ textAlign: "right", color: "#ffffff" }}>
+            <div style={{ fontSize: 8, color: "#9aa5ab", fontWeight: 700, letterSpacing: "0.3em", textTransform: "uppercase", marginBottom: 4 }}>
+              Desglose Salarial · {es40h ? "40 Horas" : "45 Horas"}
+            </div>
+            <div style={{ fontSize: 17, fontWeight: 700, letterSpacing: "0.06em", marginBottom: 6 }}>
+              CALCULADORA DE SALARIOS
+            </div>
+            <span style={{
+              display: "inline-block", border: "1px solid rgba(255,255,255,0.18)",
+              color: "#f2f5f7", padding: "2px 9px", fontSize: 8,
+              letterSpacing: "0.14em", borderRadius: 3,
+            }}>
+              {(proyecto || "—") + " · " + (productora || "—")}
+            </span>
+          </div>
+        </div>
+        {/* v145: filo con el turquesa de marca BD PROD TOOLS */}
+        <div style={{ height: 3, background: "#4ec9b8", borderRadius: "0 0 4px 4px" }} />
+      </div>
 
       {/* ═══ TRABAJADOR ═══ */}
       <div style={sectionTitle}>▸ TRABAJADOR</div>
@@ -2875,7 +2887,7 @@ function DocumentoImprimible({
           </tr>
           <tr>
             <td style={tdLabel}><strong>Nombre:</strong> {nombre || "—"}</td>
-            <td style={tdValue}><strong>Puesto:</strong> {puesto || "—"}{codigoContable ? <span style={{ color: "#888", marginLeft: 6, fontWeight: 400, fontSize: 10 }}>· {codigoContable}</span> : null}</td>
+            <td style={tdValue}><strong>Puesto:</strong> {puesto || "—"}{codigoContable ? <span style={{ color: "#444", marginLeft: 6, fontWeight: 700, fontSize: 10 }}>· {codigoContable}</span> : null}</td>
           </tr>
           {!es40h && (
             <tr>
@@ -2916,14 +2928,15 @@ function DocumentoImprimible({
             ].map((it, idx, arr) => (
               <td key={idx} style={{
                 width: `${100/arr.length}%`,
-                border: "1px solid #d5d9dc",
+                border: `1px solid ${PDF_BORDE}`,
                 padding: "10px 6px",
                 textAlign: "center",
-                background: "#fafaf7",
+                background: PDF_FONDO,
               }}>
-                <div style={{ fontSize: 7, color: "#888", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: 5 }}>{it.l}</div>
+                {/* v145: etiqueta y fórmula subidas de 7px a 8px y oscurecidas */}
+                <div style={{ fontSize: 8, color: "#444", fontWeight: 700, letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: 5 }}>{it.l}</div>
                 <div style={{ fontSize: 13, fontWeight: 700, color: it.blue ? "#1a1a1a" : "#1a1a1a" }}>{fmt(it.v)} €</div>
-                <div style={{ fontSize: 7, color: "#aaa", marginTop: 4 }}>{it.s}</div>
+                <div style={{ fontSize: 8, color: "#666", fontWeight: 600, marginTop: 4 }}>{it.s}</div>
               </td>
             ))}
           </tr>
@@ -2934,7 +2947,7 @@ function DocumentoImprimible({
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <tbody>
               <tr>
-                <td style={{ background: "#fdf8f0", border: "1px solid #e8d4a8", padding: "7px 10px", textAlign: "center", fontSize: 10, fontWeight: 700, color: "#1a1a1a", letterSpacing: "0.04em", width: "50%" }}>
+                <td style={{ background: PDF_FONDO, border: `1px solid ${PDF_BORDE}`, padding: "7px 10px", textAlign: "center", fontSize: 10, fontWeight: 700, color: "#1a1a1a", letterSpacing: "0.04em", width: "50%" }}>
                   TOTAL MES 40H · <span style={{ color: "#1a1a1a", fontSize: 12 }}>{fmt(baseRef + vacRef + indemRef)} €</span> <span style={{ display: "inline-block", background: "#1a1a1a", color: "#f2f5f7", fontSize: 8, fontWeight: 700, letterSpacing: "0.1em", padding: "1px 5px", borderRadius: 3, marginLeft: 4, verticalAlign: "middle" }}>BRUTOS</span>
                 </td>
                 <td style={{ background: "#f0f6fc", border: "1px solid #c8d8e8", padding: "7px 10px", textAlign: "center", fontSize: 10, fontWeight: 700, color: "#1a1a1a", letterSpacing: "0.04em", width: "50%" }}>
@@ -2945,7 +2958,7 @@ function DocumentoImprimible({
             </tbody>
           </table>
           {!vacAcumulada && (
-            <div style={{ marginTop: 8, padding: "7px 10px", background: "#fafaf7", border: "1px solid #d5d9dc", borderRadius: 3, fontSize: 9, color: "#555", lineHeight: 1.5, fontStyle: "italic" }}>
+            <div style={{ marginTop: 8, padding: "7px 10px", background: PDF_FONDO, border: `1px solid ${PDF_BORDE}`, borderRadius: 3, fontSize: 9, color: "#444", lineHeight: 1.5 }}>
               <strong style={{ color: "#1a1a1a", fontStyle: "normal" }}>Nota:</strong> Salario en contrato es la suma del salario base + las vacaciones.
             </div>
           )}
@@ -2955,7 +2968,7 @@ function DocumentoImprimible({
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <tbody>
               <tr>
-                <td style={{ background: "#fdf8f0", border: "1px solid #e8d4a8", padding: "7px 10px", textAlign: "center", fontSize: 10, fontWeight: 700, color: "#1a1a1a", letterSpacing: "0.04em", width: "50%" }}>
+                <td style={{ background: PDF_FONDO, border: `1px solid ${PDF_BORDE}`, padding: "7px 10px", textAlign: "center", fontSize: 10, fontWeight: 700, color: "#1a1a1a", letterSpacing: "0.04em", width: "50%" }}>
                   TOTAL MES 45H TODO INCLUIDO · <span style={{ color: "#1a1a1a", fontSize: 12 }}>{fmt(sumaRef)} €</span> <span style={{ display: "inline-block", background: "#1a1a1a", color: "#f2f5f7", fontSize: 8, fontWeight: 700, letterSpacing: "0.1em", padding: "1px 5px", borderRadius: 3, marginLeft: 4, verticalAlign: "middle" }}>BRUTOS</span>
                 </td>
                 <td style={{ background: "#f0f6fc", border: "1px solid #c8d8e8", padding: "7px 10px", textAlign: "center", fontSize: 10, fontWeight: 700, color: "#1a1a1a", letterSpacing: "0.04em", width: "50%" }}>
@@ -2964,7 +2977,7 @@ function DocumentoImprimible({
               </tr>
             </tbody>
           </table>
-          <div style={{ marginTop: 8, padding: "7px 10px", background: "#fafaf7", border: "1px solid #d5d9dc", borderRadius: 3, fontSize: 9, color: "#555", lineHeight: 1.5, fontStyle: "italic" }}>
+          <div style={{ marginTop: 8, padding: "7px 10px", background: PDF_FONDO, border: `1px solid ${PDF_BORDE}`, borderRadius: 3, fontSize: 9, color: "#444", lineHeight: 1.5 }}>
             <strong style={{ color: "#1a1a1a", fontStyle: "normal" }}>Nota:</strong> El salario que figura en contrato es la suma del salario base 40h más las vacaciones.
           </div>
         </>
@@ -3009,11 +3022,11 @@ function DocumentoImprimible({
               { l: "TOTAL", a: "right", gold: true },
             ].map((h, hi) => (
               <th key={hi} style={{
-                padding: "5px 4px", fontSize: 7,
+                padding: "5px 4px", fontSize: 8,                 // v145: 7 -> 8
                 textAlign: h.a, letterSpacing: "0.05em", textTransform: "uppercase", fontWeight: 700,
-                color: h.gold ? "#1a1a1a" : "#666",
-                background: "#f2f5f7",
-                border: "1px solid #d8d4ce",
+                color: h.gold ? "#1a1a1a" : "#333",              // v145: #666 -> #333
+                background: PDF_FONDO,
+                border: `1px solid ${PDF_BORDE}`,
               }}>{h.l}</th>
             ))}
           </tr>
@@ -3030,52 +3043,52 @@ function DocumentoImprimible({
             // En 40H restamos el plusAct del totalMes porque esa columna se elimina
             const totalRow = (es40h ? (d.totalMes - (d.plusAct || 0)) : d.totalMes) + fest + (c.total || 0);
             return (
-              <tr key={i} style={{ background: i % 2 === 0 ? "#f2f5f7" : "#fafaf7" }}>
+              <tr key={i} style={{ background: i % 2 === 0 ? "#ffffff" : "#f2f5f7" }}>
                 <td style={tdCell({ textTransform: "capitalize", fontWeight: 700 })}>
                   {d.mes}
-                  {!d.esCompleto && <span style={{ fontSize: 7, color: "#888", marginLeft: 3 }}>({d.desde}-{d.hasta})</span>}
+                  {!d.esCompleto && <span style={{ fontSize: 8, color: "#555", marginLeft: 3 }}>({d.desde}-{d.hasta})</span>}
                 </td>
-                <td style={tdCell({ textAlign: "right", color: "#888" })}>{fmtM(d.fraccion)}</td>
+                <td style={tdCell({ textAlign: "right", color: "#555" })}>{fmtM(d.fraccion)}</td>
                 <td style={tdCell({ textAlign: "right" })}>{fmt(d.base40)}</td>
-                <td style={tdCell({ textAlign: "right", color: d.vac40 === 0 ? "#bbb" : "#1a1a1a" })}>{d.vac40 === 0 ? "—" : fmt(d.vac40)}</td>
-                <td style={tdCell({ textAlign: "right", color: d.indem40 === 0 ? "#bbb" : "#1a1a1a" })}>{d.indem40 === 0 ? "—" : fmt(d.indem40)}</td>
+                <td style={tdCell({ textAlign: "right", color: d.vac40 === 0 ? "#999" : "#1a1a1a" })}>{d.vac40 === 0 ? "—" : fmt(d.vac40)}</td>
+                <td style={tdCell({ textAlign: "right", color: d.indem40 === 0 ? "#999" : "#1a1a1a" })}>{d.indem40 === 0 ? "—" : fmt(d.indem40)}</td>
                 <td style={tdCell({ textAlign: "right", color: "#1a1a1a" })}>{d.hMes}h</td>
                 <td style={tdCell({ textAlign: "right", color: "#1a1a1a" })}>{fmt(d.cobroHx)}</td>
-                {!es40h && <td style={tdCell({ textAlign: "right", color: d.plusAct > 0 ? "#b07030" : "#bbb", fontWeight: d.plusAct > 0 ? 600 : 400 })}>{d.plusAct > 0 ? fmt(d.plusAct) : "—"}</td>}
-                <td style={tdCell({ textAlign: "right", color: vd > 0 ? "#8a2a20" : "#bbb" })}>{vd > 0 ? `−${fmt(vd)}` : "—"}</td>
-                <td style={tdCell({ textAlign: "right", color: fest > 0 ? "#6a3a9a" : "#bbb" })}>{fest > 0 ? fmt(fest) : "—"}</td>
-                <td style={tdCell({ textAlign: "right", color: (d.importeJE || 0) > 0 ? "#8a1e4a" : "#bbb" })}>{(d.importeJE || 0) > 0 ? fmt(d.importeJE) : "—"}</td>
-                <td style={tdCell({ textAlign: "right", color: plusesSinComida > 0 ? "#5a8a5a" : "#bbb" })}>{plusesSinComida > 0 ? fmt(plusesSinComida) : "—"}</td>
-                <td style={tdCell({ textAlign: "right", color: comida > 0 ? "#5a8a5a" : "#bbb" })}>{comida > 0 ? fmt(comida) : "—"}</td>
+                {!es40h && <td style={tdCell({ textAlign: "right", color: d.plusAct > 0 ? "#4a5157" : "#999", fontWeight: d.plusAct > 0 ? 600 : 400 })}>{d.plusAct > 0 ? fmt(d.plusAct) : "—"}</td>}
+                <td style={tdCell({ textAlign: "right", color: vd > 0 ? "#8a2a20" : "#999" })}>{vd > 0 ? `−${fmt(vd)}` : "—"}</td>
+                <td style={tdCell({ textAlign: "right", color: fest > 0 ? "#6a3a9a" : "#999" })}>{fest > 0 ? fmt(fest) : "—"}</td>
+                <td style={tdCell({ textAlign: "right", color: (d.importeJE || 0) > 0 ? "#8a1e4a" : "#999" })}>{(d.importeJE || 0) > 0 ? fmt(d.importeJE) : "—"}</td>
+                <td style={tdCell({ textAlign: "right", color: plusesSinComida > 0 ? "#5a8a5a" : "#999" })}>{plusesSinComida > 0 ? fmt(plusesSinComida) : "—"}</td>
+                <td style={tdCell({ textAlign: "right", color: comida > 0 ? "#5a8a5a" : "#999" })}>{comida > 0 ? fmt(comida) : "—"}</td>
                 <td style={tdCell({ textAlign: "right", color: "#1a1a1a", fontWeight: 700 })}>{fmt(totalRow)}</td>
               </tr>
             );
           })}
           {/* Fila TOTAL */}
-          <tr style={{ background: "#fdf8f0", fontWeight: 700 }}>
-            <td style={tdCell({ background: "#fdf8f0", color: "#1a1a1a", letterSpacing: "0.1em", textTransform: "uppercase", fontSize: 8 })}>TOTAL</td>
-            <td style={tdCell({ background: "#fdf8f0", textAlign: "right", color: "#888" })}>—</td>
-            <td style={tdCell({ background: "#fdf8f0", textAlign: "right" })}>{fmt(totBase)}</td>
-            <td style={tdCell({ background: "#fdf8f0", textAlign: "right" })}>{fmt(totVac)}</td>
-            <td style={tdCell({ background: "#fdf8f0", textAlign: "right" })}>{fmt(totIndem)}</td>
-            <td style={tdCell({ background: "#fdf8f0", textAlign: "right", color: "#1a1a1a" })}>
+          <tr style={{ background: PDF_AZUL, fontWeight: 700 }}>
+            <td style={tdCell({ background: PDF_AZUL, color: "#1a1a1a", letterSpacing: "0.1em", textTransform: "uppercase", fontSize: 8 })}>TOTAL</td>
+            <td style={tdCell({ background: PDF_AZUL, textAlign: "right", color: "#555" })}>—</td>
+            <td style={tdCell({ background: PDF_AZUL, textAlign: "right" })}>{fmt(totBase)}</td>
+            <td style={tdCell({ background: PDF_AZUL, textAlign: "right" })}>{fmt(totVac)}</td>
+            <td style={tdCell({ background: PDF_AZUL, textAlign: "right" })}>{fmt(totIndem)}</td>
+            <td style={tdCell({ background: PDF_AZUL, textAlign: "right", color: "#1a1a1a" })}>
               {horasPorMes.reduce((s, v, i) => {
                 if (v === undefined || v === null || v === "") return s + Math.round((p?.desglose[i]?.semanasLaborables || 0) * 5);
                 return s + (v || 0);
               }, 0)}h
             </td>
-            <td style={tdCell({ background: "#fdf8f0", textAlign: "right", color: "#1a1a1a" })}>{fmt(totHx)}</td>
-            {!es40h && <td style={tdCell({ background: "#fdf8f0", textAlign: "right", color: totPlus > 0 ? "#b07030" : "#bbb" })}>{totPlus > 0 ? fmt(totPlus) : "—"}</td>}
-            <td style={tdCell({ background: "#fdf8f0", textAlign: "right", color: totVd > 0 ? "#8a2a20" : "#bbb" })}>{totVd > 0 ? `−${fmt(totVd)}` : "—"}</td>
-            <td style={tdCell({ background: "#fdf8f0", textAlign: "right", color: totalFestImport45 > 0 ? "#6a3a9a" : "#bbb" })}>{totalFestImport45 > 0 ? fmt(totalFestImport45) : "—"}</td>
-            <td style={tdCell({ background: "#fdf8f0", textAlign: "right", color: totJEImporte > 0 ? "#8a1e4a" : "#bbb" })} title={totJEDias > 0 ? `${totJEDias} JE` : ""}>{totJEImporte > 0 ? fmt(totJEImporte) : "—"}</td>
-            <td style={tdCell({ background: "#fdf8f0", textAlign: "right", color: "#5a8a5a" })}>
+            <td style={tdCell({ background: PDF_AZUL, textAlign: "right", color: "#1a1a1a" })}>{fmt(totHx)}</td>
+            {!es40h && <td style={tdCell({ background: PDF_AZUL, textAlign: "right", color: totPlus > 0 ? "#4a5157" : "#999" })}>{totPlus > 0 ? fmt(totPlus) : "—"}</td>}
+            <td style={tdCell({ background: PDF_AZUL, textAlign: "right", color: totVd > 0 ? "#8a2a20" : "#999" })}>{totVd > 0 ? `−${fmt(totVd)}` : "—"}</td>
+            <td style={tdCell({ background: PDF_AZUL, textAlign: "right", color: totalFestImport45 > 0 ? "#6a3a9a" : "#999" })}>{totalFestImport45 > 0 ? fmt(totalFestImport45) : "—"}</td>
+            <td style={tdCell({ background: PDF_AZUL, textAlign: "right", color: totJEImporte > 0 ? "#8a1e4a" : "#999" })} title={totJEDias > 0 ? `${totJEDias} JE` : ""}>{totJEImporte > 0 ? fmt(totJEImporte) : "—"}</td>
+            <td style={tdCell({ background: PDF_AZUL, textAlign: "right", color: "#5a8a5a" })}>
               {fmt(complementos45.reduce((s,c)=>s+(c.herramienta||0)+(c.coche||0)+(c.vivienda||0)+(c.seguroVida||0), 0))}
             </td>
-            <td style={tdCell({ background: "#fdf8f0", textAlign: "right", color: "#5a8a5a" })}>
+            <td style={tdCell({ background: PDF_AZUL, textAlign: "right", color: "#5a8a5a" })}>
               {fmt(complementos45.reduce((s,c)=>s+(c.comida||0), 0))}
             </td>
-            <td style={tdCell({ background: "#fdf8f0", textAlign: "right", color: "#1a1a1a" })}>{fmt(es40h ? (totalConExtras - (totPlus || 0)) : totalConExtras)}</td>
+            <td style={tdCell({ background: PDF_AZUL, textAlign: "right", color: "#1a1a1a" })}>{fmt(es40h ? (totalConExtras - (totPlus || 0)) : totalConExtras)}</td>
           </tr>
         </tbody>
       </table>
@@ -3107,12 +3120,12 @@ function DocumentoImprimible({
             <td style={{ ...tdValue, textAlign: "right", fontWeight: 700 }}>{fmtE(totBase)}</td>
           </tr>
           <tr>
-            <td style={{ ...tdLabel, paddingLeft: 18, color: "#666" }}>· Vacaciones</td>
-            <td style={{ ...tdValue, textAlign: "right", color: "#666" }}>{fmtE(totalVac45)}</td>
+            <td style={{ ...tdLabel, paddingLeft: 18, color: "#444", fontWeight: 400 }}>· Vacaciones</td>
+            <td style={{ ...tdValue, textAlign: "right", color: "#444", fontWeight: 400 }}>{fmtE(totalVac45)}</td>
           </tr>
           <tr>
-            <td style={{ ...tdLabel, paddingLeft: 18, color: "#666" }}>· Indemnización</td>
-            <td style={{ ...tdValue, textAlign: "right", color: "#666" }}>{fmtE(totalIndem45)}</td>
+            <td style={{ ...tdLabel, paddingLeft: 18, color: "#444", fontWeight: 400 }}>· Indemnización</td>
+            <td style={{ ...tdValue, textAlign: "right", color: "#444", fontWeight: 400 }}>{fmtE(totalIndem45)}</td>
           </tr>
           <tr>
             <td style={tdLabel}>+ Horas extra ({horasPorMes.reduce((s,v)=>s+(v||0),0)}h)</td>
@@ -3121,7 +3134,7 @@ function DocumentoImprimible({
           {totPlus > 0 && !es40h && (
             <tr>
               <td style={tdLabel}>+ Plus de Actividad</td>
-              <td style={{ ...tdValue, textAlign: "right", color: "#b07030", fontWeight: 700 }}>+ {fmtE(totPlus)}</td>
+              <td style={{ ...tdValue, textAlign: "right", color: "#4a5157", fontWeight: 700 }}>+ {fmtE(totPlus)}</td>
             </tr>
           )}
           {totVd > 0 && (
@@ -3142,20 +3155,20 @@ function DocumentoImprimible({
               <td style={{ ...tdValue, textAlign: "right", color: "#8a1e4a", fontWeight: 700 }}>+ {fmtE(totJEImporte)}</td>
             </tr>
           )}
-          <tr style={{ background: "#fdf8f0" }}>
-            <td style={{ ...tdLabel, background: "#fdf8f0", color: "#1a1a1a", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", fontSize: 10, padding: "8px 8px" }}>
+          <tr style={{ background: PDF_AZUL }}>
+            <td style={{ ...tdLabel, background: PDF_AZUL, border: `1px solid ${PDF_AZUL_B}`, color: "#1a1a1a", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", fontSize: 10, padding: "8px 8px" }}>
               TOTAL A PERCIBIR ({es40h ? "40h" : "45h"}) {tieneCompl ? "(sin extras)" : ""} <span style={{ display: "inline-block", background: "#1a1a1a", color: "#f2f5f7", fontSize: 8, fontWeight: 700, letterSpacing: "0.12em", padding: "1px 6px", borderRadius: 3, marginLeft: 6, verticalAlign: "middle", textTransform: "uppercase" }}>Importe Bruto</span>
             </td>
-            <td style={{ ...tdValue, background: "#fdf8f0", textAlign: "right", fontSize: 13, fontWeight: 700, color: "#1a1a1a", padding: "8px 8px" }}>
+            <td style={{ ...tdValue, background: PDF_AZUL, border: `1px solid ${PDF_AZUL_B}`, textAlign: "right", fontSize: 13, fontWeight: 700, color: "#1a1a1a", padding: "8px 8px" }}>
               {fmtE((es40h ? (totFinal - (totPlus || 0)) : totFinal) + (totalFestImport45 || 0))}
             </td>
           </tr>
           <tr>
-            <td style={{ ...tdLabel, paddingLeft: 18, color: "#666" }}>· Promedio mensual ({fmtM(p?.mesesTotales || 0)} meses)</td>
+            <td style={{ ...tdLabel, paddingLeft: 18, color: "#444", fontWeight: 400 }}>· Promedio mensual ({fmtM(p?.mesesTotales || 0)} meses)</td>
             <td style={{ ...tdValue, textAlign: "right", color: "#1a7a58", fontWeight: 700 }}>{p && p.mesesTotales > 0 ? fmtE((es40h ? (totFinal - (totPlus || 0)) : totFinal) / p.mesesTotales) : "—"}</td>
           </tr>
           <tr>
-            <td style={{ ...tdLabel, paddingLeft: 18, color: "#666" }}>· Promedio semanal ({fmt(p?.semanasTotales || 0, 1)} sem L-V)</td>
+            <td style={{ ...tdLabel, paddingLeft: 18, color: "#444", fontWeight: 400 }}>· Promedio semanal ({fmt(p?.semanasTotales || 0, 1)} sem L-V)</td>
             <td style={{ ...tdValue, textAlign: "right", color: "#1a7a58" }}>{p && p.semanasTotales > 0 ? fmtE((es40h ? (totFinal - (totPlus || 0)) : totFinal) / p.semanasTotales) : "—"}</td>
           </tr>
 
@@ -3166,8 +3179,8 @@ function DocumentoImprimible({
                 <td colSpan={2} style={{
                   padding: "6px 8px", textAlign: "center", fontSize: 8,
                   letterSpacing: "0.18em", textTransform: "uppercase",
-                  background: "#fafaf7", color: "#888", fontWeight: 700,
-                  border: "1px solid #d5d9dc",
+                  background: PDF_FONDO, color: "#444", fontWeight: 700,   // v145
+                  border: `1px solid ${PDF_BORDE}`,
                 }}>
                   EXTRAS DEL PERÍODO
                 </td>
@@ -3199,17 +3212,18 @@ function DocumentoImprimible({
       </table>
 
       {/* Aviso orientativo — v68 compacto pero legible */}
-      <div style={{ marginTop: 12, padding: "8px 12px", background: "#fafaf7", border: "1px solid #d5d9dc", borderRadius: 3, textAlign: "center", fontSize: 9, fontWeight: 700, color: "#1a1a1a", letterSpacing: "0.02em", lineHeight: 1.4 }}>
+      <div style={{ marginTop: 12, padding: "8px 12px", background: PDF_FONDO, border: `1px solid ${PDF_BORDE}`, borderRadius: 3, textAlign: "center", fontSize: 9, fontWeight: 700, color: "#1a1a1a", letterSpacing: "0.02em", lineHeight: 1.4 }}>
         Cálculo orientativo del salario mensual bruto, que puede diferir ligeramente de la nómina real generada en cada periodo.
       </div>
 
       {/* ═══ PIE ═══ v68 compacto pero legible (una sola línea combinada) */}
-      <div style={{ marginTop: 12, paddingTop: 8, borderTop: "1px solid #d5d9dc", textAlign: "center" }}>
-        <div style={{ fontSize: 8, color: "#888", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 700, marginBottom: 3 }}>
-          BD PROD TOOLS · Designed by Eugenio Perez · All Rights Reserved
+      {/* v145: pie sin autoría personal, aviso bilingüe y grises más legibles */}
+      <div style={{ marginTop: 12, paddingTop: 8, borderTop: `1px solid ${PDF_BORDE}`, textAlign: "center" }}>
+        <div style={{ fontSize: 8, color: "#555", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 700, marginBottom: 3 }}>
+          BD PROD TOOLS · All Rights Reserved
         </div>
-        <div style={{ fontSize: 7, color: "#aaa", letterSpacing: "0.05em" }}>
-          Uso no autorizado prohibido · Generado el {new Date().toLocaleString("es-ES")}
+        <div style={{ fontSize: 7, color: "#777", letterSpacing: "0.05em" }}>
+          Prohibido el uso no autorizado · Unauthorized use prohibited · {new Date().toLocaleString("es-ES")}
         </div>
       </div>
 
