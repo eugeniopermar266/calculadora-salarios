@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v147";
+const APP_VERSION = "v148";
 
 // v97: Departamentos de un rodaje audiovisual (obligatorio en cada perfil)
 const DEPARTAMENTOS = [
@@ -5659,6 +5659,35 @@ async function listarPerfilesSupabase({ tabId, proyectoId, verTodos, adminPin })
   }
 }
 
+// v148: copia masiva de perfiles a otro proyecto (solo admin).
+// Inserta en lotes en lugar de uno a uno: con 100+ perfiles, una petición por
+// perfil es lenta y frágil. Mismo criterio que reemplazarTodosPuestos.
+// Copia, no mueve: los perfiles de origen no se tocan.
+async function copiarPerfilesAProyecto({ perfiles, proyectoDestinoId, autor, adminPin }) {
+  const LOTE = 50;
+  let copiados = 0;
+  const errores = [];
+  const headers = { "Prefer": "return=minimal", ...(adminPin ? { "x-admin-pin": adminPin } : {}) };
+
+  for (let i = 0; i < perfiles.length; i += LOTE) {
+    const trozo = perfiles.slice(i, i + LOTE).map(p => ({
+      proyecto_id: proyectoDestinoId,
+      // la BD guarda "45h"/"40h"; el estado usa iruna45/tab40 (ver DECISIONS D-14)
+      tab_id: p.tabId === "iruna45" ? "45h" : p.tabId === "tab40" ? "40h" : p.tabId,
+      nombre: p.nombre,
+      autor,
+      datos: p.datos,
+    }));
+    try {
+      await supabaseFetch(`perfiles`, { method: "POST", headers, body: JSON.stringify(trozo) });
+      copiados += trozo.length;
+    } catch (e) {
+      errores.push(`Lote ${Math.floor(i / LOTE) + 1}: ${e.message || e}`);
+    }
+  }
+  return { copiados, fallidos: perfiles.length - copiados, errores };
+}
+
 async function crearPerfilSupabase({ proyectoId, tabId, nombre, autor, datos }) {
   return supabaseFetch(`perfiles`, {
     method: "POST",
@@ -8922,6 +8951,24 @@ function ModalCargarPerfil({ perfiles, cargando, onCerrar, onCargar, onBorrarSel
   const [filtroDepto, setFiltroDepto] = useState("__todos__");
   const [orden, setOrden] = useState("recientes"); // v134: criterio de ordenación
   const [borrando, setBorrando] = useState(false);
+  // v148: copiar perfiles seleccionados a otro proyecto (solo admin)
+  const usuarioCtxModal = useContext(UsuarioContext);
+  const esAdminModal = !!usuarioCtxModal?.es_admin;
+  const [mostrarCopiar, setMostrarCopiar] = useState(false);
+  const [proyectosDestino, setProyectosDestino] = useState([]);
+  const [destinoId, setDestinoId] = useState("");
+  const [copiando, setCopiando] = useState(false);
+
+  // v148: la lista de proyectos solo se pide al abrir el diálogo de copia
+  useEffect(() => {
+    if (!mostrarCopiar || !esAdminModal) return;
+    (async () => {
+      try {
+        const lista = await listarProyectos({ adminPin: usuarioCtxModal?.pin, usuarioId: usuarioCtxModal?.id, esAdmin: true });
+        setProyectosDestino(Array.isArray(lista) ? lista : []);
+      } catch { setProyectosDestino([]); }
+    })();
+  }, [mostrarCopiar, esAdminModal]);
 
   const perfilesFiltrados = perfiles.filter(p => {
     if (filtroTipo !== "todos" && p.tabId !== filtroTipo) return false;
@@ -8961,6 +9008,40 @@ function ModalCargarPerfil({ perfiles, cargando, onCerrar, onCargar, onBorrarSel
     await onBorrarSeleccionados([...seleccionados]);
     setSeleccionados(new Set());
     setBorrando(false);
+  };
+
+  // v148: copia los seleccionados al proyecto elegido. No mueve: los originales quedan.
+  const copiarAProyecto = async () => {
+    if (!destinoId || seleccionados.size === 0) return;
+    const aCopiar = perfiles.filter(p => seleccionados.has(p.supabaseId || p.key) && p.fuente === "supabase");
+    if (aCopiar.length === 0) { alert("No hay perfiles de Supabase entre los seleccionados."); return; }
+    const destino = proyectosDestino.find(p => String(p.id) === String(destinoId));
+    if (!confirm(`¿Copiar ${aCopiar.length} perfil${aCopiar.length !== 1 ? "es" : ""} a "${destino?.nombre || "el proyecto elegido"}"?\n\nLos originales se mantienen. Las fechas se copian tal cual.`)) return;
+    setCopiando(true);
+    try {
+      const r = await copiarPerfilesAProyecto({
+        perfiles: aCopiar,
+        proyectoDestinoId: destinoId,
+        autor: usuarioCtxModal?.nombre || "—",
+        adminPin: usuarioCtxModal?.pin,
+      });
+      registrarLog(
+        usuarioCtxModal?.nombre,
+        "copiar_perfiles",
+        `${r.copiados} perfiles copiados a proyecto ${destinoId}${r.fallidos ? ` (${r.fallidos} fallidos)` : ""}`
+      );
+      if (r.fallidos > 0) {
+        alert(`Copiados ${r.copiados} de ${aCopiar.length}.\n\nFallaron ${r.fallidos}. Revisa el proyecto destino antes de repetir la operación:\n\n${r.errores.join("\n")}`);
+      } else {
+        alert(`✓ ${r.copiados} perfil${r.copiados !== 1 ? "es" : ""} copiado${r.copiados !== 1 ? "s" : ""} a "${destino?.nombre || ""}".\n\nSe verán al cambiar a ese proyecto.`);
+      }
+      setMostrarCopiar(false);
+      setDestinoId("");
+      setSeleccionados(new Set());
+    } catch (e) {
+      alert("Error al copiar: " + (e.message || e));
+    }
+    setCopiando(false);
   };
 
   // Contar por departamento
@@ -9026,6 +9107,12 @@ function ModalCargarPerfil({ perfiles, cargando, onCerrar, onCargar, onBorrarSel
               <button onClick={deseleccionarTodos} style={{ fontSize: 10, padding: "5px 12px", border: "1px solid #ccc", borderRadius: 4, background: "#f2f5f7", cursor: "pointer", color: "#666", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontWeight: 700 }}>Ninguno</button>
             </>
           )}
+          {seleccionados.size > 0 && esAdminModal && (
+            <button onClick={() => setMostrarCopiar(true)} disabled={copiando}
+              style={{ padding: "8px 14px", fontSize: 10, border: "1px solid #4ec9b8", borderRadius: 4, background: "#f2f5f7", color: "#2a7a70", cursor: copiando ? "wait" : "pointer", fontWeight: 700, letterSpacing: "0.08em", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>
+              ⧉ Copiar a proyecto
+            </button>
+          )}
           {seleccionados.size > 0 && (
             <button onClick={borrarSeleccionados} disabled={borrando}
               style={{ padding: "8px 14px", fontSize: 10, border: "1px solid #c04040", borderRadius: 4, background: "#c04040", color: "#f2f5f7", cursor: borrando ? "wait" : "pointer", fontWeight: 700, letterSpacing: "0.08em", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>
@@ -9033,6 +9120,36 @@ function ModalCargarPerfil({ perfiles, cargando, onCerrar, onCargar, onBorrarSel
             </button>
           )}
         </div>
+
+        {/* v148: diálogo de destino para la copia masiva */}
+        {mostrarCopiar && esAdminModal && (
+          <div style={{ marginBottom: 14, padding: 16, background: "#f2f5f7", border: "1px solid #4ec9b8", borderRadius: 6 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#1a1a1a", marginBottom: 10, fontFamily: "'Inter', -apple-system, sans-serif" }}>
+              Copiar {seleccionados.size} perfil{seleccionados.size !== 1 ? "es" : ""} a otro proyecto
+            </div>
+            <div style={{ fontSize: 11, color: "#555", marginBottom: 12, lineHeight: 1.5, fontFamily: "'Inter', -apple-system, sans-serif" }}>
+              Los perfiles originales se mantienen. Las fechas de contrato se copian tal cual:
+              si el proyecto destino tiene otro calendario, habrá que revisarlas.
+            </div>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+              <select value={destinoId} onChange={e => setDestinoId(e.target.value)}
+                style={{ flex: 1, minWidth: 220, padding: "9px 12px", fontSize: 12, border: "1px solid #d5d9dc", borderRadius: 4, background: "#ffffff", color: "#1a1a1a", fontFamily: "'Inter', -apple-system, sans-serif" }}>
+                <option value="">— Elige el proyecto destino —</option>
+                {proyectosDestino.map(p => (
+                  <option key={p.id} value={p.id}>{p.nombre}{p.productora ? ` · ${p.productora}` : ""}{p.activo === false ? " (inactivo)" : ""}</option>
+                ))}
+              </select>
+              <button onClick={copiarAProyecto} disabled={!destinoId || copiando}
+                style={{ padding: "9px 16px", fontSize: 11, border: "1px solid #4ec9b8", borderRadius: 4, background: destinoId ? "#4ec9b8" : "#dfe4e8", color: destinoId ? "#0a0a0a" : "#888", cursor: (!destinoId || copiando) ? "default" : "pointer", fontWeight: 700, letterSpacing: "0.08em", fontFamily: "'Inter', -apple-system, sans-serif" }}>
+                {copiando ? "Copiando…" : "Copiar"}
+              </button>
+              <button onClick={() => { setMostrarCopiar(false); setDestinoId(""); }} disabled={copiando}
+                style={{ padding: "9px 16px", fontSize: 11, border: "1px solid #ccc", borderRadius: 4, background: "#ffffff", color: "#666", cursor: copiando ? "wait" : "pointer", fontWeight: 700, letterSpacing: "0.08em", fontFamily: "'Inter', -apple-system, sans-serif" }}>
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
 
         {cargando ? <div style={{ padding: 40, textAlign: "center", color: "#888" }}>Cargando perfiles…</div> : perfilesFiltrados.length === 0 ? (
           <div style={{ padding: 40, textAlign: "center", color: "#888", fontStyle: "italic" }}>
