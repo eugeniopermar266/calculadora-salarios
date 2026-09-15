@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v145";
+const APP_VERSION = "v146";
 
 // v97: Departamentos de un rodaje audiovisual (obligatorio en cada perfil)
 const DEPARTAMENTOS = [
@@ -5111,8 +5111,11 @@ ${docHTML}
                     </div>
                   </>
                 )}
-                {/* v84: Box Coste Empresa (solo admin) — vista rápida SS sobre datos en vivo */}
-                {esAdmin && desglose45.length > 0 && (() => {
+                {/* v84: Box Coste Empresa — vista rápida SS sobre datos en vivo */}
+                {/* v146: visible también para coordinadores. No consulta Supabase: calcula
+                    con los datos del formulario en pantalla, así que no expone perfiles
+                    de otros proyectos. La pestaña Coste Empresa sigue siendo solo admin. */}
+                {(esAdmin || esCoordinadorApp45) && desglose45.length > 0 && (() => {
                   const totalPercibido45 = (es40h ? (totFinal - (totPlus || 0)) : totFinal) + (totalFestImport45 || 0);
                   // Calcular SS por mes usando calcularCosteEmpresaMes con datos en vivo
                   let ssPrincipalTot = 0, ssVacTot = 0, ssHxTot = 0, imeiTot = 0, solidTot = 0;
