@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v159";
+const APP_VERSION = "v160";
 
 // v97: Departamentos de un rodaje audiovisual (obligatorio en cada perfil)
 const DEPARTAMENTOS = [
@@ -3519,6 +3519,20 @@ function App45({ modoTab = "iruna45" }) {
     const vacEsperadas = mapearContadoresADesglose(p.desglose, vacacionesPorMes);
     for (let i = 0; i < vacEsperadas.length; i++) {
       if ((vacDiasPorMes[i] || 0) !== (vacEsperadas[i] || 0)) return true;
+    }
+
+    // v160: ajustes 45H del proyecto. Sin esto, cambiar solo las horas over 45
+    // en el calendario no se detectaba como diferencia y el aviso no salía,
+    // así que no había forma de aplicarlo a un perfil ya guardado.
+    if (!es40h) {
+      if (!!over45Activo !== !!cal.over45_activo) return true;
+      if (!!festivo45Activo !== !!cal.festivo_45_activo) return true;
+      if (cal.over45_activo) {
+        const over45Esperadas = repartirOver45PorMes(p.desglose, cal.over45_horas_mes || {});
+        for (let i = 0; i < over45Esperadas.length; i++) {
+          if ((Number(over45PorMes[i]) || 0) !== (Number(over45Esperadas[i]) || 0)) return true;
+        }
+      }
     }
 
     return false;
