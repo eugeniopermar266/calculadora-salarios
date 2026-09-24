@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v154";
+const APP_VERSION = "v155";
 
 // v97: Departamentos de un rodaje audiovisual (obligatorio en cada perfil)
 const DEPARTAMENTOS = [
@@ -2262,7 +2262,7 @@ function InputsPorMes({ desglose, horasPorMes, setHorasPorMes, vacDiasPorMes, se
                   }}
                   title={`Estimado L-V: ${autoH}h (puedes modificarlo)`}
                   style={{ background: esEstimadoOriginal?"#eef3f8":"#dfe4e8", border:`1px solid ${esEstimadoOriginal?"#d5d9dc":"#4a6a9a"}`, borderRadius:4, color:"#1a1a1a", fontFamily:"'Courier Prime', 'Courier New', monospace", fontSize:12, padding:"6px 2px", outline:"none", textAlign:"center", colorScheme:"light", minWidth:0, width:"100%", boxSizing:"border-box", fontWeight:600 }}
-                  onFocus={e=>e.target.style.borderColor="#4a6a9a"} onBlur={e=>e.target.style.borderColor=esEstimadoOriginal?"#d5d9dc":"#4a6a9a"} />
+                  onFocus={e=>{e.target.select(); e.target.style.borderColor="#4a6a9a";}} onBlur={e=>e.target.style.borderColor=esEstimadoOriginal?"#d5d9dc":"#4a6a9a"} />
               </div>
             );
           })()}
@@ -2272,7 +2272,7 @@ function InputsPorMes({ desglose, horasPorMes, setHorasPorMes, vacDiasPorMes, se
               onChange={e=>setO45(i,parseFloat(e.target.value)||0)}
               title="Horas extra over 45h — se pagan al precio pactado, aparte de las del calendario"
               style={{ background:"#fdf4ea", border:"1px solid #e0c090", borderRadius:4, color:"#b07030", fontFamily:"'Courier Prime', 'Courier New', monospace", fontSize:12, padding:"6px 2px", outline:"none", textAlign:"center", colorScheme:"light", minWidth:0, width:"100%", boxSizing:"border-box", fontWeight:600 }}
-              onFocus={e=>e.target.style.borderColor="#b07030"} onBlur={e=>e.target.style.borderColor="#e0c090"} />
+              onFocus={e=>{e.target.select(); e.target.style.borderColor="#b07030";}} onBlur={e=>e.target.style.borderColor="#e0c090"} />
           </div>}
           {hasJE && <div>
             <div style={{ fontSize:8, lineHeight:1, marginBottom:2, visibility:"hidden" }}>·</div>
@@ -2280,21 +2280,21 @@ function InputsPorMes({ desglose, horasPorMes, setHorasPorMes, vacDiasPorMes, se
               onChange={e=>setJE(i,parseFloat(e.target.value)||0)}
               title="Jornadas especiales (cada una = 1 HX + 20€)"
               style={{ background:"#fff0f6", border:"1px solid #f0b0d0", borderRadius:4, color:"#8a1e4a", fontFamily:"'Courier Prime', 'Courier New', monospace", fontSize:12, padding:"6px 2px", outline:"none", textAlign:"center", colorScheme:"light", minWidth:0, width:"100%", boxSizing:"border-box", fontWeight:600 }}
-              onFocus={e=>e.target.style.borderColor="#d63a7a"} onBlur={e=>e.target.style.borderColor="#f0b0d0"} />
+              onFocus={e=>{e.target.select(); e.target.style.borderColor="#d63a7a";}} onBlur={e=>e.target.style.borderColor="#f0b0d0"} />
           </div>}
           <div>
             <div style={{ fontSize:8, lineHeight:1, marginBottom:2, visibility:"hidden" }}>·</div>
             <input type="number" min="0" step="1" value={vacDiasPorMes[i]||""} placeholder="0"
               onChange={e=>setV(i,parseFloat(e.target.value)||0)}
               style={{ background:"#dfe4e8", border:"1px solid #e0c8b0", borderRadius:4, color:"#8a2a20", fontFamily:"'Courier Prime', 'Courier New', monospace", fontSize:12, padding:"6px 2px", outline:"none", textAlign:"center", colorScheme:"light", minWidth:0, width:"100%", boxSizing:"border-box", fontWeight:600 }}
-              onFocus={e=>e.target.style.borderColor="#4ec9b8"} onBlur={e=>e.target.style.borderColor="#e0c8b0"} />
+              onFocus={e=>{e.target.select(); e.target.style.borderColor="#4ec9b8";}} onBlur={e=>e.target.style.borderColor="#e0c8b0"} />
           </div>
           {hasFest && <div>
             <div style={{ fontSize:8, lineHeight:1, marginBottom:2, visibility:"hidden" }}>·</div>
             <input type="number" min="0" step="1" value={(festivosPorMes||[])[i]||""} placeholder="0"
               onChange={e=>setF(i,parseFloat(e.target.value)||0)}
               style={{ background:"#dfe4e8", border:"1px solid #c8b0d8", borderRadius:4, color:"#6a3a9a", fontFamily:"'Courier Prime', 'Courier New', monospace", fontSize:12, padding:"6px 2px", outline:"none", textAlign:"center", colorScheme:"light", minWidth:0, width:"100%", boxSizing:"border-box", fontWeight:600 }}
-              onFocus={e=>e.target.style.borderColor="#8a5aaa"} onBlur={e=>e.target.style.borderColor="#c8b0d8"} />
+              onFocus={e=>{e.target.select(); e.target.style.borderColor="#8a5aaa";}} onBlur={e=>e.target.style.borderColor="#c8b0d8"} />
           </div>}
         </div>
         );
