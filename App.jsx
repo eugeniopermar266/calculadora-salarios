@@ -1,0 +1,11900 @@
+import { useState, useEffect, useRef, createContext, useContext } from "react";
+
+// Context para que componentes anidados accedan al usuario actual
+const UsuarioContext = createContext(null);
+const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre, productora)
+
+// ─── LOGOS ───────────────────────────────────────────────────────────────────
+// Versión neutra: el logo se renderiza como texto "BD PROD TOOLS" inline,
+// sin imágenes embebidas. Si quieres recuperar logos personalizados,
+// añade aquí las constantes base64 y un componente Logo.
+
+// ─── CALENDARIO LABORAL CANARIAS ────────────────────────────────────────────
+// Festivos nacionales + autonómicos. Ordenado por fecha.
+// 2026: oficial (BOE-A-2025-21667 y Decreto 61/2025 BOC)
+// 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
+
+// v57: versión visible de la app (banner, login, selector de proyecto)
+const APP_VERSION = "v150";
+
+// v97: Departamentos de un rodaje audiovisual (obligatorio en cada perfil)
+const DEPARTAMENTOS = [
+  "Dirección",
+  "Producción",
+  "Fotografía",
+  "Decoración",
+  "Vestuario",
+  "Maquillaje",
+  "Peluquería",
+  "FX",
+  "Sonido",
+  "Postproducción",
+  "Eléctricos",
+  "Maquinistas",
+  "Personal complementario",
+];
+
+// v73: importe fijo por jornada especial (se paga POR ENCIMA del salario pactado)
+const IMPORTE_JORNADA_ESPECIAL = 20;
+
+// v54: Festivos por defecto (fallback si Supabase falla). El array activo se
+// rellena desde Supabase en el arranque; ver cargarFestivosSupabase()
+const FESTIVOS_DEFAULT = [
+  // 2026 — Decreto 82/2025 (BOPV nº78, 25 abril 2025) + festivos territoriales y locales
+  // 8 nacionales
+  { fecha: "2026-01-01", nombre: "Año Nuevo",                  tipo: "nacional" },
+  { fecha: "2026-01-06", nombre: "Epifanía del Señor",         tipo: "nacional" },
+  { fecha: "2026-05-01", nombre: "Fiesta del Trabajo",         tipo: "nacional" },
+  { fecha: "2026-08-15", nombre: "Asunción de la Virgen",      tipo: "nacional" },
+  { fecha: "2026-10-12", nombre: "Fiesta Nacional de España",  tipo: "nacional" },
+  { fecha: "2026-12-08", nombre: "Inmaculada Concepción",      tipo: "nacional" },
+  { fecha: "2026-12-25", nombre: "Natividad del Señor",        tipo: "nacional" },
+  // 4 autonómicos País Vasco (sustitutivos de algunos nacionales)
+  { fecha: "2026-03-19", nombre: "San José",                   tipo: "autonomico" },
+  { fecha: "2026-04-02", nombre: "Jueves Santo",               tipo: "autonomico" },
+  { fecha: "2026-04-03", nombre: "Viernes Santo",              tipo: "autonomico" },
+  { fecha: "2026-04-06", nombre: "Lunes de Pascua",            tipo: "autonomico" },
+  { fecha: "2026-07-25", nombre: "Santiago Apóstol",           tipo: "autonomico" },
+  // 1 territorial Bizkaia
+  { fecha: "2026-07-31", nombre: "San Ignacio de Loyola",      tipo: "territorial" },
+  // 1 local Bilbao
+  { fecha: "2026-08-28", nombre: "Semana Grande (Aste Nagusia)", tipo: "local" },
+];
+
+// v54: array mutable — se actualiza cuando Supabase responde
+let FESTIVOS_BILBAO = [...FESTIVOS_DEFAULT];
+
+// Alias para compatibilidad con el resto del código
+const FESTIVOS_CANARIAS_GETTER = () => FESTIVOS_BILBAO;
+
+// Devuelve festivos que caen dentro del rango [inicio, fin] (ambos inclusive)
+function festivosEnRango(fechaInicio, fechaFin) {
+  if (!fechaInicio || !fechaFin) return [];
+  return FESTIVOS_BILBAO.filter(f => f.fecha >= fechaInicio && f.fecha <= fechaFin);
+}
+
+// v59: Helpers para trabajar con el calendario del proyecto en 45H/40H
+// Cuenta días con una propiedad concreta dentro de [inicio, fin] agrupados por mes.
+// Devuelve un objeto { "YYYY-MM": N }
+// v63/v65: si contamos "laboral" o "rodaje":
+//   - excluir festivos NO trabajados (el trabajador no trabaja ese día)
+//   - incluir festivos SÍ trabajados (el trabajador sí trabaja, cuentan como día laboral con su HX)
+//   - excluir vacaciones (el trabajador no está)
+function contarDiasCalendarioPorMes(calendario, propiedad, fechaInicio, fechaFin, festivosComunidadFechas = []) {
+  const resultado = {};
+  if (!calendario || !calendario.dias) return resultado;
+  const setFest = new Set(festivosComunidadFechas || []);
+  const dias = calendario.dias;
+  for (const [fecha, info] of Object.entries(dias)) {
+    if (fecha < fechaInicio || fecha > fechaFin) continue;
+    if (!info || !info[propiedad]) continue;
+    if (propiedad === "laboral" || propiedad === "rodaje" || propiedad === "especial") {
+      // v65: solo excluir festivos NO trabajados (los trabajados sí cuentan como día laboral)
+      if (setFest.has(fecha) && !info.festivo_trabajado) continue;
+      if (info.vacaciones) continue;
+    }
+    const ym = fecha.slice(0, 7);
+    resultado[ym] = (resultado[ym] || 0) + 1;
+  }
+  return resultado;
+}
+
+// Cuenta festivos trabajados (info.festivo_trabajado === true) por mes
+function contarFestivosTrabajadosPorMes(calendario, festivosComunidadFechas, fechaInicio, fechaFin) {
+  const resultado = {};
+  if (!calendario || !calendario.dias) return resultado;
+  const setFest = new Set(festivosComunidadFechas || []);
+  for (const [fecha, info] of Object.entries(calendario.dias)) {
+    if (fecha < fechaInicio || fecha > fechaFin) continue;
+    if (!setFest.has(fecha)) continue; // solo si es festivo real
+    if (!info?.festivo_trabajado) continue;
+    const ym = fecha.slice(0, 7);
+    resultado[ym] = (resultado[ym] || 0) + 1;
+  }
+  return resultado;
+}
+
+// Dado un desglose (array de meses) y un objeto { "YYYY-MM": N },
+// devuelve un array de longitud desglose.length con el valor N en cada posición
+function mapearContadoresADesglose(desglose, contadoresPorMes) {
+  if (!desglose) return [];
+  return desglose.map(d => {
+    // d.anio y d.mesNum (0-based) los añadimos al construir el desglose
+    if (d.anio == null || d.mesNum == null) return 0;
+    const ym = `${d.anio}-${String(d.mesNum + 1).padStart(2, "0")}`;
+    return contadoresPorMes[ym] || 0;
+  });
+}
+
+// Devuelve qué mes (índice del desglose) le corresponde a una fecha YYYY-MM-DD
+function mesIndexParaFecha(fecha, desglose, fechaInicioStr) {
+  if (!desglose || desglose.length === 0) return -1;
+  const f = new Date(fecha + "T00:00:00");
+  const inicio = new Date(fechaInicioStr + "T00:00:00");
+  const mesObjetivo = f.getFullYear() * 12 + f.getMonth();
+  const mesInicio   = inicio.getFullYear() * 12 + inicio.getMonth();
+  const idx = mesObjetivo - mesInicio;
+  return (idx >= 0 && idx < desglose.length) ? idx : -1;
+}
+
+// ─── CONSTANTES ──────────────────────────────────────────────────────────────
+const DISCLAIMER_ES = "Esta herramienta ha sido disenada y desarrollada por Eugenio Perez. Todos los derechos reservados. Queda prohibida su reproduccion, distribucion, comunicacion publica o uso comercial sin el consentimiento expreso por escrito del autor. El uso no autorizado podra ser perseguido legalmente.";
+const DISCLAIMER_EN = "This tool has been designed and developed by Eugenio Perez. All rights reserved. Reproduction, distribution, public communication or commercial use without the express written consent of the author is strictly prohibited. Unauthorized use may be subject to legal action.";
+const DISCLAIMER_PDF = "(c) Eugenio Perez - All Rights Reserved - Uso no autorizado prohibido / Unauthorized use forbidden";
+
+const FACTOR_BASE      = 0.89286;
+const DIVISOR_VAC      = 11.478452;
+const FACTOR_INDEM_DIA = 0.98632;
+// v47: Factor indemnización cuando el trabajador es FIJO DISCONTINUO (solo aplica en 40H)
+const FACTOR_INDEM_FIJO_DISC = 1.6433333;
+
+// 40H: el salario pactado se descompone en Base + Vac + Indem (suman = pactado)
+// Base + Base/11,478452 + (Base/30)*0,98632 = Salario_pactado
+// Base * (1 + 1/11,478452 + 0,98632/30) = Salario_pactado
+// Base * 1,119996 = Salario_pactado
+const DIVISOR_40H_BASE = 1 + 1/DIVISOR_VAC + FACTOR_INDEM_DIA/30; // = 1.119996
+
+// 334 puestos extraídos del Listado COAC Técnicos
+const PUESTOS_COAC = [
+  { codigo: "003010100", puesto: "DIRECTOR/A 1", categoria: "DIRECCIÓN, CASTING Y REDACCION" },
+  { codigo: "003010101", puesto: "DIRECTOR/A 2", categoria: "DIRECCIÓN, CASTING Y REDACCION" },
+  { codigo: "003010102", puesto: "DIRECTOR/A 3", categoria: "DIRECCIÓN, CASTING Y REDACCION" },
+  { codigo: "003010200", puesto: "SCRIPT 1", categoria: "DIRECCIÓN, CASTING Y REDACCION" },
+  { codigo: "003010201", puesto: "SCRIPT 2", categoria: "DIRECCIÓN, CASTING Y REDACCION" },
+  { codigo: "003010300", puesto: "COORDINADOR/A DE DIRECCIÓN", categoria: "DIRECCIÓN, CASTING Y REDACCION" },
+  { codigo: "003010400", puesto: "PRIMER/A AYTE. DIRECCIÓN 1", categoria: "DIRECCIÓN, CASTING Y REDACCION" },
+  { codigo: "003010401", puesto: "PRIMER/A AYTE. DIRECCIÓN 2", categoria: "DIRECCIÓN, CASTING Y REDACCION" },
+  { codigo: "003010500", puesto: "SEGUNDO/A AYTE DIRECCIÓN RODAJE 1", categoria: "DIRECCIÓN, CASTING Y REDACCION" },
+  { codigo: "003010501", puesto: "SEGUNDO/A AYTE DIRECCIÓN RODAJE 2", categoria: "DIRECCIÓN, CASTING Y REDACCION" },
+  { codigo: "003010502", puesto: "SEGUNDO/A AYTE DIRECCIÓN RODAJE 3", categoria: "DIRECCIÓN, CASTING Y REDACCION" },
+  { codigo: "003010600", puesto: "SEGUNDO/A AYTE DIRECCIÓN PAPELES 1", categoria: "DIRECCIÓN, CASTING Y REDACCION" },
+  { codigo: "003010601", puesto: "SEGUNDO/A AYTE DIRECCIÓN PAPELES 2", categoria: "DIRECCIÓN, CASTING Y REDACCION" },
+  { codigo: "003010602", puesto: "SEGUNDO/A AYTE DIRECCIÓN PAPELES 3", categoria: "DIRECCIÓN, CASTING Y REDACCION" },
+  { codigo: "003010700", puesto: "AUXILIAR DE DIRECCIÓN 1", categoria: "DIRECCIÓN, CASTING Y REDACCION" },
+  { codigo: "003010701", puesto: "AUXILIAR DE DIRECCIÓN 2", categoria: "DIRECCIÓN, CASTING Y REDACCION" },
+  { codigo: "003010702", puesto: "AUXILIAR DE DIRECCIÓN 3", categoria: "DIRECCIÓN, CASTING Y REDACCION" },
+  { codigo: "003010800", puesto: "MERITORIO/A DE DIRECCIÓN", categoria: "DIRECCIÓN, CASTING Y REDACCION" },
+  { codigo: "003010900", puesto: "BECARIO/A DE DIRECCIÓN", categoria: "DIRECCIÓN, CASTING Y REDACCION" },
+  { codigo: "003011000", puesto: "REFUERZOS DE DIRECCIÓN", categoria: "DIRECCIÓN, CASTING Y REDACCION" },
+  { codigo: "003011100", puesto: "HORAS EXTRAS DIRECCIÓN", categoria: "DIRECCIÓN, CASTING Y REDACCION" },
+  { codigo: "003011200", puesto: "DIRECTOR/A DE CASTING", categoria: "DIRECCIÓN, CASTING Y REDACCION" },
+  { codigo: "003011300", puesto: "AYTE. CASTING", categoria: "DIRECCIÓN, CASTING Y REDACCION" },
+  { codigo: "003011400", puesto: "SCOUTING CASTING", categoria: "DIRECCIÓN, CASTING Y REDACCION" },
+  { codigo: "003011500", puesto: "COACH 1", categoria: "DIRECCIÓN, CASTING Y REDACCION" },
+  { codigo: "003011501", puesto: "COACH 2", categoria: "DIRECCIÓN, CASTING Y REDACCION" },
+  { codigo: "003011600", puesto: "AYUDANTE DE COACH", categoria: "DIRECCIÓN, CASTING Y REDACCION" },
+  { codigo: "003011700", puesto: "DIBUJANTE DE STORY BOARD", categoria: "DIRECCIÓN, CASTING Y REDACCION" },
+  { codigo: "003011800", puesto: "ASISTENTE PERSONAL DEL DIRECTO", categoria: "DIRECCIÓN, CASTING Y REDACCION" },
+  { codigo: "003011900", puesto: "ASISTENTE PERSONAL DE ACTORES/", categoria: "DIRECCIÓN, CASTING Y REDACCION" },
+  { codigo: "003012000", puesto: "HORAS EXTRAS CASTING Y ASISTEN", categoria: "DIRECCIÓN, CASTING Y REDACCION" },
+  { codigo: "003020100", puesto: "PRODUCTOR/A EJECUTIVO 1", categoria: "PRODUCCIÓN" },
+  { codigo: "003020101", puesto: "PRODUCTOR/A EJECUTIVO 2", categoria: "PRODUCCIÓN" },
+  { codigo: "003020102", puesto: "PRODUCTOR/A EJECUTIVO 3", categoria: "PRODUCCIÓN" },
+  { codigo: "003020200", puesto: "AYTE. PRODUCCIÓN EJECUTIVA", categoria: "PRODUCCIÓN" },
+  { codigo: "003020300", puesto: "DIRECTOR/A DE PRODUCCIÓN", categoria: "PRODUCCIÓN" },
+  { codigo: "003020400", puesto: "JEFE/A DE PRODUCCIÓN 1", categoria: "PRODUCCIÓN" },
+  { codigo: "003020401", puesto: "JEFE/A DE PRODUCCIÓN 2", categoria: "PRODUCCIÓN" },
+  { codigo: "003020500", puesto: "AYTE. DE PRODUCCIÓN 1", categoria: "PRODUCCIÓN" },
+  { codigo: "003020501", puesto: "AYTE. DE PRODUCCIÓN 2", categoria: "PRODUCCIÓN" },
+  { codigo: "003020502", puesto: "AYTE. DE PRODUCCIÓN 3", categoria: "PRODUCCIÓN" },
+  { codigo: "003020503", puesto: "AYTE. DE PRODUCCIÓN 4", categoria: "PRODUCCIÓN" },
+  { codigo: "003020504", puesto: "AYTE. DE PRODUCCIÓN 5", categoria: "PRODUCCIÓN" },
+  { codigo: "003020505", puesto: "AYTE. DE PRODUCCIÓN 6", categoria: "PRODUCCIÓN" },
+  { codigo: "003020600", puesto: "KEY SET 1", categoria: "PRODUCCIÓN" },
+  { codigo: "003020601", puesto: "KEY SET 2", categoria: "PRODUCCIÓN" },
+  { codigo: "003020700", puesto: "AUXILIAR DE PRODUCCIÓN 1", categoria: "PRODUCCIÓN" },
+  { codigo: "003020701", puesto: "AUXILIAR DE PRODUCCIÓN 2", categoria: "PRODUCCIÓN" },
+  { codigo: "003020702", puesto: "AUXILIAR DE PRODUCCIÓN 3", categoria: "PRODUCCIÓN" },
+  { codigo: "003020703", puesto: "AUXILIAR DE PRODUCCIÓN 4", categoria: "PRODUCCIÓN" },
+  { codigo: "003020704", puesto: "AUXILIAR DE PRODUCCIÓN 5", categoria: "PRODUCCIÓN" },
+  { codigo: "003020705", puesto: "AUXILIAR DE PRODUCCIÓN 6", categoria: "PRODUCCIÓN" },
+  { codigo: "003020706", puesto: "AUXILIAR DE PRODUCCIÓN 7", categoria: "PRODUCCIÓN" },
+  { codigo: "003020800", puesto: "JEFE/A  DE TRANSPORTES 1", categoria: "PRODUCCIÓN" },
+  { codigo: "003020801", puesto: "JEFE/A  DE TRANSPORTES 2", categoria: "PRODUCCIÓN" },
+  { codigo: "003020900", puesto: "COORDINADOR/A DE TRANSPORTES", categoria: "PRODUCCIÓN" },
+  { codigo: "003021000", puesto: "CAPITAN/A DE TRANSPORTES", categoria: "PRODUCCIÓN" },
+  { codigo: "003021100", puesto: "RUNNERS 1", categoria: "PRODUCCIÓN" },
+  { codigo: "003021101", puesto: "RUNNERS 2", categoria: "PRODUCCIÓN" },
+  { codigo: "003021102", puesto: "RUNNERS 3", categoria: "PRODUCCIÓN" },
+  { codigo: "003021103", puesto: "RUNNERS 4", categoria: "PRODUCCIÓN" },
+  { codigo: "003021200", puesto: "OTROS CONDUCTORES 1", categoria: "PRODUCCIÓN" },
+  { codigo: "003021201", puesto: "OTROS CONDUCTORES 2", categoria: "PRODUCCIÓN" },
+  { codigo: "003021300", puesto: "JEFE/A LOCALIZACIONES 1", categoria: "PRODUCCIÓN" },
+  { codigo: "003021301", puesto: "JEFE/A LOCALIZACIONES 2", categoria: "PRODUCCIÓN" },
+  { codigo: "003021400", puesto: "COORDINADOR/A DE LOCALIZACIONES", categoria: "PRODUCCIÓN" },
+  { codigo: "003021500", puesto: "AYTE DE LOCALIZACIONES 1", categoria: "PRODUCCIÓN" },
+  { codigo: "003021501", puesto: "AYTE DE LOCALIZACIONES 2", categoria: "PRODUCCIÓN" },
+  { codigo: "003021502", puesto: "AYTE DE LOCALIZACIONES 3", categoria: "PRODUCCIÓN" },
+  { codigo: "003021600", puesto: "AUXILIAR DE LOCALIZACIONES 1", categoria: "PRODUCCIÓN" },
+  { codigo: "003021601", puesto: "AUXILIAR DE LOCALIZACIONES 2", categoria: "PRODUCCIÓN" },
+  { codigo: "003021700", puesto: "PEONES DE LOCALIZACIONES", categoria: "PRODUCCIÓN" },
+  { codigo: "003021800", puesto: "COORDINADOR/A DE PRODUCCIÓN", categoria: "PRODUCCIÓN" },
+  { codigo: "003021900", puesto: "AYTE. COORDINACIÓN DE PRODUCCIÓN 1", categoria: "PRODUCCIÓN" },
+  { codigo: "003021901", puesto: "AYTE. COORDINACIÓN DE PRODUCCIÓN 2", categoria: "PRODUCCIÓN" },
+  { codigo: "003022000", puesto: "SECRETARIO/A DE PRODUCCIÓN", categoria: "PRODUCCIÓN" },
+  { codigo: "003022100", puesto: "CONTROLLER 1", categoria: "PRODUCCIÓN" },
+  { codigo: "003022101", puesto: "CONTROLLER 2", categoria: "PRODUCCIÓN" },
+  { codigo: "003022200", puesto: "CONTABLE", categoria: "PRODUCCIÓN" },
+  { codigo: "003022300", puesto: "CAJERO/A PAGADOR", categoria: "PRODUCCIÓN" },
+  { codigo: "003022400", puesto: "AUXILAR DE CONTROLLER", categoria: "PRODUCCIÓN" },
+  { codigo: "003022500", puesto: "PEONES DE PRODUCCIÓN", categoria: "PRODUCCIÓN" },
+  { codigo: "003022600", puesto: "MERITORIO/A DE PRODUCCIÓN 1", categoria: "PRODUCCIÓN" },
+  { codigo: "003022601", puesto: "MERITORIO/A DE PRODUCCIÓN 2", categoria: "PRODUCCIÓN" },
+  { codigo: "003022602", puesto: "MERITORIO/A DE PRODUCCIÓN 3", categoria: "PRODUCCIÓN" },
+  { codigo: "003022603", puesto: "MERITORIO/A DE PRODUCCIÓN 4", categoria: "PRODUCCIÓN" },
+  { codigo: "003022604", puesto: "MERITORIO/A DE PRODUCCIÓN 5", categoria: "PRODUCCIÓN" },
+  { codigo: "003022700", puesto: "BECARIO/A DE PRODUCCIÓN", categoria: "PRODUCCIÓN" },
+  { codigo: "003022800", puesto: "REFUERZOS DE PRODUCCIÓN", categoria: "PRODUCCIÓN" },
+  { codigo: "003022900", puesto: "HORAS EXTRAS PRODUCCIÓN", categoria: "PRODUCCIÓN" },
+  { codigo: "003030100", puesto: "DIRECTOR/A DE FOTOGRAFIA 1", categoria: "FOTOGRAFÍA" },
+  { codigo: "003030101", puesto: "DIRECTOR/A DE FOTOGRAFIA 2", categoria: "FOTOGRAFÍA" },
+  { codigo: "003030200", puesto: "DIT 1", categoria: "FOTOGRAFÍA" },
+  { codigo: "003030201", puesto: "DIT 2", categoria: "FOTOGRAFÍA" },
+  { codigo: "003030202", puesto: "DIT 3", categoria: "FOTOGRAFÍA" },
+  { codigo: "003030300", puesto: "OPERADOR/A DE CÁMARA 1", categoria: "FOTOGRAFÍA" },
+  { codigo: "003030301", puesto: "OPERADOR/A DE CÁMARA 2", categoria: "FOTOGRAFÍA" },
+  { codigo: "003030302", puesto: "OPERADOR/A DE CÁMARA 3", categoria: "FOTOGRAFÍA" },
+  { codigo: "003030400", puesto: "OPERADOR/A DE STEADY 1", categoria: "FOTOGRAFÍA" },
+  { codigo: "003030401", puesto: "OPERADOR/A DE STEADY 2", categoria: "FOTOGRAFÍA" },
+  { codigo: "003030402", puesto: "OPERADOR/A DE STEADY 3", categoria: "FOTOGRAFÍA" },
+  { codigo: "003030500", puesto: "AYUDANTE DE CÁMARA 1", categoria: "FOTOGRAFÍA" },
+  { codigo: "003030501", puesto: "AYUDANTE DE CÁMARA 2", categoria: "FOTOGRAFÍA" },
+  { codigo: "003030502", puesto: "AYUDANTE DE CÁMARA 3", categoria: "FOTOGRAFÍA" },
+  { codigo: "003030503", puesto: "AYUDANTE DE CÁMARA 4", categoria: "FOTOGRAFÍA" },
+  { codigo: "003030504", puesto: "AYUDANTE DE CÁMARA 5", categoria: "FOTOGRAFÍA" },
+  { codigo: "003030600", puesto: "AYUDANTE DE STEADY", categoria: "FOTOGRAFÍA" },
+  { codigo: "003030700", puesto: "AUXILIAR DE CÁMARA 1", categoria: "FOTOGRAFÍA" },
+  { codigo: "003030701", puesto: "AUXILIAR DE CÁMARA 2", categoria: "FOTOGRAFÍA" },
+  { codigo: "003030702", puesto: "AUXILIAR DE CÁMARA 3", categoria: "FOTOGRAFÍA" },
+  { codigo: "003030703", puesto: "AUXILIAR DE CÁMARA 4", categoria: "FOTOGRAFÍA" },
+  { codigo: "003030704", puesto: "AUXILIAR DE CÁMARA 5", categoria: "FOTOGRAFÍA" },
+  { codigo: "003030800", puesto: "VIDEOASSIST 1", categoria: "FOTOGRAFÍA" },
+  { codigo: "003030801", puesto: "VIDEOASSIST 2", categoria: "FOTOGRAFÍA" },
+  { codigo: "003030802", puesto: "VIDEOASSIST 3", categoria: "FOTOGRAFÍA" },
+  { codigo: "003030900", puesto: "DATA WRANGLER 1", categoria: "FOTOGRAFÍA" },
+  { codigo: "003030901", puesto: "DATA WRANGLER 2", categoria: "FOTOGRAFÍA" },
+  { codigo: "003031000", puesto: "FOTO-FIJA 1", categoria: "FOTOGRAFÍA" },
+  { codigo: "003031001", puesto: "FOTO-FIJA 2", categoria: "FOTOGRAFÍA" },
+  { codigo: "003031100", puesto: "MERITORIO/A DE CÁMARA 1", categoria: "FOTOGRAFÍA" },
+  { codigo: "003031101", puesto: "MERITORIO/A DE CÁMARA 2", categoria: "FOTOGRAFÍA" },
+  { codigo: "003031200", puesto: "BECARIO/A DE CÁMARA 1", categoria: "FOTOGRAFÍA" },
+  { codigo: "003031201", puesto: "BECARIO/A DE CÁMARA 2", categoria: "FOTOGRAFÍA" },
+  { codigo: "003031300", puesto: "REFUERZOS DE CÁMARA", categoria: "FOTOGRAFÍA" },
+  { codigo: "003031400", puesto: "HORAS EXTRAS CÁMARA", categoria: "FOTOGRAFÍA" },
+  { codigo: "003040100", puesto: "DISEÑADOR/A DE PROYECTO 1", categoria: "DECORACIÓN" },
+  { codigo: "003040101", puesto: "DISEÑADOR/A DE PROYECTO 2", categoria: "DECORACIÓN" },
+  { codigo: "003040200", puesto: "PRODUCTION DESIGNER", categoria: "DECORACIÓN" },
+  { codigo: "003040300", puesto: "DIRECTOR/A ARTÍSTICO", categoria: "DECORACIÓN" },
+  { codigo: "003040400", puesto: "ASISTENTE DE DIRECCIÓN ARTÍSTICO", categoria: "DECORACIÓN" },
+  { codigo: "003040500", puesto: "COORDINADOR/A DE ARTE", categoria: "DECORACIÓN" },
+  { codigo: "003040600", puesto: "DIBUJANTE", categoria: "DECORACIÓN" },
+  { codigo: "003040700", puesto: "DECORADOR/A", categoria: "DECORACIÓN" },
+  { codigo: "003040800", puesto: "DISEÑADOR/A GRAFISTA POR ORDENADOR", categoria: "DECORACIÓN" },
+  { codigo: "003040900", puesto: "AMBIENTADOR", categoria: "DECORACIÓN" },
+  { codigo: "003041000", puesto: "AYUDANTE DE DECORACIÓN 1", categoria: "DECORACIÓN" },
+  { codigo: "003041001", puesto: "AYUDANTE DE DECORACIÓN 2", categoria: "DECORACIÓN" },
+  { codigo: "003041002", puesto: "AYUDANTE DE DECORACIÓN 3", categoria: "DECORACIÓN" },
+  { codigo: "003041003", puesto: "AYUDANTE DE DECORACIÓN 4", categoria: "DECORACIÓN" },
+  { codigo: "003041100", puesto: "AUXILIAR DE DECORACIÓN 1", categoria: "DECORACIÓN" },
+  { codigo: "003041101", puesto: "AUXILIAR DE DECORACIÓN 2", categoria: "DECORACIÓN" },
+  { codigo: "003041102", puesto: "AUXILIAR DE DECORACIÓN 3", categoria: "DECORACIÓN" },
+  { codigo: "003041103", puesto: "AUXILIAR DE DECORACIÓN 4", categoria: "DECORACIÓN" },
+  { codigo: "003041200", puesto: "ATRECISTA DE RODAJE 1", categoria: "DECORACIÓN" },
+  { codigo: "003041201", puesto: "ATRECISTA DE RODAJE 2", categoria: "DECORACIÓN" },
+  { codigo: "003041300", puesto: "ATRECISTA DE AVANCE 1", categoria: "DECORACIÓN" },
+  { codigo: "003041301", puesto: "ATRECISTA DE AVANCE 2", categoria: "DECORACIÓN" },
+  { codigo: "003041302", puesto: "ATRECISTA DE AVANCE 3", categoria: "DECORACIÓN" },
+  { codigo: "003041303", puesto: "ATRECISTA DE AVANCE 4", categoria: "DECORACIÓN" },
+  { codigo: "003041304", puesto: "ATRECISTA DE AVANCE 5", categoria: "DECORACIÓN" },
+  { codigo: "003041400", puesto: "REGIDOR/A", categoria: "DECORACIÓN" },
+  { codigo: "003041500", puesto: "AYUDANTE DE REGIDURÍA 1", categoria: "DECORACIÓN" },
+  { codigo: "003041501", puesto: "AYUDANTE DE REGIDURÍA 2", categoria: "DECORACIÓN" },
+  { codigo: "003041600", puesto: "AUXILIAR DE REGIDURÍA", categoria: "DECORACIÓN" },
+  { codigo: "003041700", puesto: "AYUDANTE DE ATREZZO 1", categoria: "DECORACIÓN" },
+  { codigo: "003041701", puesto: "AYUDANTE DE ATREZZO 2", categoria: "DECORACIÓN" },
+  { codigo: "003041702", puesto: "AYUDANTE DE ATREZZO 3", categoria: "DECORACIÓN" },
+  { codigo: "003041800", puesto: "AUXILIAR DE ATREZZO 1", categoria: "DECORACIÓN" },
+  { codigo: "003041801", puesto: "AUXILIAR DE ATREZZO 2", categoria: "DECORACIÓN" },
+  { codigo: "003041802", puesto: "AUXILIAR DE ATREZZO 3", categoria: "DECORACIÓN" },
+  { codigo: "003041803", puesto: "AUXILIAR DE ATREZZO 4", categoria: "DECORACIÓN" },
+  { codigo: "003041804", puesto: "AUXILIAR DE ATREZZO 5", categoria: "DECORACIÓN" },
+  { codigo: "003041805", puesto: "AUXILIAR DE ATREZZO 6", categoria: "DECORACIÓN" },
+  { codigo: "003041806", puesto: "AUXILIAR DE ATREZZO 7", categoria: "DECORACIÓN" },
+  { codigo: "003041807", puesto: "AUXILIAR DE ATREZZO 8", categoria: "DECORACIÓN" },
+  { codigo: "003041900", puesto: "JEFE/A DE VEHÍCULOS DE ESCENA 1", categoria: "DECORACIÓN" },
+  { codigo: "003041901", puesto: "JEFE/A DE VEHÍCULOS DE ESCENA 2", categoria: "DECORACIÓN" },
+  { codigo: "003042000", puesto: "JEFE/A DE CONSTRUCCIÓN", categoria: "DECORACIÓN" },
+  { codigo: "003042100", puesto: "AYUDANTE DE CONSTRUCCIÓN", categoria: "DECORACIÓN" },
+  { codigo: "003042200", puesto: "ESCAYOLISTA", categoria: "DECORACIÓN" },
+  { codigo: "003042300", puesto: "CARPINTERO/A", categoria: "DECORACIÓN" },
+  { codigo: "003042400", puesto: "PINTOR/A", categoria: "DECORACIÓN" },
+  { codigo: "003042500", puesto: "HERRERO/A / CERRAJERO/A", categoria: "DECORACIÓN" },
+  { codigo: "003042600", puesto: "TAPICERO/A", categoria: "DECORACIÓN" },
+  { codigo: "003042700", puesto: "PAISAJISTA", categoria: "DECORACIÓN" },
+  { codigo: "003042800", puesto: "PEONES DE DECORACIÓN", categoria: "DECORACIÓN" },
+  { codigo: "003042900", puesto: "MERITORIO/A DE DECORACIÓN", categoria: "DECORACIÓN" },
+  { codigo: "003043000", puesto: "BECARIO/A DE DECORACIÓN", categoria: "DECORACIÓN" },
+  { codigo: "003043100", puesto: "REFUERZOS DE DECORACIÓN", categoria: "DECORACIÓN" },
+  { codigo: "003043200", puesto: "HORAS EXTRAS DECORACIÓN", categoria: "DECORACIÓN" },
+  { codigo: "003050100", puesto: "DISEÑADOR/A DE VESTUARIO - FIGURINISTA", categoria: "VESTUARIO" },
+  { codigo: "003050200", puesto: "JEFE/A DE VESTUARIO", categoria: "VESTUARIO" },
+  { codigo: "003050300", puesto: "COORDINADOR/A DE VESTUARIO", categoria: "VESTUARIO" },
+  { codigo: "003050400", puesto: "AYUDANTE DE VESTUARIO 1", categoria: "VESTUARIO" },
+  { codigo: "003050401", puesto: "AYUDANTE DE VESTUARIO 2", categoria: "VESTUARIO" },
+  { codigo: "003050402", puesto: "AYUDANTE DE VESTUARIO 3", categoria: "VESTUARIO" },
+  { codigo: "003050500", puesto: "AUXILIAR DE VESTUARIO 1", categoria: "VESTUARIO" },
+  { codigo: "003050501", puesto: "AUXILIAR DE VESTUARIO 2", categoria: "VESTUARIO" },
+  { codigo: "003050502", puesto: "AUXILIAR DE VESTUARIO 3", categoria: "VESTUARIO" },
+  { codigo: "003050600", puesto: "SASTRE/A (CONFECCIÓN)", categoria: "VESTUARIO" },
+  { codigo: "003050700", puesto: "SASTRE/A DE RODAJE", categoria: "VESTUARIO" },
+  { codigo: "003050800", puesto: "AUXILIAR DE SASTRERÍA", categoria: "VESTUARIO" },
+  { codigo: "003050900", puesto: "PEONES DE VESTUARIO 1", categoria: "VESTUARIO" },
+  { codigo: "003050901", puesto: "PEONES DE VESTUARIO 2", categoria: "VESTUARIO" },
+  { codigo: "003051000", puesto: "MERITORIO/A DE VESTUARIO 1", categoria: "VESTUARIO" },
+  { codigo: "003051001", puesto: "MERITORIO/A DE VESTUARIO 2", categoria: "VESTUARIO" },
+  { codigo: "003051100", puesto: "BECARIO/A DE VESTUARIO", categoria: "VESTUARIO" },
+  { codigo: "003051200", puesto: "REFUERZOS DE VESTUARIO", categoria: "VESTUARIO" },
+  { codigo: "003051300", puesto: "HORAS EXTRAS VESTUARIO", categoria: "VESTUARIO" },
+  { codigo: "003060100", puesto: "JEFE/A DE MAQUILLAJE 1", categoria: "MAQUILLADORES. CARACTERIZADORES" },
+  { codigo: "003060101", puesto: "JEFE/A DE MAQUILLAJE 2", categoria: "MAQUILLADORES. CARACTERIZADORES" },
+  { codigo: "003060102", puesto: "JEFE/A DE MAQUILLAJE 3", categoria: "MAQUILLADORES. CARACTERIZADORES" },
+  { codigo: "003060103", puesto: "JEFE/A DE MAQUILLAJE 4", categoria: "MAQUILLADORES. CARACTERIZADORES" },
+  { codigo: "003060200", puesto: "COORDINADOR/A DE MAQUILLAJE 1", categoria: "MAQUILLADORES. CARACTERIZADORES" },
+  { codigo: "003060201", puesto: "COORDINADOR/A DE MAQUILLAJE 2", categoria: "MAQUILLADORES. CARACTERIZADORES" },
+  { codigo: "003060300", puesto: "AYUDANTE DE MAQUILLAJE 1", categoria: "MAQUILLADORES. CARACTERIZADORES" },
+  { codigo: "003060301", puesto: "AYUDANTE DE MAQUILLAJE 2", categoria: "MAQUILLADORES. CARACTERIZADORES" },
+  { codigo: "003060302", puesto: "AYUDANTE DE MAQUILLAJE 3", categoria: "MAQUILLADORES. CARACTERIZADORES" },
+  { codigo: "003060400", puesto: "AUXILIAR DE MAQUILLAJE 1", categoria: "MAQUILLADORES. CARACTERIZADORES" },
+  { codigo: "003060401", puesto: "AUXILIAR DE MAQUILLAJE 2", categoria: "MAQUILLADORES. CARACTERIZADORES" },
+  { codigo: "003060500", puesto: "CARACTERIZADOR/A", categoria: "MAQUILLADORES. CARACTERIZADORES" },
+  { codigo: "003060600", puesto: "AYUDANTE DE CARACTERIZACIÓN", categoria: "MAQUILLADORES. CARACTERIZADORES" },
+  { codigo: "003060700", puesto: "AUXILIAR DE CARACTERIZACIÓN", categoria: "MAQUILLADORES. CARACTERIZADORES" },
+  { codigo: "003060800", puesto: "MAQUILLADOR/A DE FX", categoria: "MAQUILLADORES. CARACTERIZADORES" },
+  { codigo: "003060900", puesto: "AYUDANTE DE FX", categoria: "MAQUILLADORES. CARACTERIZADORES" },
+  { codigo: "003061000", puesto: "AUXILIAR DE FX", categoria: "MAQUILLADORES. CARACTERIZADORES" },
+  { codigo: "003061100", puesto: "MERITORIO/A DE MAQUILLAJE", categoria: "MAQUILLADORES. CARACTERIZADORES" },
+  { codigo: "003061200", puesto: "BECARIO/A DE MAQUILLAJE", categoria: "MAQUILLADORES. CARACTERIZADORES" },
+  { codigo: "003061300", puesto: "REFUERZOS DE MAQUILLAJE", categoria: "MAQUILLADORES. CARACTERIZADORES" },
+  { codigo: "003061400", puesto: "HORAS EXTRAS MAQUILLAJE", categoria: "MAQUILLADORES. CARACTERIZADORES" },
+  { codigo: "003070100", puesto: "JEFE DE PELUQUERO/A", categoria: "EQUIPO PROGRAMAS ESPECIALES" },
+  { codigo: "003070200", puesto: "AYUDANTE DE PELUQUERÍA", categoria: "EQUIPO PROGRAMAS ESPECIALES" },
+  { codigo: "003070300", puesto: "AUXILIAR DE PELUQUERÍA", categoria: "EQUIPO PROGRAMAS ESPECIALES" },
+  { codigo: "003070400", puesto: "POSTICERO/A", categoria: "EQUIPO PROGRAMAS ESPECIALES" },
+  { codigo: "003070500", puesto: "AYUDANTE DE POSTICERÍA", categoria: "EQUIPO PROGRAMAS ESPECIALES" },
+  { codigo: "003070600", puesto: "MERITORIO/A DE PELUQUERÍA", categoria: "EQUIPO PROGRAMAS ESPECIALES" },
+  { codigo: "003070700", puesto: "BECARIO/A DE PELUQUERÍA", categoria: "EQUIPO PROGRAMAS ESPECIALES" },
+  { codigo: "003070800", puesto: "REFUERZOS DE PELUQUERÍA", categoria: "EQUIPO PROGRAMAS ESPECIALES" },
+  { codigo: "003070900", puesto: "HORAS EXTRAS  PELUQUERÍA", categoria: "EQUIPO PROGRAMAS ESPECIALES" },
+  { codigo: "003080100", puesto: "COORDINADOR/A DE EFECTOS ESPEC", categoria: "TÉCNICOS/ AS EFECTOS ESPECIALES Y SONOROS" },
+  { codigo: "003080200", puesto: "JEFE/A DE EFECTOS ESPECIALES", categoria: "TÉCNICOS/ AS EFECTOS ESPECIALES Y SONOROS" },
+  { codigo: "003080300", puesto: "AYUDANTE DE EFECTOS ESPECIALES 1", categoria: "TÉCNICOS/ AS EFECTOS ESPECIALES Y SONOROS" },
+  { codigo: "003080301", puesto: "AYUDANTE DE EFECTOS ESPECIALES 2", categoria: "TÉCNICOS/ AS EFECTOS ESPECIALES Y SONOROS" },
+  { codigo: "003080400", puesto: "AUXILIAR DE EFECTOS ESPECIALES", categoria: "TÉCNICOS/ AS EFECTOS ESPECIALES Y SONOROS" },
+  { codigo: "003080500", puesto: "ARMERO/A", categoria: "TÉCNICOS/ AS EFECTOS ESPECIALES Y SONOROS" },
+  { codigo: "003080600", puesto: "AYUDANTE DE ARMERO/A", categoria: "TÉCNICOS/ AS EFECTOS ESPECIALES Y SONOROS" },
+  { codigo: "003080700", puesto: "MERITORIO/A DE EFECTOS ESPECIA", categoria: "TÉCNICOS/ AS EFECTOS ESPECIALES Y SONOROS" },
+  { codigo: "003080800", puesto: "BECARIO/A DE EFECTOS ESPECIALE", categoria: "TÉCNICOS/ AS EFECTOS ESPECIALES Y SONOROS" },
+  { codigo: "003080900", puesto: "REFUERZOS DE EFECTOS ESPECIALE", categoria: "TÉCNICOS/ AS EFECTOS ESPECIALES Y SONOROS" },
+  { codigo: "003081000", puesto: "HORAS EXTRAS EFECTOS ESPECIALE", categoria: "TÉCNICOS/ AS EFECTOS ESPECIALES Y SONOROS" },
+  { codigo: "003090100", puesto: "JEFE/A DE SONIDO 1", categoria: "SONIDO" },
+  { codigo: "003090101", puesto: "JEFE/A DE SONIDO 2", categoria: "SONIDO" },
+  { codigo: "003090200", puesto: "AYUDANTE DE SONIDO 1", categoria: "SONIDO" },
+  { codigo: "003090201", puesto: "AYUDANTE DE SONIDO 2", categoria: "SONIDO" },
+  { codigo: "003090300", puesto: "MICROFONISTA 1 1", categoria: "SONIDO" },
+  { codigo: "003090301", puesto: "MICROFONISTA 2", categoria: "SONIDO" },
+  { codigo: "003090302", puesto: "MICROFONISTA 1 2", categoria: "SONIDO" },
+  { codigo: "003090400", puesto: "AUXILIAR DE SONIDO", categoria: "SONIDO" },
+  { codigo: "003090500", puesto: "MERITORIO/A DE SONIDO", categoria: "SONIDO" },
+  { codigo: "003090600", puesto: "BECARIO/A DE SONIDO", categoria: "SONIDO" },
+  { codigo: "003090700", puesto: "REFUERZOS DE SONIDO", categoria: "SONIDO" },
+  { codigo: "003090800", puesto: "HORAS EXTRAS SONIDO", categoria: "SONIDO" },
+  { codigo: "003100100", puesto: "COORDINADOR/A DE POSTPRODUCCIÓ 1", categoria: "EQUIPO DE POSTPRODUCCIÓN" },
+  { codigo: "003100101", puesto: "COORDINADOR/A DE POSTPRODUCCIÓ 2", categoria: "EQUIPO DE POSTPRODUCCIÓN" },
+  { codigo: "003100200", puesto: "AYUDANTE DE COORDINADOR DE POSTPRODUCCIÓN 1", categoria: "EQUIPO DE POSTPRODUCCIÓN" },
+  { codigo: "003100201", puesto: "AYUDANTE DE COORDINADOR DE POSTPRODUCCIÓN 2", categoria: "EQUIPO DE POSTPRODUCCIÓN" },
+  { codigo: "003100300", puesto: "MONTADOR/A 1", categoria: "EQUIPO DE POSTPRODUCCIÓN" },
+  { codigo: "003100301", puesto: "MONTADOR/A 2", categoria: "EQUIPO DE POSTPRODUCCIÓN" },
+  { codigo: "003100400", puesto: "AYUDANTE DE MONTAJE 1", categoria: "EQUIPO DE POSTPRODUCCIÓN" },
+  { codigo: "003100401", puesto: "AYUDANTE DE MONTAJE 2", categoria: "EQUIPO DE POSTPRODUCCIÓN" },
+  { codigo: "003100402", puesto: "AYUDANTE DE MONTAJE 3", categoria: "EQUIPO DE POSTPRODUCCIÓN" },
+  { codigo: "003100403", puesto: "AYUDANTE DE MONTAJE 4", categoria: "EQUIPO DE POSTPRODUCCIÓN" },
+  { codigo: "003100500", puesto: "DIGITALIZADOR/A 1", categoria: "EQUIPO DE POSTPRODUCCIÓN" },
+  { codigo: "003100501", puesto: "DIGITALIZADOR/A 2", categoria: "EQUIPO DE POSTPRODUCCIÓN" },
+  { codigo: "003100502", puesto: "DIGITALIZADOR/A 3", categoria: "EQUIPO DE POSTPRODUCCIÓN" },
+  { codigo: "003100600", puesto: "SUPERVISOR/A DE VFX", categoria: "EQUIPO DE POSTPRODUCCIÓN" },
+  { codigo: "003100700", puesto: "GRAFISTA", categoria: "EQUIPO DE POSTPRODUCCIÓN" },
+  { codigo: "003100800", puesto: "AYUDANTE DE GRAFISMO 1", categoria: "EQUIPO DE POSTPRODUCCIÓN" },
+  { codigo: "003100801", puesto: "AYUDANTE DE GRAFISMO 2", categoria: "EQUIPO DE POSTPRODUCCIÓN" },
+  { codigo: "003100900", puesto: "JEFE/A DE ANIMACIÓN", categoria: "EQUIPO DE POSTPRODUCCIÓN" },
+  { codigo: "003101000", puesto: "ANIMADOR/A", categoria: "EQUIPO DE POSTPRODUCCIÓN" },
+  { codigo: "003101100", puesto: "TRANSCIPTOR/A", categoria: "EQUIPO DE POSTPRODUCCIÓN" },
+  { codigo: "003101200", puesto: "SUBTITULADOR/A 1", categoria: "EQUIPO DE POSTPRODUCCIÓN" },
+  { codigo: "003101201", puesto: "SUBTITULADOR/A 2", categoria: "EQUIPO DE POSTPRODUCCIÓN" },
+  { codigo: "003101202", puesto: "SUBTITULADOR/A 3", categoria: "EQUIPO DE POSTPRODUCCIÓN" },
+  { codigo: "003101300", puesto: "MONTADOR/A DE SONIDO", categoria: "EQUIPO DE POSTPRODUCCIÓN" },
+  { codigo: "003101400", puesto: "AYUDANTE DE MONTAJE DE SONIDO", categoria: "EQUIPO DE POSTPRODUCCIÓN" },
+  { codigo: "003101500", puesto: "MERITORIO/A DE MONTAJE", categoria: "EQUIPO DE POSTPRODUCCIÓN" },
+  { codigo: "003101600", puesto: "BECARIO/A DE MONTAJE", categoria: "EQUIPO DE POSTPRODUCCIÓN" },
+  { codigo: "003101700", puesto: "REFUERZOS DE MONTAJE", categoria: "EQUIPO DE POSTPRODUCCIÓN" },
+  { codigo: "003101800", puesto: "HORAS EXTRAS MONTAJE", categoria: "EQUIPO DE POSTPRODUCCIÓN" },
+  { codigo: "003110100", puesto: "JEFE/A ELÉCTRICOS", categoria: "ELÉCTRICOS. MAQUINISTAS" },
+  { codigo: "003110200", puesto: "BEST-BOY 1", categoria: "ELÉCTRICOS. MAQUINISTAS" },
+  { codigo: "003110201", puesto: "BEST-BOY 2", categoria: "ELÉCTRICOS. MAQUINISTAS" },
+  { codigo: "003110300", puesto: "ELÉCTRICO/A 1", categoria: "ELÉCTRICOS. MAQUINISTAS" },
+  { codigo: "003110301", puesto: "ELÉCTRICO/A 2", categoria: "ELÉCTRICOS. MAQUINISTAS" },
+  { codigo: "003110302", puesto: "ELÉCTRICO/A 3", categoria: "ELÉCTRICOS. MAQUINISTAS" },
+  { codigo: "003110303", puesto: "ELÉCTRICO/A 4", categoria: "ELÉCTRICOS. MAQUINISTAS" },
+  { codigo: "003110304", puesto: "ELÉCTRICO/A 5", categoria: "ELÉCTRICOS. MAQUINISTAS" },
+  { codigo: "003110305", puesto: "ELÉCTRICO/A 6", categoria: "ELÉCTRICOS. MAQUINISTAS" },
+  { codigo: "003110306", puesto: "ELÉCTRICO/A 7", categoria: "ELÉCTRICOS. MAQUINISTAS" },
+  { codigo: "003110400", puesto: "RIGGER GAFFER", categoria: "ELÉCTRICOS. MAQUINISTAS" },
+  { codigo: "003110500", puesto: "BEST-BOY RIGGER", categoria: "ELÉCTRICOS. MAQUINISTAS" },
+  { codigo: "003110600", puesto: "RIGGER", categoria: "ELÉCTRICOS. MAQUINISTAS" },
+  { codigo: "003110700", puesto: "GRUPISTA", categoria: "ELÉCTRICOS. MAQUINISTAS" },
+  { codigo: "003110800", puesto: "MERITORIO/A DE ELÉCTRICO", categoria: "ELÉCTRICOS. MAQUINISTAS" },
+  { codigo: "003110900", puesto: "BECARIO/A DE ELÉCTRICO", categoria: "ELÉCTRICOS. MAQUINISTAS" },
+  { codigo: "003111000", puesto: "REFUERZOS ELÉCTRICO", categoria: "ELÉCTRICOS. MAQUINISTAS" },
+  { codigo: "003111100", puesto: "HORAS EXTRAS ELÉCTRICOS Y RIGGER", categoria: "ELÉCTRICOS. MAQUINISTAS" },
+  { codigo: "003111200", puesto: "JEFE/A DE MAQUINISTA 1", categoria: "ELÉCTRICOS. MAQUINISTAS" },
+  { codigo: "003111201", puesto: "JEFE/A DE MAQUINISTA 2", categoria: "ELÉCTRICOS. MAQUINISTAS" },
+  { codigo: "003111300", puesto: "MAQUINISTA", categoria: "ELÉCTRICOS. MAQUINISTAS" },
+  { codigo: "003111400", puesto: "AYUDANTE DE MAQUINISTA 1", categoria: "ELÉCTRICOS. MAQUINISTAS" },
+  { codigo: "003111401", puesto: "AYUDANTE DE MAQUINISTA 2", categoria: "ELÉCTRICOS. MAQUINISTAS" },
+  { codigo: "003111500", puesto: "AUXILIAR DE MAQUINISTA", categoria: "ELÉCTRICOS. MAQUINISTAS" },
+  { codigo: "003111600", puesto: "MERITORIO/A DE MAQUINISTA", categoria: "ELÉCTRICOS. MAQUINISTAS" },
+  { codigo: "003111700", puesto: "BECARIO/A DE MAQUINISTA", categoria: "ELÉCTRICOS. MAQUINISTAS" },
+  { codigo: "003111800", puesto: "REFUERZOS MAQUINISTA", categoria: "ELÉCTRICOS. MAQUINISTAS" },
+  { codigo: "003111900", puesto: "HORAS EXTRAS MAQUINISTAS", categoria: "ELÉCTRICOS. MAQUINISTAS" },
+  { codigo: "003120100", puesto: "MÉDICOS", categoria: "PERSONAL COMPLEMENTARIO Y OTROS" },
+  { codigo: "003120200", puesto: "ENFERMERO/A", categoria: "PERSONAL COMPLEMENTARIO Y OTROS" },
+  { codigo: "003120300", puesto: "OTROS SANITARIOS", categoria: "PERSONAL COMPLEMENTARIO Y OTROS" },
+  { codigo: "003120400", puesto: "TÉCNICO/A EN PREVENCIÓN DE RIESGOS", categoria: "PERSONAL COMPLEMENTARIO Y OTROS" },
+  { codigo: "003120500", puesto: "AYUDANTE DE TÉCNICO EN PREVENCIÓN", categoria: "PERSONAL COMPLEMENTARIO Y OTROS" },
+  { codigo: "003120600", puesto: "BOMBEROS/AS", categoria: "PERSONAL COMPLEMENTARIO Y OTROS" },
+  { codigo: "003120700", puesto: "PROTECCIÓN CIVIL", categoria: "PERSONAL COMPLEMENTARIO Y OTROS" },
+  { codigo: "003120800", puesto: "SEGURIDAD PRIVADA", categoria: "PERSONAL COMPLEMENTARIO Y OTROS" },
+  { codigo: "003120900", puesto: "GUARDAESPALDAS", categoria: "PERSONAL COMPLEMENTARIO Y OTROS" },
+  { codigo: "003121000", puesto: "BLOCKERS", categoria: "PERSONAL COMPLEMENTARIO Y OTROS" },
+  { codigo: "003121100", puesto: "PERSONAL DE LIMPIEZA", categoria: "PERSONAL COMPLEMENTARIO Y OTROS" },
+  { codigo: "003121200", puesto: "PERSONAL DE LIMPIEZA HIGIENICO", categoria: "PERSONAL COMPLEMENTARIO Y OTROS" },
+  { codigo: "003121300", puesto: "PERSONAL PARA RESERVAS DE ESPACIO", categoria: "PERSONAL COMPLEMENTARIO Y OTROS" },
+  { codigo: "003121400", puesto: "MOZOS/AS", categoria: "PERSONAL COMPLEMENTARIO Y OTROS" },
+  { codigo: "003121500", puesto: "COORDINADOR/A DE SEMOVIENTES", categoria: "PERSONAL COMPLEMENTARIO Y OTROS" },
+  { codigo: "003121600", puesto: "CUADRERO/A", categoria: "PERSONAL COMPLEMENTARIO Y OTROS" },
+  { codigo: "003121700", puesto: "RAMALERO/A 1", categoria: "PERSONAL COMPLEMENTARIO Y OTROS" },
+  { codigo: "003121701", puesto: "RAMALERO/A 2", categoria: "PERSONAL COMPLEMENTARIO Y OTROS" },
+  { codigo: "003121702", puesto: "RAMALERO/A 3", categoria: "PERSONAL COMPLEMENTARIO Y OTROS" },
+  { codigo: "003121800", puesto: "ADIESTRADOR/A", categoria: "PERSONAL COMPLEMENTARIO Y OTROS" },
+  { codigo: "003121900", puesto: "VETERINARIO/A 1", categoria: "PERSONAL COMPLEMENTARIO Y OTROS" },
+  { codigo: "003121901", puesto: "VETERINARIO/A 2", categoria: "PERSONAL COMPLEMENTARIO Y OTROS" },
+  { codigo: "003122000", puesto: "ENTRENADORES/AS", categoria: "PERSONAL COMPLEMENTARIO Y OTROS" },
+  { codigo: "003122100", puesto: "PROFESORES/AS", categoria: "PERSONAL COMPLEMENTARIO Y OTROS" },
+  { codigo: "003122200", puesto: "BUZOS", categoria: "PERSONAL COMPLEMENTARIO Y OTROS" },
+];
+
+// ═══════════════════════════════════════════════════════════════════
+// COMPONENTE: SELECTOR DE PUESTO (filtrable + agrupado + permite texto libre)
+// ═══════════════════════════════════════════════════════════════════
+function PuestoSelector({ puesto, codigoContable, onPuesto, onCodigoContable }) {
+  const [mostrarLista, setMostrarLista] = useState(false);
+  const [busqueda, setBusqueda] = useState(puesto || "");
+  const [puestosLista, setPuestosLista] = useState(() => {
+    // Fallback inicial: constante embebida (normalizada al formato {codigo, nombre, categoria})
+    return PUESTOS_COAC.map(p => ({ codigo: p.codigo, nombre: p.puesto, categoria: p.categoria }));
+  });
+  const [cargandoLista, setCargandoLista] = useState(true);
+  const inputRef = useRef(null);
+  const listaRef = useRef(null);
+
+  // Cargar lista desde Supabase al montar (con fallback silencioso a la constante embebida)
+  useEffect(() => {
+    let cancelado = false;
+    (async () => {
+      try {
+        const data = await listarPuestosCoac();
+        if (cancelado) return;
+        if (Array.isArray(data) && data.length > 0) {
+          // Normalizar a {codigo, nombre, categoria}
+          setPuestosLista(data.map(p => ({
+            codigo: p.codigo,
+            nombre: p.nombre,
+            categoria: p.categoria,
+          })));
+        }
+        // Si data está vacío, se queda con el fallback embebido
+      } catch (e) {
+        // Si Supabase falla, mantenemos la constante embebida (no rompemos la app)
+        console.warn("listarPuestosCoac falló, usando lista embebida:", e.message);
+      } finally {
+        if (!cancelado) setCargandoLista(false);
+      }
+    })();
+    return () => { cancelado = true; };
+  }, []);
+
+  // Sincronizar búsqueda cuando cambia el puesto externamente (ej. al cargar perfil)
+  useEffect(() => {
+    setBusqueda(puesto || "");
+  }, [puesto]);
+
+  // Cerrar al hacer click fuera
+  useEffect(() => {
+    if (!mostrarLista) return;
+    const onClickFuera = (e) => {
+      if (listaRef.current && !listaRef.current.contains(e.target) && inputRef.current && !inputRef.current.contains(e.target)) {
+        setMostrarLista(false);
+      }
+    };
+    document.addEventListener("mousedown", onClickFuera);
+    return () => document.removeEventListener("mousedown", onClickFuera);
+  }, [mostrarLista]);
+
+  // Filtrar puestos según búsqueda
+  const norm = (s) => (s || "").toString().toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, ""); // sin acentos
+  const q = norm(busqueda);
+  const puestosFiltrados = q
+    ? puestosLista.filter(p => norm(p.nombre).includes(q) || norm(p.codigo).includes(q) || norm(p.categoria).includes(q))
+    : puestosLista;
+
+  // Agrupar por categoría
+  const grupos = {};
+  for (const p of puestosFiltrados) {
+    if (!grupos[p.categoria]) grupos[p.categoria] = [];
+    grupos[p.categoria].push(p);
+  }
+
+  const seleccionar = (p) => {
+    onPuesto(p.nombre);
+    onCodigoContable(p.codigo);
+    setBusqueda(p.nombre);
+    setMostrarLista(false);
+  };
+
+  const onInputChange = (val) => {
+    setBusqueda(val);
+    onPuesto(val);
+    // Si lo que escribe coincide exactamente con algún puesto, asignar su código
+    const match = puestosLista.find(p => p.nombre === val);
+    if (match) onCodigoContable(match.codigo);
+    else onCodigoContable(""); // texto libre = sin código
+  };
+
+  const inp = { padding: "11px 14px", fontSize: 13, border: "1px solid #d5d9dc", borderRadius: 6, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", boxSizing: "border-box", width: "100%", outline: "none", background: "#f2f5f7", color: "#1a1a1a", fontWeight: 500 };
+  const LS = { display: "block", fontSize: 10, color: "#666", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 8, fontWeight: 700, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" };
+
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <label style={LS}>Puesto</label>
+      <div style={{ position: "relative" }}>
+        <input
+          ref={inputRef}
+          type="text"
+          value={busqueda}
+          onChange={e => onInputChange(e.target.value)}
+          onFocus={() => setMostrarLista(true)}
+          placeholder="Escribe para filtrar o elige de la lista..."
+          style={{ ...inp, paddingRight: 40 }}
+          autoComplete="off"
+        />
+        <button
+          type="button"
+          onClick={() => setMostrarLista(!mostrarLista)}
+          style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", background: "transparent", border: "none", cursor: "pointer", padding: "4px 8px", color: "#666", display: "flex", alignItems: "center", justifyContent: "center" }}
+          tabIndex={-1}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: mostrarLista ? "rotate(180deg)" : "none", transition: "transform 0.15s" }}>
+            <polyline points="6 9 12 15 18 9"/>
+          </svg>
+        </button>
+      </div>
+
+      {mostrarLista && (
+        <div
+          ref={listaRef}
+          style={{
+            position: "relative", zIndex: 100, marginTop: 4,
+            background: "#fff", border: "1px solid #d5d9dc", borderRadius: 8,
+            maxHeight: 320, overflowY: "auto", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+            boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
+          }}
+        >
+          {puestosFiltrados.length === 0 ? (
+            <div style={{ padding: 16, textAlign: "center", color: "#888", fontSize: 12, fontStyle: "italic" }}>
+              Sin resultados. Puedes escribir libremente este puesto sin código.
+            </div>
+          ) : (
+            Object.entries(grupos).map(([cat, items]) => (
+              <div key={cat}>
+                <div style={{ padding: "8px 14px", background: "#f2f5f7", fontSize: 10, color: "#1a1a1a", letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 700, borderBottom: "1px solid #d5d9dc", position: "sticky", top: 0, display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{ width: 5, height: 5, background: "#4ec9b8", borderRadius: "50%" }}></div>
+                  {cat} <span style={{ color: "#999", fontWeight: 400, marginLeft: 4 }}>({items.length})</span>
+                </div>
+                {items.map(p => (
+                  <div
+                    key={p.codigo}
+                    onClick={() => seleccionar(p)}
+                    style={{
+                      padding: "9px 14px", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center",
+                      borderBottom: "1px solid #eef1f3", fontSize: 12,
+                      background: p.nombre === puesto ? "rgba(78,201,184,0.12)" : "transparent",
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = "rgba(78,201,184,0.15)"}
+                    onMouseLeave={e => e.currentTarget.style.background = p.nombre === puesto ? "rgba(78,201,184,0.12)" : "transparent"}
+                  >
+                    <span style={{ color: "#1a1a1a", fontWeight: p.nombre === puesto ? 700 : 500 }}>{p.nombre}</span>
+                    <span style={{ color: p.nombre === puesto ? "#666" : "#999", fontSize: 10, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontWeight: p.nombre === puesto ? 600 : 400 }}>{p.codigo}</span>
+                  </div>
+                ))}
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {/* Campo Código Contable (solo lectura) */}
+      <div style={{ marginTop: 10 }}>
+        <label style={LS}>Código Contable</label>
+        <input
+          type="text"
+          value={codigoContable || ""}
+          readOnly
+          placeholder="— se rellena automáticamente al elegir un puesto —"
+          style={{ ...inp, background: codigoContable ? "#dfe4e8" : "#f2f5f7", color: codigoContable ? "#1a1a1a" : "#aaa", fontWeight: codigoContable ? 700 : 400, cursor: "default" }}
+        />
+        {!codigoContable && busqueda && (
+          <div style={{ fontSize: 10, color: "#a07030", marginTop: 4, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontStyle: "italic" }}>
+            ℹ Puesto no estándar (sin código contable asignado)
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// CONSTANTES COSTE EMPRESA
+// ═══════════════════════════════════════════════════════════════════
+const CE_TOPE_BASE       = 5101.20;            // Tope mensual base máxima cotización
+const CE_PCT_SS          = 0.3335;             // 33,35% empresa SS
+const CE_SS_TOPADA       = CE_TOPE_BASE * CE_PCT_SS; // 1.701,25 €
+const CE_PCT_SS_HEXTRA   = 0.27;               // 27% sobre horas extra
+const CE_PCT_IMEI        = 0.0075;             // 0,75% IMEI (MEI)
+const CE_IMEI_TOPADO     = CE_TOPE_BASE * CE_PCT_IMEI; // 38,26 €
+// Cuota Solidaridad sobre el exceso de la base máxima:
+const CE_PCT_SOL_T1      = 0.0097;             // 0-10% exceso (primeros 510,12 €)
+const CE_PCT_SOL_T2      = 0.0115;             // 10-50% exceso (siguientes 2.040,48 €)
+const CE_PCT_SOL_T3      = 0.0133;             // >50% exceso (resto)
+const CE_SOL_T1_HASTA    = CE_TOPE_BASE * 0.10; // 510,12 €
+const CE_SOL_T2_HASTA    = CE_TOPE_BASE * 0.50; // 2.550,60 €
+// Gestoría
+const CE_GESTORIA_ALTA   = 6;
+const CE_GESTORIA_MES    = 26;
+
+// Cálculo del coste empresa para un mes
+// Recibe los importes brutos del mes y devuelve un objeto con cada concepto
+function calcularCosteEmpresaMes({
+  total,         // TOTAL del mes (lo que percibe el trabajador)
+  vacaciones,    // importe vacaciones del mes
+  vacDisfrutadas = 0, // v82: importe de vacaciones disfrutadas (vdShow). Solo afecta en modo "al final".
+  indem,         // importe indemnización del mes
+  horasExtraEur, // importe h.extra en euros del mes
+  plusVivienda,  // importe plus vivienda del mes
+  irpfActivo,    // boolean: ¿empresa asume IRPF?
+  pctIRPF,       // 0-100: % IRPF del trabajador
+  esPrimerMes,   // boolean: ¿es el primer mes del contrato?
+  importeExento = 0, // importe a restar de las bases SS/IMEI/Solidaridad (por baja médica)
+  firmaContrato = true, // boolean: ¿hay firma de contrato este primer mes? (afecta solo si esPrimerMes)
+  incluirGestoria = false, // v78: si false, la gestoría no suma al total
+  vacAcumulada = false, // v81: si false (mes a mes), las vacaciones van al pool topado. Si true, van aparte.
+}) {
+  const exento = Math.max(0, importeExento || 0);
+  const vacMes = vacaciones || 0;
+
+  // v81: si las vacaciones son MES A MES (vacAcumulada=false), van dentro del pool topado (SS Vac = 0)
+  //      si son AL FINAL (vacAcumulada=true), van aparte (comportamiento anterior)
+  // v82: en modo AL FINAL, si el trabajador ya disfrutó días, se restan de la base SS Vac
+  //      (la empresa cotiza solo por lo realmente pagado al final)
+  let baseSSPrincipal, ssVacaciones;
+  if (vacAcumulada) {
+    // Modo B: al final → vacaciones aparte, descontando disfrutadas
+    baseSSPrincipal = Math.max(0, (total || 0) - vacMes - (indem || 0) - exento);
+    const vacNeta = Math.max(0, vacMes - (vacDisfrutadas || 0)); // v82: descontar disfrutadas
+    ssVacaciones    = vacNeta * CE_PCT_SS;
+  } else {
+    // Modo A: mes a mes → vacaciones dentro del pool topado
+    baseSSPrincipal = Math.max(0, (total || 0) - (indem || 0) - exento);
+    ssVacaciones    = 0;
+  }
+  const ssPrincipal = baseSSPrincipal > CE_TOPE_BASE ? CE_SS_TOPADA : baseSSPrincipal * CE_PCT_SS;
+
+  // SS H.Extra: siempre 27% × h.extra (suma aparte, NO afectada por exención)
+  const ssHorasExtra    = (horasExtraEur || 0) * CE_PCT_SS_HEXTRA;
+
+  // Base IMEI: TOTAL - indemnización - importe exento (vacaciones SÍ cuentan)
+  const baseIMEI        = Math.max(0, (total || 0) - (indem || 0) - exento);
+  const imeiCalc        = baseIMEI > CE_TOPE_BASE ? CE_IMEI_TOPADO : baseIMEI * CE_PCT_IMEI;
+
+  // Base Solidaridad: TOTAL - indemnización - horas extra - importe exento
+  // v81: si vacAcumulada=true (al final) las vacaciones NO cuentan para solidaridad (van aparte).
+  //      si vacAcumulada=false (mes a mes) las vacaciones SÍ cuentan (van dentro del pool).
+  const baseSolidaridad = Math.max(0, (total || 0) - (indem || 0) - (vacAcumulada ? vacMes : 0) - (horasExtraEur || 0) - exento);
+  let solidaridad = 0;
+  if (baseSolidaridad > CE_TOPE_BASE) {
+    const exc = baseSolidaridad - CE_TOPE_BASE;
+    solidaridad += Math.min(exc, CE_SOL_T1_HASTA) * CE_PCT_SOL_T1;
+    if (exc > CE_SOL_T1_HASTA) {
+      solidaridad += Math.min(exc - CE_SOL_T1_HASTA, CE_SOL_T2_HASTA - CE_SOL_T1_HASTA) * CE_PCT_SOL_T2;
+    }
+    if (exc > CE_SOL_T2_HASTA) {
+      solidaridad += (exc - CE_SOL_T2_HASTA) * CE_PCT_SOL_T3;
+    }
+  }
+
+  // IRPF Plus Vivienda (solo si empresa lo asume)
+  const irpfVivienda = (irpfActivo && pctIRPF > 0)
+    ? (plusVivienda || 0) * (pctIRPF / 100)
+    : 0;
+
+  // Gestoría:
+  // - Si esPrimerMes y firmaContrato → 32 € (6 alta + 26 nómina)
+  // - Si esPrimerMes y NO firmaContrato → 26 € (solo nómina, sin alta)
+  // - Si NO esPrimerMes → 26 €
+  const gestoria = (esPrimerMes && firmaContrato)
+    ? (CE_GESTORIA_ALTA + CE_GESTORIA_MES)
+    : CE_GESTORIA_MES;
+
+  const totalCosteEmpresa = ssPrincipal + ssVacaciones + ssHorasExtra + imeiCalc + solidaridad + irpfVivienda + (incluirGestoria ? gestoria : 0);
+
+  return {
+    baseSSPrincipal, ssPrincipal,
+    ssVacaciones, ssHorasExtra,
+    baseIMEI, imei: imeiCalc,
+    baseSolidaridad, solidaridad,
+    irpfVivienda,
+    gestoria,
+    exento,
+    totalCosteEmpresa,
+  };
+}
+
+// ─── LÓGICA DE FECHAS ────────────────────────────────────────────────────────
+function calcularPeriodo(fechaInicio, fechaFin) {
+  if (!fechaInicio || !fechaFin) return null;
+  const inicio = new Date(fechaInicio + "T00:00:00");
+  const fin    = new Date(fechaFin    + "T00:00:00");
+  if (fin <= inicio) return null;
+  // v61: salvaguarda contra fechas absurdas (typos que causan cuelgues)
+  if (isNaN(inicio.getTime()) || isNaN(fin.getTime())) return null;
+  const diffMeses = (fin.getFullYear() - inicio.getFullYear()) * 12 + (fin.getMonth() - inicio.getMonth());
+  if (diffMeses > 30) {
+    console.warn(`calcularPeriodo: rango demasiado largo (${diffMeses} meses), rechazado`);
+    return null;
+  }
+
+  const diaInicio  = inicio.getDate();
+  const mesInicio  = inicio.getMonth();
+  const anioInicio = inicio.getFullYear();
+  const diaFin     = fin.getDate();
+  const mesFin     = fin.getMonth();
+  const anioFin    = fin.getFullYear();
+
+  let diasNorm = 0;
+  const desglose = [];
+  let mesActual  = mesInicio;
+  let anioActual = anioInicio;
+
+  while (anioActual < anioFin || (anioActual === anioFin && mesActual <= mesFin)) {
+    const esPrimerMes   = anioActual === anioInicio && mesActual === mesInicio;
+    const esUltimoMes   = anioActual === anioFin    && mesActual === mesFin;
+    const ultimoDiaReal = new Date(anioActual, mesActual + 1, 0).getDate();
+
+    let diaDesde, diaHasta;
+    if (esPrimerMes && esUltimoMes) { diaDesde = diaInicio; diaHasta = diaFin; }
+    else if (esPrimerMes)           { diaDesde = diaInicio; diaHasta = ultimoDiaReal; }
+    else if (esUltimoMes)           { diaDesde = 1;         diaHasta = diaFin; }
+    else                            { diaDesde = 1;         diaHasta = ultimoDiaReal; }
+
+    const esCompleto  = diaDesde === 1 && diaHasta === ultimoDiaReal;
+    const diasReales  = diaHasta - diaDesde + 1;
+    const diasNormes  = esCompleto ? 30 : diasReales;
+    diasNorm         += diasNormes;
+    const fraccion    = diasNormes / 30;
+
+    const nombreMes = new Date(anioActual, mesActual, 1).toLocaleString("es-ES", { month: "long", year: "numeric" });
+    desglose.push({ mes: nombreMes, desde: diaDesde, hasta: diaHasta, diasReales, diasNorm: diasNormes, fraccion, esCompleto, anio: anioActual, mesNum: mesActual });
+    mesActual++;
+    if (mesActual > 11) { mesActual = 0; anioActual++; }
+  }
+
+  if (desglose.length > 0) desglose[desglose.length - 1].esElUltimo = true;
+  const mesesTotales = diasNorm / 30;
+
+  // Semanas laborables: cada día L-V cuenta 0,2 semanas (recorre días reales del calendario)
+  let semanasLaborables = 0;
+  const cursor = new Date(inicio);
+  while (cursor <= fin) {
+    const dow = cursor.getDay(); // 0=dom, 6=sab
+    if (dow >= 1 && dow <= 5) semanasLaborables += 0.2;
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  semanasLaborables = Math.round(semanasLaborables * 10) / 10;
+
+  // Añadir semanas laborables por mes al desglose
+  desglose.forEach((d, i) => {
+    const mesObj = new Date(anioInicio, mesInicio + i, 1);
+    const anioM  = mesObj.getFullYear();
+    const mesM   = mesObj.getMonth();
+    let sw = 0;
+    for (let dd = d.desde; dd <= d.hasta; dd++) {
+      const dow = new Date(anioM, mesM, dd).getDay();
+      if (dow >= 1 && dow <= 5) sw += 0.2;
+    }
+    d.semanasLaborables = Math.round(sw * 10) / 10;
+  });
+
+  return { mesesTotales, semanasTotales: semanasLaborables, diasNormalizados: diasNorm, desglose };
+}
+
+// ─── CÁLCULO SALARIAL ────────────────────────────────────────────────────────
+function calcularSalario({ salarioPactado, periodo, horasPorMes, vacDiasPorMes,
+                           vacAcumulada, indemAcumulada, horasAcumuladas }) {
+  if (!periodo) return null;
+  const { mesesTotales, semanasTotales, desglose } = periodo;
+  const n = desglose.length;
+
+  // ── Referencia mes completo ──
+  const base1mes  = salarioPactado * FACTOR_BASE;
+  const vac1mes   = base1mes / DIVISOR_VAC;
+  const indem1mes = (base1mes / 30) * FACTOR_INDEM_DIA;
+  const suma1mes  = base1mes + vac1mes + indem1mes;
+
+  // ── Valores hora ──
+  const salarioDia     = base1mes / 30;
+  const salarioSemana  = salarioDia * 7;
+  const valorHora      = salarioSemana / 40;
+  const valorHoraExtra = valorHora * 1.5;
+
+  // ── Horas extra por mes: si está vacío (sin tocar), usar días L-V; si es 0 explícito, respetar 0 ──
+  const hxMes = Array.from({ length: n }, (_, i) => {
+    const v = horasPorMes[i];
+    if (v === undefined || v === null || v === "") {
+      return Math.round((desglose[i]?.semanasLaborables || 0) * 5);
+    }
+    return v || 0;
+  });
+  const totalHorasExtra = hxMes.reduce((s, h) => s + h, 0);
+  const importeHxMes    = hxMes.map(h => h * valorHoraExtra);
+  const totalImporteHx  = importeHxMes.reduce((s, v) => s + v, 0);
+
+  // ── Vacaciones disfrutadas por mes ──
+  const vdMes = Array.from({ length: n }, (_, i) => vacDiasPorMes[i] ?? 0);
+  const totalVacDias    = vdMes.reduce((s, d) => s + d, 0);
+  const importeVdMes    = vdMes.map(d => d * salarioDia);
+  const totalImporteVd  = importeVdMes.reduce((s, v) => s + v, 0);
+
+  // ── Raw por mes ──
+  const rawMes = desglose.map((d, i) => {
+    const totalMes = salarioPactado * d.fraccion;
+    const baseMes  = totalMes * FACTOR_BASE;
+    const vacMes   = baseMes / DIVISOR_VAC;
+    const indemMes = (baseMes / 30) * FACTOR_INDEM_DIA;
+    return { ...d, totalMes, baseMes, vacMes, indemMes };
+  });
+
+  // ── Totales brutos ──
+  const totalBase  = rawMes.reduce((s, m) => s + m.baseMes,  0);
+  const totalVac   = rawMes.reduce((s, m) => s + m.vacMes,   0);
+  const totalIndem = rawMes.reduce((s, m) => s + m.indemMes, 0);
+  const totalBruto = rawMes.reduce((s, m) => s + m.totalMes, 0);
+
+  // ── Aplicar modos de pago ──
+  const porMes = rawMes.map((d, i) => {
+    const esUltimo = i === n - 1;
+
+    // vacaciones del salario (prorrateadas o acumuladas)
+    const vacShow = vacAcumulada ? (esUltimo ? totalVac : 0) : d.vacMes;
+    // indemnización
+    const indemShow = indemAcumulada ? (esUltimo ? totalIndem : 0) : d.indemMes;
+    // horas extra
+    const hxShow = horasAcumuladas ? (esUltimo ? totalImporteHx : 0) : importeHxMes[i];
+    // descuento vacaciones disfrutadas: si vac acumuladas → se restan al final; si no → mes a mes
+    const vdShow = vacAcumulada ? (esUltimo ? totalImporteVd : 0) : importeVdMes[i];
+
+    const cobroMes = d.baseMes + vacShow + indemShow + hxShow - vdShow;
+
+    return {
+      ...d,
+      vacShow, indemShow,
+      horasExtraMes: hxMes[i],
+      importeHxShow: hxShow,
+      vacDiasMes: vdMes[i],
+      importeVdShow: vdShow,
+      cobroMes,
+    };
+  });
+
+  const totalFinal = porMes.reduce((s, m) => s + m.cobroMes, 0);
+  const promedioMensual = totalFinal / mesesTotales;
+
+  return {
+    // referencia
+    base1mes, vac1mes, indem1mes, suma1mes,
+    salarioDia, salarioSemana, valorHora, valorHoraExtra,
+    // horas extra
+    totalHorasExtra, totalImporteHx,
+    // vacaciones disfrutadas
+    totalVacDias, totalImporteVd,
+    // por mes
+    porMes,
+    // totales
+    totalBruto, totalBase, totalVac, totalIndem,
+    totalFinal, promedioMensual,
+    mesesTotales, semanasTotales,
+  };
+}
+
+// ─── HELPERS UI ──────────────────────────────────────────────────────────────
+const fmt  = (n, d = 2) => parseFloat(n).toLocaleString("es-ES", { minimumFractionDigits: d, maximumFractionDigits: d });
+const fmtE = (n)        => fmt(n, 2) + " €";
+const fmtM = (n)        => fmt(n, 4);
+
+const P = { background: "#ffffff", border: "1px solid #d5d9dc", borderRadius: 8, padding: 24, marginBottom: 20, minWidth: 0 };
+const ST = { fontSize: 12, letterSpacing: "0.15em", color: "#555", textTransform: "uppercase", marginBottom: 18, paddingBottom: 12, borderBottom: "1px solid #d5d9dc", fontFamily: "'Inter', -apple-system, sans-serif", fontWeight: 700 };
+
+// Badge "IMPORTES BRUTOS" – estilo dorado, en línea, visible
+const BadgeBrutos = ({ size = "normal" }) => {
+  const s = size === "small"
+    ? { fontSize: 8, padding: "1px 5px", marginLeft: 6 }
+    : size === "inline"
+      ? { fontSize: 10, padding: "2px 7px", marginLeft: 8 }
+      : { fontSize: 10, padding: "2px 8px", marginLeft: 10 };
+  return (
+    <span style={{
+      display: "inline-block",
+      background: "#4ec9b8",
+      color: "#0a0a0a",
+      fontWeight: 700,
+      letterSpacing: "0.05em",
+      textTransform: "uppercase",
+      borderRadius: 5,
+      fontFamily: "'Inter', -apple-system, sans-serif",
+      verticalAlign: "middle",
+      ...s,
+    }}>Importes Brutos</span>
+  );
+};
+const LS = { display: "block", fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "#666", marginBottom: 6, fontFamily: "'Inter', -apple-system, sans-serif" };
+
+function Field({ label, value, onChange, onBlur, type = "number", prefix, hint, small, readOnly, lockHint, min, max }) {
+  return (
+    <div style={{ marginBottom: small ? 8 : 14, minWidth: 0 }}>
+      {label && (
+        <label style={{ ...LS, fontSize: small ? 9 : 10 }}>
+          {label}{readOnly && <span style={{ marginLeft: 6, color: "#4ec9b8" }}>🔒</span>}
+        </label>
+      )}
+      <div style={{ position: "relative", minWidth: 0 }}>
+        {prefix && <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "#1a1a1a", fontWeight: 700, fontSize: 13, fontFamily: "'Inter', -apple-system, sans-serif" }}>{prefix}</span>}
+        <input
+          type={type === "date" ? "date" : type === "text" ? "text" : "number"}
+          value={value}
+          onChange={e => readOnly ? null : onChange(type === "text" || type === "date" ? e.target.value : parseFloat(e.target.value) || 0)}
+          readOnly={!!readOnly}
+          tabIndex={readOnly ? -1 : undefined}
+          step="any"
+          min={type === "date" ? (min || undefined) : "0"}
+          max={type === "date" ? (max || undefined) : undefined}
+          style={{
+            width: "100%",
+            background: readOnly ? "#e5e2dd" : "#dfe4e8",
+            border: `1px solid ${readOnly ? "#4ec9b8" : "#d5d9dc"}`,
+            borderRadius: 4,
+            color: readOnly ? "#666" : "#1a1a1a",
+            fontFamily: "'Inter', -apple-system, sans-serif",
+            fontSize: small ? 13 : 14,
+            padding: prefix ? (small ? "7px 8px 7px 22px" : "9px 10px 9px 26px") : (small ? "7px 10px" : "9px 12px"),
+            outline: "none", boxSizing: "border-box", transition: "border-color 0.2s",
+            colorScheme: "light",
+            cursor: readOnly ? "not-allowed" : "text",
+          }}
+          onFocus={e => { if (!readOnly) e.target.style.borderColor = "#4ec9b8"; }}
+          // v141: la rueda del ratón sobre un input numérico enfocado cambiaba el valor
+          // (scroll de página = -1 € por muesca). Lo mismo con las flechas arriba/abajo.
+          onWheel={e => { if (e.target === document.activeElement) e.target.blur(); }}
+          onKeyDown={e => { if (type !== "date" && type !== "text" && (e.key === "ArrowUp" || e.key === "ArrowDown")) e.preventDefault(); }}
+          onBlur={e  => {
+            if (!readOnly) e.target.style.borderColor = "#2a2a2a";
+            if (onBlur) onBlur(e.target.value);
+          }}
+        />
+      </div>
+      {hint && <p style={{ margin: "4px 0 0", fontSize: 10, color: "#1a1a1a", fontFamily: "'Inter', -apple-system, sans-serif", fontWeight: 500 }}>{hint}</p>}
+      {readOnly && lockHint && <p style={{ margin: "4px 0 0", fontSize: 10, color: "#1a1a1a", fontFamily: "'Inter', -apple-system, sans-serif", fontStyle: "italic", fontWeight: 500 }}>{lockHint}</p>}
+    </div>
+  );
+}
+
+function Toggle({ label, sublabel, value, onChange }) {
+  return (
+    <div onClick={() => onChange(!value)} style={{
+      display: "flex", justifyContent: "space-between", alignItems: "center",
+      padding: "11px 13px", background: "#dfe4e8", borderRadius: 6,
+      border: `1px solid ${value ? "#4ec9b8" : "#d5d9dc"}`, marginBottom: 10, cursor: "pointer",
+    }}>
+      <div>
+        <div style={{ fontSize: 11, color: value ? "#1a1a1a" : "#666", fontFamily: "'Inter', -apple-system, sans-serif", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 700 }}>{label}</div>
+        {sublabel && <div style={{ fontSize: 10, color: "#666", marginTop: 3, fontFamily: "'Inter', -apple-system, sans-serif", fontWeight: 500 }}>{sublabel}</div>}
+      </div>
+      <div style={{ position: "relative", width: 38, height: 20, flexShrink: 0, marginLeft: 12 }}>
+        <div style={{ width: "100%", height: "100%", borderRadius: 10, background: value ? "#4ec9b8" : "#222", transition: "background 0.25s" }} />
+        <div style={{ position: "absolute", top: 3, left: value ? 19 : 3, width: 14, height: 14, borderRadius: "50%", background: value ? "#f2f5f7" : "#aaa", transition: "left 0.25s", boxShadow: "0 1px 3px rgba(0,0,0,0.5)" }} />
+      </div>
+    </div>
+  );
+}
+
+function Row({ label, value, sub, highlight, green, muted }) {
+  return (
+    <div style={{
+      display: "flex", justifyContent: "space-between", alignItems: "baseline",
+      padding: highlight ? "14px 18px" : "8px 0",
+      background: highlight ? "#f2f5f7" : "transparent",
+      borderRadius: highlight ? 8 : 0,
+      border: highlight ? "1px solid #d5d9dc" : "none",
+      borderBottom: highlight ? "1px solid #d5d9dc" : "1px solid #e8ecef",
+      marginBottom: highlight ? 6 : 0,
+    }}>
+      <span style={{ fontSize: highlight ? 12 : 11, letterSpacing: "0.08em", textTransform: "uppercase", color: highlight ? "#1a1a1a" : muted ? "#888" : "#1a1a1a", fontFamily: "'Inter', -apple-system, sans-serif", fontWeight: highlight ? 700 : 500 }}>
+        {label}
+        {sub && <span style={{ display: "block", fontSize: 10, color: "#888", marginTop: 3, fontWeight: 400, textTransform: "none", letterSpacing: "0.02em" }}>{sub}</span>}
+      </span>
+      <span style={{ fontSize: highlight ? 20 : 13, fontWeight: highlight ? 800 : 600, color: green ? "#1a7a58" : muted ? "#888" : "#1a1a1a", fontFamily: "'Inter', -apple-system, sans-serif", letterSpacing: highlight ? "-0.01em" : "0" }}>
+        {value}
+      </span>
+    </div>
+  );
+}
+
+function Div() { return <div style={{ height: 1, background: "#e8ecef", margin: "8px 0" }} />; }
+
+// ═══════════════════════════════════════════════════════════════════════
+// IMPORTADOR DE PERFILES ANTIGUOS (v46) — solo admin
+// Lista los perfiles de localStorage y permite migrarlos a Supabase
+// asignándoles un proyecto. NO borra el original de localStorage.
+// ═══════════════════════════════════════════════════════════════════════
+function ImportadorAntiguos({ usuarioActual, tabId, onCerrar, onImportado }) {
+  const [locales, setLocales] = useState([]);
+  const [proyectos, setProyectos] = useState([]);
+  const [seleccion, setSeleccion] = useState({}); // { key: proyectoId }
+  const [cargando, setCargando] = useState(true);
+  const [importando, setImportando] = useState(false);
+  const [mensaje, setMensaje] = useState(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        // Leer todos los perfiles locales (todos los prefijos)
+        const prefijos = ["perfil_unif_", "perfil_45h_", "perfil_40h_"];
+        const keys = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && prefijos.some(p => k.startsWith(p))) keys.push(k);
+        }
+        const lista = keys.map(k => {
+          try {
+            const v = localStorage.getItem(k);
+            const data = JSON.parse(v);
+            return { key: k, ...data };
+          } catch { return null; }
+        }).filter(Boolean).filter(p => {
+          // Filtrar por tabId actual (o antiguos sin tabId → 45H)
+          if (p.tabId === tabId) return true;
+          if (!p.tabId && tabId === "45h") return true;
+          if (!p.tabId && tabId === "40h" && p.key && p.key.startsWith("perfil_40h_")) return true;
+          return false;
+        });
+        setLocales(lista.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)));
+
+        // Cargar proyectos disponibles (admin ve todos)
+        const proys = await listarProyectos({
+          adminPin: usuarioActual.pin,
+          esAdmin: true,
+        });
+        setProyectos((proys || []).filter(p => p.activo));
+      } catch (e) {
+        setMensaje({ tipo: "error", texto: "Error al cargar: " + e.message });
+      }
+      setCargando(false);
+    })();
+  }, []);
+
+  const importarSeleccionados = async () => {
+    const aImportar = Object.entries(seleccion).filter(([_, pid]) => pid);
+    if (aImportar.length === 0) {
+      alert("Selecciona un proyecto para al menos un perfil");
+      return;
+    }
+    setImportando(true);
+    let ok = 0, fallos = 0;
+    for (const [key, proyectoId] of aImportar) {
+      const p = locales.find(x => x.key === key);
+      if (!p) continue;
+      try {
+        await crearPerfilSupabase({
+          proyectoId: Number(proyectoId),
+          tabId: p.tabId || tabId,
+          nombre: p.nombre,
+          autor: p.autor || usuarioActual.nombre,
+          datos: p.datos,
+        });
+        ok++;
+      } catch (e) {
+        console.error("Error importando", p.nombre, e);
+        fallos++;
+      }
+    }
+    setImportando(false);
+    setMensaje({
+      tipo: fallos === 0 ? "ok" : "warn",
+      texto: `Importados: ${ok}${fallos > 0 ? ` · Fallidos: ${fallos}` : ""}. Los originales locales se conservan.`,
+    });
+    if (ok > 0) setTimeout(() => { onImportado(); }, 1500);
+  };
+
+  const overlay = {
+    position: "fixed", inset: 0, background: "rgba(20,20,20,0.75)",
+    display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100,
+  };
+  const modal = {
+    background: "#e8ecef", padding: 20, borderRadius: 6, maxWidth: 750, width: "92%",
+    maxHeight: "88vh", overflowY: "auto", color: "#1a1a1a",
+    fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", border: "1px solid #4ec9b8",
+  };
+
+  return (
+    <div style={overlay} onClick={onCerrar}>
+      <div style={modal} onClick={e => e.stopPropagation()}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, borderBottom: "1px solid #d5d9dc", paddingBottom: 10 }}>
+          <h2 style={{ margin: 0, fontSize: 14, letterSpacing: "0.15em", textTransform: "uppercase", color: "#1a1a1a" }}>📥 Importar Perfiles Antiguos</h2>
+          <button onClick={onCerrar} style={{ background: "transparent", color: "#888", border: "1px solid #ccc", padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>Cerrar</button>
+        </div>
+
+        <div style={{ fontSize: 11, color: "#666", marginBottom: 12, lineHeight: 1.5 }}>
+          Los perfiles antiguos guardados en este navegador (localStorage) se pueden migrar a la nube asignándoles un proyecto.
+          <br /><b>Los originales locales NO se borran</b>, se copian.
+        </div>
+
+        {mensaje && (
+          <div style={{
+            padding: 10, borderRadius: 4, marginBottom: 12, fontSize: 11,
+            background: mensaje.tipo === "ok" ? "#e8f5e8" : mensaje.tipo === "warn" ? "#fdf0e0" : "#fdf0f0",
+            border: `1px solid ${mensaje.tipo === "ok" ? "#c0e0c0" : mensaje.tipo === "warn" ? "#e8b878" : "#e8c0c0"}`,
+            color: mensaje.tipo === "ok" ? "#2a7a50" : mensaje.tipo === "warn" ? "#7a5a2a" : "#b02020",
+          }}>{mensaje.texto}</div>
+        )}
+
+        {cargando ? (
+          <div style={{ padding: 20, textAlign: "center", color: "#888" }}>Cargando...</div>
+        ) : locales.length === 0 ? (
+          <div style={{ padding: 20, textAlign: "center", color: "#888", fontSize: 12 }}>
+            No hay perfiles antiguos en este navegador para la pestaña {tabId?.toUpperCase()}.
+          </div>
+        ) : (
+          <>
+            {/* Tabla perfiles */}
+            <div style={{ maxHeight: "50vh", overflowY: "auto", marginBottom: 12 }}>
+              {locales.map(p => (
+                <div key={p.key} style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 8, padding: 10, background: "#f2f5f7", borderRadius: 4, marginBottom: 6, border: "1px solid #e8e4de", alignItems: "center" }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a" }}>{p.nombre}</div>
+                    <div style={{ fontSize: 9, color: "#888", marginTop: 2 }}>
+                      {p.datos?.proyecto && <><span style={{ color: "#4ec9b8" }}>{p.datos.proyecto}</span>{p.datos?.productora && ` · ${p.datos.productora}`} · </>}
+                      {p.datos?.nombre || "—"} · {p.datos?.puesto || "—"}
+                      {p.datos?.fechaInicio && ` · ${p.datos.fechaInicio}→${p.datos.fechaFin}`}
+                    </div>
+                    <div style={{ fontSize: 9, color: "#aaa", marginTop: 2 }}>
+                      {p.timestamp ? new Date(p.timestamp).toLocaleString("es-ES") : "—"}
+                    </div>
+                  </div>
+                  <select
+                    value={seleccion[p.key] || ""}
+                    onChange={e => setSeleccion({ ...seleccion, [p.key]: e.target.value })}
+                    style={{ padding: "6px 8px", border: "1px solid #d5d9dc", borderRadius: 4, fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize: 11, background: "#f2f5f7", color: "#1a1a1a", minWidth: 180 }}
+                  >
+                    <option value="">— No importar —</option>
+                    {proyectos.map(pr => (
+                      <option key={pr.id} value={pr.id}>{pr.nombre}</option>
+                    ))}
+                  </select>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", borderTop: "1px solid #d5d9dc", paddingTop: 12 }}>
+              <button
+                onClick={onCerrar}
+                disabled={importando}
+                style={{ background: "transparent", color: "#666", border: "1px solid #ccc", padding: "8px 16px", borderRadius: 4, cursor: importando ? "wait" : "pointer", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}
+              >Cancelar</button>
+              <button
+                onClick={importarSeleccionados}
+                disabled={importando}
+                style={{ background: "#4ec9b8", color: "#f2f5f7", border: "none", padding: "8px 16px", borderRadius: 4, cursor: importando ? "wait" : "pointer", fontFamily: "'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}
+              >{importando ? "Importando..." : "Importar seleccionados"}</button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+
+// ─── GESTOR DE PERFILES ──────────────────────────────────────────────────────
+function GestorPerfiles({ tabId, datosActuales, onCargarPerfil, onRegistrarAcciones, onPerfilesActualizados, onPerfilEnEdicionCambio }) {
+  const usuarioCtx = useContext(UsuarioContext);
+  const proyectoActivoCtx = useContext(ProyectoContext); // v46
+  const esAdmin = !!usuarioCtx?.es_admin;
+  const esCoordinador = usuarioCtx?.rol === "coordinador"; // v88
+  const [perfiles, setPerfiles] = useState([]);
+  const [cargando, setCargando] = useState(true);
+  const [mostrarLista, setMostrarLista] = useState(false);
+  const [nombrePerfil, setNombrePerfil] = useState("");
+  const [refreshTrigger, setRefreshTrigger] = useState(0); // v99
+  const [mensaje, setMensaje] = useState(null);
+  const [mostrarGuardar, setMostrarGuardar] = useState(false);
+  const [verTodosProyectos, setVerTodosProyectos] = useState(false); // v46: toggle admin
+  const [huboFallbackSupabase, setHuboFallbackSupabase] = useState(false); // v46: para avisar
+  const [huerfanosLocalState, setHuerfanosLocalState] = useState([]); // v95: perfiles solo en local, no en Supabase
+  const [mostrarImportador, setMostrarImportador] = useState(false); // v46: modal importar antiguos
+  const [perfilEnEdicion, setPerfilEnEdicion] = useState(null); // v53: perfil cargado que se puede modificar
+
+  const STORAGE_PREFIX = `perfil_unif_`;
+  const STORAGE_PREFIXES_LEGACY = [`perfil_40h_`, `perfil_45h_`];
+
+  // Adaptador: usa window.storage si existe (artefactos Claude.ai),
+  // si no, usa localStorage del navegador (Vercel/local/etc.)
+  const storage = (() => {
+    if (typeof window !== "undefined" && window.storage) return window.storage;
+    return {
+      list: async (prefix) => {
+        const keys = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && k.startsWith(prefix)) keys.push(k);
+        }
+        return { keys };
+      },
+      get: async (key) => {
+        const value = localStorage.getItem(key);
+        if (value === null) throw new Error("Not found");
+        return { value };
+      },
+      set: async (key, value) => {
+        localStorage.setItem(key, value);
+        return { ok: true };
+      },
+      delete: async (key) => {
+        localStorage.removeItem(key);
+        return { ok: true };
+      },
+    };
+  })();
+
+  useEffect(() => {
+    (async () => {
+      try {
+        // v46: Cargar de Supabase (fuente principal) + localStorage (respaldo)
+        // Admin puede ver todos los proyectos con toggle
+        // v142: se traen los perfiles de AMBAS pestañas (45h y 40h). El filtro
+        // TIPO del modal Cargar Perfil es quien decide qué se muestra.
+        const perfilesSup = await listarPerfilesSupabase({
+          tabId: null,
+          proyectoId: proyectoActivoCtx?.id || null,
+          verTodos: esAdmin && verTodosProyectos,
+          adminPin: esAdmin ? usuarioCtx.pin : null,
+        });
+
+        let listaFinal = [];
+        let supOK = true;
+
+        if (perfilesSup === null) {
+          // Error de red → fallback a localStorage
+          supOK = false;
+          setHuboFallbackSupabase(true);
+        } else {
+          // Mapear perfiles Supabase al formato interno { key, nombre, tabId, timestamp, autor, datos, proyecto_id }
+          listaFinal = perfilesSup.map(p => ({
+            key: `sup_${p.id}`,           // prefijo "sup_" distingue Supabase
+            supabaseId: p.id,             // id real en Supabase
+            proyectoId: p.proyecto_id,
+            nombre: p.nombre,
+            tabId: p.tab_id,
+            timestamp: new Date(p.created_at).getTime(),
+            autor: p.autor,
+            datos: p.datos,
+            fuente: "supabase",
+          }));
+          setHuboFallbackSupabase(false);
+        }
+
+        // Cargar de localStorage (respaldo)
+        const todosPrefijos = [STORAGE_PREFIX, ...STORAGE_PREFIXES_LEGACY];
+        const todasLasKeys = [];
+        for (const prefix of todosPrefijos) {
+          try {
+            const res = await storage.list(prefix);
+            if (res && res.keys) todasLasKeys.push(...res.keys);
+          } catch (e) { /* ignorar */ }
+        }
+        const listaLocal = await Promise.all(todasLasKeys.map(async k => {
+          try {
+            const d = await storage.get(k);
+            const data = JSON.parse(d.value);
+            return { key: k, fuente: "local", ...data };
+          } catch { return null; }
+        }));
+        // v142: sin filtro por pestaña — se conservan los de 45h y 40h
+        const localFiltrado = listaLocal.filter(Boolean).map(p => ({
+          ...p,
+          tabId: p.tabId || (p.key && p.key.startsWith("perfil_40h_") ? "40h" : "45h"),
+        }));
+
+        // v95: SIMPLIFICADO — Supabase como única fuente visible.
+        // localStorage se mantiene solo como respaldo silencioso si Supabase falla.
+        // Detectamos perfiles huérfanos (solo en local, no en Supabase) para poder migrarlos/borrarlos.
+        let extrasLocal = [];
+        let huerfanosLocal = []; // v95: perfiles solo en local, no en Supabase → sugerir migración
+        if (!supOK) {
+          // Sin conexión → usar todos los locales como fallback
+          extrasLocal = localFiltrado;
+        } else {
+          // Con Supabase OK: NO añadir locales al listado (evita duplicados).
+          // Pero identificar los que están SOLO en local (huérfanos) para poder ofrecer migración.
+          const clavesSup = new Set(listaFinal.map(p => `${(p.nombre || "").toLowerCase().trim()}::${p.proyectoId || ""}`));
+          huerfanosLocal = localFiltrado.filter(p => {
+            const k = `${(p.nombre || "").toLowerCase().trim()}::${p.proyectoId || ""}`;
+            return !clavesSup.has(k);
+          });
+        }
+        // v95: publicar huérfanos en el estado si el componente lo consume
+        try { setHuerfanosLocalState && setHuerfanosLocalState(huerfanosLocal); } catch {}
+        // Evitar duplicados por nombre+timestamp (solo aplica cuando extrasLocal tiene contenido = fallback)
+        const claves = new Set(listaFinal.map(p => `${p.nombre}::${p.timestamp}`));
+        for (const p of extrasLocal) {
+          const k = `${p.nombre}::${p.timestamp}`;
+          if (!claves.has(k)) {
+            listaFinal.push(p);
+            claves.add(k);
+          }
+        }
+
+        setPerfiles(listaFinal.sort((a,b) => (b.timestamp||0) - (a.timestamp||0)));
+      } catch (e) { console.error("Error cargando perfiles:", e); }
+      setCargando(false);
+    })();
+  }, [tabId, proyectoActivoCtx?.id, verTodosProyectos, refreshTrigger]);
+
+  // v99: forzar recarga de perfiles (usado desde botones externos)
+  const recargar = () => setRefreshTrigger(t => t + 1);
+
+  const showMsg = (texto, tipo = "ok") => {
+    setMensaje({ texto, tipo });
+    setTimeout(() => setMensaje(null), 2500);
+  };
+
+  const guardarPerfil = async () => {
+    // Si el usuario no escribió nada, usar el placeholder sugerido como nombre
+    let nombre = nombrePerfil.trim();
+    if (!nombre) {
+      const sugerido = datosActuales.nombre
+        ? `${datosActuales.nombre} · ${datosActuales.puesto || ""}`.trim().replace(/·\s*$/,"").trim()
+        : "";
+      if (sugerido && sugerido !== "·") {
+        nombre = sugerido;
+      } else {
+        showMsg("Introduce un nombre o rellena los datos del trabajador", "error");
+        return;
+      }
+    }
+    const key = `${STORAGE_PREFIX}${Date.now()}_${nombre.replace(/[^a-zA-Z0-9]/g,"_").slice(0,40)}`;
+    const payload = {
+      nombre,
+      tabId,
+      timestamp: Date.now(),
+      autor: usuarioCtx?.nombre || null,
+      datos: datosActuales,
+    };
+    // v46: guardar en Supabase (principal) Y localStorage (respaldo)
+    let supabaseOK = false;
+    let supabaseId = null;
+    if (proyectoActivoCtx?.id) {
+      try {
+        const res = await crearPerfilSupabase({
+          proyectoId: proyectoActivoCtx.id,
+          tabId,
+          nombre,
+          autor: payload.autor,
+          datos: datosActuales,
+        });
+        if (Array.isArray(res) && res.length > 0) {
+          supabaseId = res[0].id;
+          supabaseOK = true;
+        }
+      } catch (e) {
+        console.warn("Fallo al guardar en Supabase:", e.message);
+      }
+    }
+    // v95: guardar en local SOLO como respaldo cuando Supabase falla (o no se pudo intentar)
+    // Con Supabase OK no duplicamos → todo va a la nube
+    try {
+      if (!supabaseOK) {
+        await storage.set(key, JSON.stringify(payload));
+      }
+      // Añadir a la lista según origen
+      let nuevoPerfil;
+      if (supabaseOK) {
+        nuevoPerfil = {
+          key: `sup_${supabaseId}`,
+          supabaseId,
+          proyectoId: proyectoActivoCtx.id,
+          fuente: "supabase",
+          ...payload,
+        };
+      } else {
+        nuevoPerfil = { key, fuente: "local", ...payload };
+      }
+      setPerfiles(prev => [nuevoPerfil, ...prev.filter(p => p.key !== nuevoPerfil.key)]);
+      setNombrePerfil("");
+      setMostrarGuardar(false);
+      if (supabaseOK) {
+        showMsg(`✓ Guardado en el proyecto: ${nombre}`);
+      } else if (proyectoActivoCtx?.id) {
+        showMsg(`⚠ Guardado solo local (sin conexión): ${nombre}`, "warn");
+      } else {
+        showMsg(`✓ Guardado (local): ${nombre}`);
+      }
+    } catch (e) {
+      showMsg("Error al guardar", "error");
+      console.error(e);
+    }
+  };
+
+  // v138: Cargar = solo trae los datos (al guardar crea perfil nuevo).
+  //       Modificar = carga enlazado a esa tarjeta (al guardar sobrescribe).
+  const cargarPerfil = (perfil, enlazar = false) => {
+    // v142: los perfiles de la otra pestaña ya se listan; avisamos antes de cargarlos
+    if (perfil.tabId && tabId && perfil.tabId !== tabId) {
+      const ok = confirm(
+        `Este perfil es de ${perfil.tabId.toUpperCase()} y estás en la pestaña ${tabId.toUpperCase()}.\n\n¿Cargarlo igualmente?\n\n(Los cálculos se harán con el modelo de ${tabId.toUpperCase()})`
+      );
+      if (!ok) return;
+    }
+    onCargarPerfil(perfil.datos);
+    setPerfilEnEdicion(enlazar ? perfil : null);
+    setMostrarLista(false);
+    showMsg(enlazar ? `✎ Editando: ${perfil.nombre}` : `✓ Cargado: ${perfil.nombre}`);
+  };
+
+  const abrirParaModificar = (perfil) => cargarPerfil(perfil, true);
+  const salirEdicion = () => setPerfilEnEdicion(null);
+
+  const eliminarPerfil = async (perfil, e) => {
+    e.stopPropagation();
+    if (!confirm(`¿Eliminar "${perfil.nombre}"?`)) return;
+    try {
+      if (perfil.fuente === "supabase" && perfil.supabaseId) {
+        // v46: borrar de Supabase
+        await borrarPerfilSupabase(perfil.supabaseId, esAdmin ? usuarioCtx.pin : null);
+      } else {
+        await storage.delete(perfil.key);
+      }
+      setPerfiles(prev => prev.filter(p => p.key !== perfil.key));
+      showMsg("✓ Eliminado");
+    } catch (err) {
+      showMsg("Error al eliminar", "error");
+      console.error(err);
+    }
+  };
+
+  // v51: renombrar perfil (Supabase o local). Admin puede renombrar de otros proyectos.
+  const renombrarPerfil = async (perfil, e) => {
+    e.stopPropagation();
+    const nuevo = prompt(`Renombrar "${perfil.nombre}":`, perfil.nombre);
+    if (!nuevo || !nuevo.trim() || nuevo.trim() === perfil.nombre) return;
+    const nombreNuevo = nuevo.trim();
+    try {
+      if (perfil.fuente === "supabase" && perfil.supabaseId) {
+        await actualizarPerfilSupabase(perfil.supabaseId, { nombre: nombreNuevo }, esAdmin ? usuarioCtx.pin : null);
+      } else {
+        // Local: reescribir el objeto en su misma key
+        const nuevoPayload = { ...perfil, nombre: nombreNuevo };
+        // Quitar campos internos que no queremos persistir
+        delete nuevoPayload.key;
+        delete nuevoPayload.fuente;
+        delete nuevoPayload.supabaseId;
+        delete nuevoPayload.proyectoId;
+        await storage.set(perfil.key, JSON.stringify(nuevoPayload));
+      }
+      setPerfiles(prev => prev.map(p => p.key === perfil.key ? { ...p, nombre: nombreNuevo } : p));
+      showMsg(`✓ Renombrado a "${nombreNuevo}"`);
+    } catch (err) {
+      showMsg("Error al renombrar", "error");
+      console.error(err);
+    }
+  };
+
+  // v51: duplicar perfil como "<original> (copia)" en el proyecto activo
+  const duplicarPerfil = async (perfil, e) => {
+    e.stopPropagation();
+    const nombreCopia = `${perfil.nombre} (copia)`;
+    const payload = {
+      nombre: nombreCopia,
+      tabId: perfil.tabId,
+      timestamp: Date.now(),
+      autor: usuarioCtx?.nombre || null,
+      datos: perfil.datos,
+    };
+    // v51: guardar en Supabase (si hay proyecto activo) Y localStorage (respaldo)
+    let supabaseOK = false;
+    let supabaseId = null;
+    if (proyectoActivoCtx?.id) {
+      try {
+        const res = await crearPerfilSupabase({
+          proyectoId: proyectoActivoCtx.id,
+          tabId: perfil.tabId,
+          nombre: nombreCopia,
+          autor: payload.autor,
+          datos: perfil.datos,
+        });
+        if (Array.isArray(res) && res.length > 0) {
+          supabaseId = res[0].id;
+          supabaseOK = true;
+        }
+      } catch (err) {
+        console.warn("Fallo duplicando en Supabase:", err.message);
+      }
+    }
+    // v95: guardar copia en local SOLO si Supabase falla
+    const key = `${STORAGE_PREFIX}${Date.now()}_${nombreCopia.replace(/[^a-zA-Z0-9]/g,"_").slice(0,40)}`;
+    try {
+      if (!supabaseOK) {
+        await storage.set(key, JSON.stringify(payload));
+      }
+      const nuevoPerfil = supabaseOK
+        ? { key: `sup_${supabaseId}`, supabaseId, proyectoId: proyectoActivoCtx.id, fuente: "supabase", ...payload }
+        : { key, fuente: "local", ...payload };
+      setPerfiles(prev => [nuevoPerfil, ...prev]);
+      showMsg(`✓ Duplicado: ${nombreCopia}`);
+    } catch (err) {
+      showMsg("Error al duplicar", "error");
+      console.error(err);
+    }
+  };
+
+  // v53: modificar perfil actualmente cargado (sobrescribir con datos actuales)
+  const modificarPerfil = async () => {
+    if (!perfilEnEdicion) return;
+    return modificarPerfilEspecifico(perfilEnEdicion);
+  };
+
+  // v132: modificar cualquier perfil (sobrescribir con datos actuales)
+  // v137: el nombre del perfil sigue SIEMPRE a los datos del trabajador,
+  //       para que la tarjeta y su contenido no se descuadren.
+  const modificarPerfilEspecifico = async (perfil) => {
+    if (!perfil) return { ok: false };
+    const fechaOriginal = perfil.timestamp
+      ? new Date(perfil.timestamp).toLocaleString("es-ES")
+      : "fecha desconocida";
+    const nombreAutoDe = (d) => d?.nombre
+      ? `${d.nombre} · ${d.puesto || ""}`.trim().replace(/·\s*$/, "").trim()
+      : "";
+    const autoNuevo = nombreAutoDe(datosActuales);
+    const nombreFinal = autoNuevo || perfil.nombre;
+    const avisoNombre = nombreFinal !== perfil.nombre
+      ? `\n\nEl perfil pasará a llamarse:\n"${nombreFinal}"`
+      : "";
+    const confirmar = confirm(
+      `Este perfil se guardó el ${fechaOriginal}\n\n¿Sobrescribir "${perfil.nombre}" con los datos actuales?${avisoNombre}\n\n(Los datos anteriores se perderán)`
+    );
+    if (!confirmar) return { ok: false };
+    const payload = {
+      nombre: nombreFinal,
+      tabId,
+      timestamp: Date.now(),
+      autor: usuarioCtx?.nombre || null,
+      datos: datosActuales,
+    };
+    try {
+      if (perfil.fuente === "supabase" && perfil.supabaseId) {
+        await actualizarPerfilSupabase(
+          perfil.supabaseId,
+          { nombre: payload.nombre, datos: datosActuales, autor: payload.autor },
+          esAdmin ? usuarioCtx.pin : null
+        );
+      } else {
+        await storage.set(perfil.key, JSON.stringify(payload));
+      }
+      setPerfiles(prev => prev.map(p =>
+        (p.key === perfil.key || (p.supabaseId && p.supabaseId === perfil.supabaseId))
+          ? { ...p, ...payload, key: p.key, fuente: p.fuente, supabaseId: p.supabaseId, proyectoId: p.proyectoId }
+          : p
+      ));
+      // Si el perfil sobrescrito es el que está en edición, actualiza también su referencia
+      if (perfilEnEdicion && (perfilEnEdicion.key === perfil.key || (perfilEnEdicion.supabaseId && perfilEnEdicion.supabaseId === perfil.supabaseId))) {
+        setPerfilEnEdicion(prev => prev ? { ...prev, ...payload } : prev);
+      }
+      showMsg(`✓ Modificado: ${nombreFinal}`);
+      return { ok: true };
+    } catch (err) {
+      showMsg("Error al modificar", "error");
+      console.error(err);
+      return { ok: false, err };
+    }
+  };
+
+  const _unused_old_modificarPerfil = async () => {
+    if (!perfilEnEdicion) return;
+    const fechaOriginal = perfilEnEdicion.timestamp
+      ? new Date(perfilEnEdicion.timestamp).toLocaleString("es-ES")
+      : "fecha desconocida";
+    const confirmar = confirm(
+      `Este perfil se guardó el ${fechaOriginal}\n\n¿Sobrescribir "${perfilEnEdicion.nombre}" con los datos actuales?`
+    );
+    if (!confirmar) return;
+    const payload = {
+      nombre: perfilEnEdicion.nombre,
+      tabId,
+      timestamp: Date.now(), // actualizar timestamp
+      autor: usuarioCtx?.nombre || null,
+      datos: datosActuales,
+    };
+    try {
+      if (perfilEnEdicion.fuente === "supabase" && perfilEnEdicion.supabaseId) {
+        // Sobrescribir en Supabase
+        await actualizarPerfilSupabase(
+          perfilEnEdicion.supabaseId,
+          { nombre: payload.nombre, datos: datosActuales, autor: payload.autor },
+          esAdmin ? usuarioCtx.pin : null
+        );
+      } else {
+        // Sobrescribir en localStorage (misma key)
+        await storage.set(perfilEnEdicion.key, JSON.stringify(payload));
+      }
+      // Actualizar en la lista visible
+      setPerfiles(prev => prev.map(p =>
+        p.key === perfilEnEdicion.key
+          ? { ...p, ...payload, key: p.key, fuente: p.fuente, supabaseId: p.supabaseId, proyectoId: p.proyectoId }
+          : p
+      ));
+      // Refrescar la referencia con los datos nuevos
+      setPerfilEnEdicion(prev => prev ? { ...prev, ...payload } : prev);
+      showMsg(`✓ Modificado: ${perfilEnEdicion.nombre}`);
+    } catch (err) {
+      showMsg("Error al modificar", "error");
+      console.error(err);
+    }
+  };
+
+  const exportarJSON = () => {
+    const partes = [
+      datosActuales.proyecto,
+      datosActuales.productora,
+      datosActuales.nombre,
+    ].filter(Boolean).map(s => s.replace(/[^a-zA-Z0-9]/g,"_"));
+    const nombreArchivo = (partes.length ? partes.join("_") : "perfil") + `_${tabId}.json`;
+    const blob = new Blob([JSON.stringify({ tabId, datos: datosActuales, exportado: new Date().toISOString() }, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = nombreArchivo;
+    a.click();
+    URL.revokeObjectURL(url);
+    showMsg("✓ Descargado");
+  };
+
+  const importarJSON = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        if (data.datos) { onCargarPerfil(data.datos); showMsg("✓ Importado"); }
+        else throw new Error("Formato inválido");
+      } catch (err) { showMsg("Archivo inválido", "error"); console.error(err); }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  };
+
+  const btnStyle = (color = "#1a1a1a", fondo = "#fff") => ({
+    padding: "6px 12px", fontSize: 9, fontFamily: "'Courier Prime', 'Courier New', monospace",
+    fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase",
+    background: fondo, color, border: `1px solid ${color === "#1a1a1a" ? "#d5d9dc" : color}`,
+    borderRadius: 4, cursor: "pointer", whiteSpace: "nowrap",
+  });
+
+  // v98: publicar handlers al App45 para que la barra negra pueda usarlos
+  // Guardamos las funciones vivas en un ref para evitar bucles infinitos
+  const accionesLiveRef = useRef({});
+  accionesLiveRef.current = {
+    guardarConNombre: async (nombre) => {
+      setNombrePerfil(nombre);
+      await new Promise(r => setTimeout(r, 30));
+      await guardarPerfil();
+    },
+    cargarPerfil: (perfil, enlazar) => cargarPerfil(perfil, enlazar),
+    abrirParaModificar: (perfil) => abrirParaModificar(perfil),
+    salirEdicion,
+    exportarJSON,
+    importarDesdeArchivo: (file) => {
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        try {
+          const data = JSON.parse(ev.target.result);
+          if (data.datos) { onCargarPerfil(data.datos); showMsg("✓ Importado"); }
+          else throw new Error("Formato inválido");
+        } catch (err) { showMsg("Archivo inválido", "error"); console.error(err); }
+      };
+      reader.readAsText(file);
+    },
+    recargar,
+    perfiles,
+    cargando,
+    perfilEnEdicion,
+    modificarPerfilActivo: modificarPerfil, // v131: sobrescribir perfil en edición
+    modificarPerfilEspecifico, // v132: sobrescribir cualquier perfil
+    borrarPerfilesSeleccionados: async (ids) => {
+      let ok = 0, err = 0;
+      const errores = [];
+      for (const id of ids) {
+        const p = perfiles.find(x => x.supabaseId === id || x.key === id);
+        if (!p) {
+          err++;
+          errores.push(`ID ${id}: no encontrado`);
+          continue;
+        }
+        try {
+          if (p.fuente === "supabase" && p.supabaseId) {
+            await borrarPerfilSupabase(p.supabaseId, esAdmin ? usuarioCtx.pin : null);
+          } else {
+            await storage.delete(p.key);
+          }
+          ok++;
+        } catch (e) {
+          console.warn("Fallo borrando", p.nombre, e);
+          err++;
+          errores.push(`${p.nombre}: ${e.message || e}`);
+        }
+      }
+      await recargar();
+      if (err > 0) {
+        alert(`Borrado incompleto:\n✓ ${ok} correctos\n✗ ${err} con error\n\nDetalles:\n${errores.slice(0, 5).join("\n")}${errores.length > 5 ? "\n..." : ""}`);
+      } else if (ok > 0) {
+        showMsg(`✓ ${ok} perfil${ok !== 1 ? "es" : ""} borrado${ok !== 1 ? "s" : ""}`);
+      }
+      return { ok, err };
+    },
+    // v101: renombrar (solo nombre del perfil guardado)
+    renombrarPerfil: async (perfil, nuevoNombre) => {
+      const nombreNuevo = (nuevoNombre || "").trim();
+      if (!nombreNuevo || nombreNuevo === perfil.nombre) return { ok: false };
+      try {
+        if (perfil.fuente === "supabase" && perfil.supabaseId) {
+          await actualizarPerfilSupabase(perfil.supabaseId, { nombre: nombreNuevo }, esAdmin ? usuarioCtx.pin : null);
+        } else {
+          const nuevoPayload = { ...perfil, nombre: nombreNuevo };
+          delete nuevoPayload.key;
+          delete nuevoPayload.fuente;
+          delete nuevoPayload.supabaseId;
+          delete nuevoPayload.proyectoId;
+          await storage.set(perfil.key, JSON.stringify(nuevoPayload));
+        }
+        await recargar();
+        return { ok: true };
+      } catch (err) {
+        console.error("Error al renombrar", err);
+        return { ok: false, err };
+      }
+    },
+    // v101: duplicar perfil
+    duplicarPerfil: async (perfil) => {
+      const fakeEvent = { stopPropagation: () => {} };
+      await duplicarPerfil(perfil, fakeEvent);
+      await recargar();
+    },
+  };
+
+  // v130: notificar al padre cuando la lista de perfiles cambia (para que React re-renderice el modal)
+  useEffect(() => {
+    if (onPerfilesActualizados) onPerfilesActualizados(perfiles);
+  }, [perfiles, onPerfilesActualizados]);
+
+  // v131: notificar al padre cuando cambia el perfil en edición
+  useEffect(() => {
+    if (onPerfilEnEdicionCambio) onPerfilEnEdicionCambio(perfilEnEdicion);
+  }, [perfilEnEdicion, onPerfilEnEdicionCambio]);
+
+  // Publicar UNA sola vez al montar (o cuando onRegistrarAcciones cambie), con proxy estable
+  useEffect(() => {
+    if (!onRegistrarAcciones) return;
+    // Proxy: mantiene la misma identidad de objeto pero delega a accionesLiveRef.current
+    const proxy = {
+      guardarConNombre: (n) => accionesLiveRef.current.guardarConNombre(n),
+      cargarPerfil: (p, enlazar) => accionesLiveRef.current.cargarPerfil(p, enlazar),
+      abrirParaModificar: (p) => accionesLiveRef.current.abrirParaModificar(p),
+      salirEdicion: () => accionesLiveRef.current.salirEdicion(),
+      exportarJSON: () => accionesLiveRef.current.exportarJSON(),
+      importarDesdeArchivo: (f) => accionesLiveRef.current.importarDesdeArchivo(f),
+      recargar: () => accionesLiveRef.current.recargar(),
+      borrarPerfilesSeleccionados: (ids) => accionesLiveRef.current.borrarPerfilesSeleccionados(ids),
+      renombrarPerfil: (p, n) => accionesLiveRef.current.renombrarPerfil(p, n),
+      duplicarPerfil: (p) => accionesLiveRef.current.duplicarPerfil(p),
+      modificarPerfilActivo: () => accionesLiveRef.current.modificarPerfilActivo(),
+      modificarPerfilEspecifico: (p) => accionesLiveRef.current.modificarPerfilEspecifico(p),
+      // Getters para acceso dinámico a datos que cambian
+      get perfiles() { return accionesLiveRef.current.perfiles; },
+      get cargando() { return accionesLiveRef.current.cargando; },
+      get perfilEnEdicion() { return accionesLiveRef.current.perfilEnEdicion; },
+    };
+    onRegistrarAcciones(proxy);
+  }, [onRegistrarAcciones]);
+
+  return (
+    <div style={{ background:"#f2f5f7", border:"1px solid #d5d9dc", borderRadius:8, padding:"12px 14px", marginBottom:20 }}>
+      <div style={{ fontSize:12, letterSpacing:"0.15em", color:"#1a1a1a", textTransform:"uppercase", fontFamily:"'Inter', -apple-system, sans-serif", fontWeight: 700 }}>
+        ▸ Perfiles Guardados{perfiles.length > 0 && <span style={{ color:"#1a1a1a", marginLeft:6, fontWeight: 700 }}> ({perfiles.length})</span>}{cargando && <span style={{ color:"#666", marginLeft:6, fontSize:10, fontWeight: 400, fontStyle:"italic" }}>· cargando…</span>}
+      </div>
+      <div style={{ marginTop:8, fontSize:10, color:"#999", fontStyle:"italic", letterSpacing:"0.05em", textTransform:"none", fontFamily:"'Inter', sans-serif", fontWeight: 400 }}>usa la barra superior ↑</div>
+      {mensaje && (
+        <div style={{ marginTop:8, padding:"6px 10px", borderRadius:4, fontSize:10, fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",
+          background: mensaje.tipo === "error" ? "#fdf0f0" : "#f0f8f0",
+          color: mensaje.tipo === "error" ? "#b02020" : "#2a7a50",
+          border: `1px solid ${mensaje.tipo === "error" ? "#e8c0c0" : "#c0e0c0"}` }}>
+          {mensaje.texto}
+        </div>
+      )}
+      {/* v101: bloque legacy oculto — botones/guardar/lista/importador viejos */}
+      {false && (
+      <>
+      <div style={{ fontSize:10, letterSpacing:"0.2em", color:"#4ec9b8", textTransform:"uppercase", marginBottom:10, paddingBottom:8, borderBottom:"1px solid #d5d9dc" }}>
+        ▸ Perfiles Guardados {perfiles.length > 0 && <span style={{ color:"#888", marginLeft:6 }}>({perfiles.length})</span>}
+      </div>
+
+      <div style={{ display:"flex", flexWrap:"wrap", gap:6, marginBottom: mostrarGuardar || mostrarLista ? 10 : 0 }}>
+        <button onClick={() => { setMostrarGuardar(!mostrarGuardar); setMostrarLista(false); }} style={btnStyle("#4ec9b8")}>💾 Guardar</button>
+        <button onClick={() => { setMostrarLista(!mostrarLista); setMostrarGuardar(false); }} style={btnStyle("#1a1a1a")} disabled={cargando}>📋 Cargar {cargando ? "..." : `(${perfiles.length})`}</button>
+        <button onClick={exportarJSON} style={btnStyle("#1a1a1a")}>⬇ JSON</button>
+        <label style={{ ...btnStyle("#1a1a1a"), display:"inline-block" }}>
+          ⬆ Importar
+          <input type="file" accept=".json,application/json" onChange={importarJSON} style={{ display:"none" }} />
+        </label>
+      </div>
+
+      {mensaje && (
+        <div style={{ marginTop:8, padding:"6px 10px", borderRadius:4, fontSize:10, fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace",
+          background: mensaje.tipo === "error" ? "#fdf0f0" : "#f0f8f0",
+          color: mensaje.tipo === "error" ? "#b02020" : "#2a7a50",
+          border: `1px solid ${mensaje.tipo === "error" ? "#e8c0c0" : "#c0e0c0"}` }}>
+          {mensaje.texto}
+        </div>
+      )}
+
+      {mostrarGuardar && (
+        <div style={{ marginTop:10, padding:10, background:"#dfe4e8", borderRadius:5, border:"1px solid #d5d9dc" }}>
+          <div style={{ fontSize:9, color:"#777", textTransform:"uppercase", letterSpacing:"0.1em", marginBottom:6, fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>Nombre del perfil</div>
+          <div style={{ display:"flex", gap:6 }}>
+            <input
+              type="text"
+              value={nombrePerfil}
+              placeholder={datosActuales.nombre ? `Ej: ${datosActuales.nombre} · ${datosActuales.puesto}` : "Ej: Juan Pérez · Maquinista 2026"}
+              onChange={e => setNombrePerfil(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && guardarPerfil()}
+              autoFocus
+              style={{ flex:1, background:"#f2f5f7", border:"1px solid #d5d9dc", borderRadius:4, color:"#1a1a1a", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontSize:12, padding:"7px 10px", outline:"none", colorScheme:"light" }}
+            />
+            <button onClick={guardarPerfil} style={{ ...btnStyle("#fff", "#4ec9b8"), border:"1px solid #4ec9b8" }}>Guardar</button>
+          </div>
+        </div>
+      )}
+
+      {mostrarLista && (
+        <div style={{ marginTop:10, padding:10, background:"#dfe4e8", borderRadius:5, border:"1px solid #d5d9dc", maxHeight:340, overflowY:"auto" }}>
+          {/* v46+v53: barra superior con controles */}
+          {(esAdmin || perfilEnEdicion) && (
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8, paddingBottom:8, borderBottom:"1px solid #d5d9dc", gap:8, flexWrap:"wrap" }}>
+              {esAdmin ? (
+                <label style={{ display:"flex", alignItems:"center", gap:6, fontSize:10, color:"#666", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", cursor:"pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={verTodosProyectos}
+                    onChange={e => setVerTodosProyectos(e.target.checked)}
+                    style={{ cursor:"pointer" }}
+                  />
+                  Ver todos los proyectos (admin)
+                </label>
+              ) : <div />}
+              <div style={{ display:"flex", gap:6 }}>
+                {/* v53: botón Modificar (todos) — solo si hay perfil cargado y coincide la pestaña */}
+                {perfilEnEdicion && perfilEnEdicion.tabId === tabId && (
+                  <button
+                    onClick={modificarPerfil}
+                    title={`Sobrescribir "${perfilEnEdicion.nombre}"`}
+                    style={{ background:"#4ec9b8", color:"#f2f5f7", border:"1px solid #4ec9b8", padding:"3px 8px", borderRadius:3, cursor:"pointer", fontSize:9, fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontWeight:700, letterSpacing:"0.1em", textTransform:"uppercase" }}
+                  >🔄 Modificar</button>
+                )}
+                {esAdmin && (
+                  <button
+                    onClick={() => setMostrarImportador(true)}
+                    style={{ background:"transparent", color:"#4ec9b8", border:"1px solid #4ec9b8", padding:"3px 8px", borderRadius:3, cursor:"pointer", fontSize:9, fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", fontWeight:700, letterSpacing:"0.1em", textTransform:"uppercase" }}
+                  >📥 Importar antiguos</button>
+                )}
+              </div>
+            </div>
+          )}
+          {/* v46: aviso si Supabase falló */}
+          {huboFallbackSupabase && (
+            <div style={{ background:"#fdf0e0", border:"1px solid #e8b878", color:"#7a5a2a", padding:"6px 8px", borderRadius:3, marginBottom:8, fontSize:10, fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>
+              ⚠ Sin conexión con la nube. Mostrando solo perfiles locales.
+            </div>
+          )}
+          {/* v95: aviso de perfiles huérfanos (solo en local, no en Supabase) */}
+          {huerfanosLocalState.length > 0 && !huboFallbackSupabase && esAdmin && (
+            <div style={{ background:"#fdf0e0", border:"1px solid #e8b878", color:"#7a5a2a", padding:"8px 10px", borderRadius:3, marginBottom:8, fontSize:10, fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>
+              <div style={{ marginBottom: 4 }}>⚠ Detectados <strong>{huerfanosLocalState.length}</strong> perfil{huerfanosLocalState.length!==1?"es":""} solo en local (no están en la nube).</div>
+              <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
+                <button onClick={async () => {
+                  if (!confirm(`¿Migrar ${huerfanosLocalState.length} perfiles a Supabase?\n\nSe subirán al proyecto activo. Después puedes borrarlos del local.`)) return;
+                  if (!proyectoActivoCtx?.id) { alert("Necesitas tener un proyecto activo para migrar"); return; }
+                  let ok = 0, err = 0;
+                  for (const h of huerfanosLocalState) {
+                    try {
+                      await crearPerfilSupabase({
+                        proyectoId: proyectoActivoCtx.id,
+                        tabId: h.tabId || tabId,
+                        nombre: h.nombre,
+                        autor: h.autor || usuarioCtx?.nombre || "migración",
+                        datos: h.datos,
+                      });
+                      ok++;
+                    } catch (e) { console.warn("Fallo migrando", h.nombre, e); err++; }
+                  }
+                  alert(`Migración: ${ok} OK, ${err} errores.\n\nLos perfiles locales originales siguen ahí, puedes borrarlos con el otro botón cuando confirmes que todo bien.`);
+                  recargar();
+                }}
+                  style={{ fontSize: 9, padding: "4px 8px", border: "1px solid #7a5a2a", borderRadius: 3, background: "#f2f5f7", color: "#7a5a2a", cursor: "pointer", fontWeight: 700, fontFamily: "'Courier Prime', 'Courier New', monospace", letterSpacing: "0.05em" }}
+                >📤 Migrar a Supabase</button>
+                <button onClick={async () => {
+                  if (!confirm(`¿Borrar ${huerfanosLocalState.length} perfiles solo del navegador local?\n\nEsto NO afecta a Supabase. Solo se limpian los duplicados que estaban en tu navegador.`)) return;
+                  let ok = 0;
+                  for (const h of huerfanosLocalState) {
+                    try { await storage.delete(h.key); ok++; } catch {}
+                  }
+                  alert(`Borrados ${ok} perfiles del local.`);
+                  recargar();
+                }}
+                  style={{ fontSize: 9, padding: "4px 8px", border: "1px solid #c04040", borderRadius: 3, background: "#f2f5f7", color: "#c04040", cursor: "pointer", fontWeight: 700, fontFamily: "'Courier Prime', 'Courier New', monospace", letterSpacing: "0.05em" }}
+                >🗑 Borrar solo local</button>
+              </div>
+            </div>
+          )}
+          {perfiles.length === 0 ? (
+            <div style={{ fontSize:10, color:"#888", textAlign:"center", padding:"12px 0", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>
+              No hay perfiles guardados todavía
+            </div>
+          ) : perfiles.map(perfil => (
+            <div key={perfil.key} onClick={() => cargarPerfil(perfil)}
+              style={{ display:"flex", justifyContent:"space-between", alignItems:"center",
+                padding:"8px 10px", marginBottom:4, background:"#f2f5f7", borderRadius:4,
+                border:"1px solid #e8e4de", cursor:"pointer", transition:"all 0.15s" }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = "#4ec9b8"; e.currentTarget.style.background = "#fdf8f0"; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = "#e8e4de"; e.currentTarget.style.background = "#f2f5f7"; }}>
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ fontSize:11, fontWeight:700, color:"#1a1a1a", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace", marginBottom:2, display:"flex", alignItems:"center", gap:6 }}>
+                  {perfil.nombre}
+                  {perfil.tabId && (
+                    <span style={{ fontSize:8, padding:"1px 5px", borderRadius:2, background: perfil.tabId === tabId ? "#e0d0a8" : "#e8e4de", color: perfil.tabId === tabId ? "#7a5a2a" : "#888", letterSpacing:"0.05em", textTransform:"uppercase", fontWeight:700 }}>
+                      {perfil.tabId}
+                    </span>
+                  )}
+                  {/* v46: badge fuente */}
+                  {perfil.fuente === "local" && (
+                    <span style={{ fontSize:8, padding:"1px 5px", borderRadius:2, background:"#e8e4de", color:"#888", letterSpacing:"0.05em", textTransform:"uppercase", fontWeight:700 }} title="Perfil antiguo (local)">
+                      LOCAL
+                    </span>
+                  )}
+                </div>
+                <div style={{ fontSize:9, color:"#888", fontFamily:"'Courier Prime', 'Courier Prime', 'Courier New', monospace" }}>
+                  {perfil.datos?.proyecto && <><span style={{color:"#4ec9b8",fontWeight:700}}>📁 {perfil.datos.proyecto}</span>{perfil.datos?.productora ? <span style={{color:"#888"}}> · {perfil.datos.productora}</span> : ""} · </>}
+                  {perfil.datos?.nombre || "—"} · {perfil.datos?.puesto || "—"}
+                  {perfil.datos?.fechaInicio && ` · ${perfil.datos.fechaInicio}→${perfil.datos.fechaFin}`}
+                  <br />
+                  <span style={{ color:"#aaa" }}>{new Date(perfil.timestamp).toLocaleString("es-ES")}</span>
+                </div>
+              </div>
+              <div style={{ display:"flex", alignItems:"center", marginLeft:8 }}>
+                <button onClick={(e) => renombrarPerfil(perfil, e)}
+                  style={{ background:"transparent", border:"none", color:"#7a7a7a", fontSize:13, cursor:"pointer", padding:"4px 6px" }}
+                  title="Renombrar">✏️</button>
+                <button onClick={(e) => duplicarPerfil(perfil, e)}
+                  style={{ background:"transparent", border:"none", color:"#7a7a7a", fontSize:13, cursor:"pointer", padding:"4px 6px" }}
+                  title="Duplicar">📋</button>
+                <button onClick={(e) => eliminarPerfil(perfil, e)}
+                  style={{ background:"transparent", border:"none", color:"#c08080", fontSize:14, cursor:"pointer", padding:"4px 8px" }}
+                  title="Eliminar">🗑</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {/* v46: modal importador antiguos (solo admin) */}
+      {mostrarImportador && esAdmin && (
+        <ImportadorAntiguos
+          usuarioActual={usuarioCtx}
+          tabId={tabId}
+          onCerrar={() => setMostrarImportador(false)}
+          onImportado={() => {
+            // Refrescar lista tras importar
+            setMostrarImportador(false);
+            setCargando(true);
+            // Forzar re-run del efecto cambiando dependencia artificial no es limpio;
+            // más simple: cerrar y reabrir la lista dispara re-mount
+            setMostrarLista(false);
+            setTimeout(() => setMostrarLista(true), 100);
+          }}
+        />
+      )}
+      </>
+      )}
+    </div>
+  );
+}
+
+// ─── TABLA NÓMINA POR MES ────────────────────────────────────────────────────
+function TablaMeses({ porMes, vacAcumulada, indemAcumulada, horasAcumuladas, complementosPorMes = [], festivosPorMes = [], valorFestivo = 0 }) {
+  if (!porMes || porMes.length === 0) return null;
+
+  const th = (align, extra) => ({
+    padding: "7px 8px", fontSize: 9, letterSpacing: "0.12em", textTransform: "uppercase",
+    color: "#555", fontWeight: 700, textAlign: align, fontFamily: "'Courier Prime', 'Courier New', monospace",
+    borderBottom: "1px solid #d5d9dc", whiteSpace: "nowrap", ...extra,
+  });
+  const td = (align, color, bold) => ({
+    padding: "8px 8px", fontSize: 11, textAlign: align, fontFamily: "'Courier Prime', 'Courier New', monospace",
+    color: color || "#1a1a1a", fontWeight: bold ? 600 : 400, borderBottom: "1px solid #eae7e2",
+  });
+
+  const Badge = ({ t }) => (
+    <span style={{ fontSize: 8, background: "rgba(184,134,74,0.12)", color: "#8a5e20", borderRadius: 3, padding: "1px 4px", marginLeft: 4, letterSpacing: "0.08em", verticalAlign: "middle" }}>{t}</span>
+  );
+  const Dash = () => <span style={{ color: "#ccc" }}>—</span>;
+
+  const totalCobro = porMes.reduce((s, m) => s + m.cobroMes, 0);
+  const totalConExtras = porMes.reduce((s, m, i) => {
+    const fest  = (festivosPorMes[i] || 0) * valorFestivo;
+    const plus  = complementosPorMes[i] ? complementosPorMes[i].total : 0;
+    return s + m.cobroMes + fest + plus;
+  }, 0);
+
+  return (
+    <div style={{ overflowX: "auto" }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+        <thead>
+          <tr>
+            <th style={th("left")}>Mes</th>
+            <th style={th("right")}>Fracc.</th>
+            <th style={th("right")}>Base €</th>
+            <th style={th("right")}>Vac. €{vacAcumulada   && <Badge t="FINAL" />}</th>
+            <th style={th("right")}>Indem. €{indemAcumulada && <Badge t="FINAL" />}</th>
+            <th style={th("right")}>H.Extra{horasAcumuladas && <Badge t="FINAL" />}</th>
+            <th style={th("right")}>H.Extra €{horasAcumuladas && <Badge t="FINAL" />}</th>
+            <th style={th("right")}>Vac.Disf.d</th>
+            <th style={th("right")}>Vac.Disf. €</th>
+            <th style={th("right", { color: "#2a7a50" })}>Comida €</th>
+            <th style={th("right", { color: "#4ec9b8" })}>COBRO MES €</th>
+          </tr>
+        </thead>
+        <tbody>
+          {porMes.map((d, i) => {
+            const esUlt = i === porMes.length - 1;
+            return (
+              <tr key={i} style={{ background: esUlt ? "rgba(184,134,74,0.05)" : i % 2 === 0 ? "transparent" : "rgba(0,0,0,0.015)" }}>
+                <td style={td("left", esUlt ? "#d4b88a" : "#aaa")}>
+                  <span style={{ textTransform: "capitalize" }}>{d.mes}</span>
+                  {!d.esCompleto && <span style={{ fontSize: 8, color: "#3a3a3a", marginLeft: 5 }}>{d.desde}–{d.hasta}</span>}
+                </td>
+                <td style={td("right", "#555")}>{fmtM(d.fraccion)}</td>
+                <td style={td("right")}>{fmt(d.baseMes)}</td>
+                <td style={td("right", d.vacShow === 0 ? "#252525" : "#bbb")}>
+                  {d.vacShow === 0 ? <Dash /> : fmt(d.vacShow)}
+                </td>
+                <td style={td("right", d.indemShow === 0 ? "#252525" : "#bbb")}>
+                  {d.indemShow === 0 ? <Dash /> : fmt(d.indemShow)}
+                </td>
+                <td style={td("right", d.importeHxShow === 0 && d.horasExtraMes === 0 ? "#2a2a2a" : "#88a0c0")}>
+                  {d.importeHxShow === 0 && d.horasExtraMes === 0 ? <Dash /> : d.horasExtraMes > 0 && !horasAcumuladas ? `${d.horasExtraMes}h` : horasAcumuladas && esUlt ? `${porMes.reduce((s,m)=>s+m.horasExtraMes,0)}h` : <Dash />}
+                </td>
+                <td style={td("right", d.importeHxShow === 0 ? "#252525" : "#88a0c0")}>
+                  {d.importeHxShow === 0 ? <Dash /> : fmt(d.importeHxShow)}
+                </td>
+                <td style={td("right", d.vacDiasMes === 0 ? "#2a2a2a" : "#c08080")}>
+                  {d.vacDiasMes === 0 && !vacAcumulada ? <Dash /> : d.vacDiasMes > 0 && !vacAcumulada ? `${d.vacDiasMes}d` : vacAcumulada && esUlt && porMes.reduce((s,m)=>s+m.vacDiasMes,0) > 0 ? `${porMes.reduce((s,m)=>s+m.vacDiasMes,0)}d` : <Dash />}
+                </td>
+                <td style={td("right", d.importeVdShow === 0 ? "#252525" : "#c08080")}>
+                  {d.importeVdShow === 0 ? <Dash /> : `−${fmt(d.importeVdShow)}`}
+                </td>
+                {(() => {
+                  const comidaMes = complementosPorMes[i] ? complementosPorMes[i].comida : 0;
+                  const fest  = (festivosPorMes[i] || 0) * valorFestivo;
+                  const plus  = complementosPorMes[i] ? complementosPorMes[i].total : 0;
+                  const total = d.cobroMes + fest + plus;
+                  return (
+                    <>
+                      <td style={{ ...td("right", comidaMes > 0 ? "#2a7a50" : "#ccc") }}>
+                        {comidaMes > 0
+                          ? <>{fmt(comidaMes)}<div style={{fontSize:8,color:"#888"}}>{complementosPorMes[i].diasComida}d × {fmt(complementosPorMes[i].diasComida > 0 ? comidaMes/complementosPorMes[i].diasComida : 0)}€</div></>
+                          : <span style={{color:"#ccc"}}>—</span>}
+                      </td>
+                      <td style={{ ...td("right", "#4ec9b8", true), fontSize: 12 }}>
+                        {fmt(total)}
+                        {(fest > 0 || plus > 0) && (
+                          <div style={{ fontSize:9, color:"#999", fontWeight:400 }}>
+                            {fmt(d.cobroMes)} sal.
+                            {fest > 0 && ` + ${fmt(fest)} fest.`}
+                            {plus > 0 && ` + ${fmt(plus)} plus`}
+                          </div>
+                        )}
+                      </td>
+                    </>
+                  );
+                })()}
+              </tr>
+            );
+          })}
+        </tbody>
+        <tfoot>
+          <tr style={{ background: "rgba(184,134,74,0.06)" }}>
+            <td colSpan={2} style={{ ...td("left", "#4ec9b8", true), borderTop: "1px solid #d8d4ce", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase" }}>TOTAL</td>
+            <td style={{ ...td("right", "#888", true), borderTop: "1px solid #d8d4ce" }}>{fmt(porMes.reduce((s,m)=>s+m.baseMes,0))}</td>
+            <td style={{ ...td("right", "#888", true), borderTop: "1px solid #d8d4ce" }}>{fmt(porMes.reduce((s,m)=>s+m.vacShow,0))}</td>
+            <td style={{ ...td("right", "#888", true), borderTop: "1px solid #d8d4ce" }}>{fmt(porMes.reduce((s,m)=>s+m.indemShow,0))}</td>
+            <td style={{ ...td("right", "#888", true), borderTop: "1px solid #d8d4ce" }}>{porMes.reduce((s,m)=>s+m.horasExtraMes,0)}h</td>
+            <td style={{ ...td("right", "#888", true), borderTop: "1px solid #d8d4ce" }}>{fmt(porMes.reduce((s,m)=>s+m.importeHxShow,0))}</td>
+            <td style={{ ...td("right", "#888", true), borderTop: "1px solid #d8d4ce" }}>{porMes.reduce((s,m)=>s+m.vacDiasMes,0)}d</td>
+            <td style={{ ...td("right", "#888", true), borderTop: "1px solid #d8d4ce" }}>−{fmt(porMes.reduce((s,m)=>s+m.importeVdShow,0))}</td>
+            <td style={{ ...td("right", "#5a8a5a", true), borderTop: "1px solid #d8d4ce", fontSize: 13 }}>{complementosPorMes.length ? fmt(complementosPorMes.reduce((s,c)=>s+c.comida,0)) : "—"}</td>
+            <td style={{ ...td("right", "#4ec9b8", true), borderTop: "1px solid #d8d4ce", fontSize: 13 }}>{fmt(totalConExtras)}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  );
+}
+
+// ─── INPUTS POR MES (horas extra y días vacaciones) ─────────────────────────
+function InputsPorMes({ desglose, horasPorMes, setHorasPorMes, vacDiasPorMes, setVacDiasPorMes, festivosPorMes, setFestivosPorMes, jornadasEspecialesPorMes, setJornadasEspecialesPorMes, over45PorMes, setOver45PorMes }) {
+  if (!desglose || desglose.length === 0) return null;
+
+  const setH = (i,v) => { const a=[...horasPorMes];   a[i]=v; setHorasPorMes(a); };
+  const setV = (i,v) => { const a=[...vacDiasPorMes]; a[i]=v; setVacDiasPorMes(a); };
+  const setF = (i,v) => { const a=[...(festivosPorMes||[])]; a[i]=v; setFestivosPorMes(a); };
+  const setJE = (i,v) => { const a=[...(jornadasEspecialesPorMes||[])]; a[i]=v; setJornadasEspecialesPorMes(a); };
+  const setO45 = (i,v) => { const a=[...(over45PorMes||[])]; a[i]=v; setOver45PorMes(a); };   // v150
+
+  const totalH = horasPorMes.reduce((s,v)=>s+(v||0),0);
+  const totalV = vacDiasPorMes.reduce((s,v)=>s+(v||0),0);
+  const totalF = (festivosPorMes||[]).reduce((s,v)=>s+(v||0),0);
+  const totalJE = (jornadasEspecialesPorMes||[]).reduce((s,v)=>s+(v||0),0);
+  const totalO45 = (over45PorMes||[]).reduce((s,v)=>s+(v||0),0);   // v150
+  const hasFest = !!setFestivosPorMes;
+  const hasJE = !!setJornadasEspecialesPorMes;
+  const hasO45 = !!setOver45PorMes;   // v150: solo 45H y con la opción activada
+
+  // v75: ancho fijo mes + resto uniforme para no descentrar según largo del nombre
+  const colsBase = hasFest && hasJE ? "95px 1fr 1fr 1fr 1fr" : hasFest ? "95px 1fr 1fr 1fr" : "95px 1fr 1fr";
+  const cols = hasO45 ? colsBase + " 1fr" : colsBase;   // v150: una columna más solo si aplica
+
+  return (
+    <div>
+      <div style={{ display:"grid", gridTemplateColumns:cols, gap:6, marginBottom:12, padding:"0 2px 6px", borderBottom:"1px solid #eae7e2" }}>
+        <div style={{ fontSize:9, color:"#888", letterSpacing:"0.12em", textTransform:"uppercase", fontFamily:"'Courier Prime', 'Courier New', monospace", fontWeight:700 }}>Mes</div>
+        <div style={{ fontSize:9, color:"#3a6090", letterSpacing:"0.1em", textTransform:"uppercase", fontFamily:"'Courier Prime', 'Courier New', monospace", textAlign:"center", fontWeight:700 }}>H.Ext</div>
+        {hasO45 && <div style={{ fontSize:9, color:"#b07030", letterSpacing:"0.1em", textTransform:"uppercase", fontFamily:"'Courier Prime', 'Courier New', monospace", textAlign:"center", fontWeight:700 }} title="Horas extra over 45h — precio pactado aparte">Over45</div>}
+        {hasJE && <div style={{ fontSize:9, color:"#8a1e4a", letterSpacing:"0.1em", textTransform:"uppercase", fontFamily:"'Courier Prime', 'Courier New', monospace", textAlign:"center", fontWeight:700 }} title="Jornadas Especiales">J.Esp</div>}
+        <div style={{ fontSize:9, color:"#907060", letterSpacing:"0.1em", textTransform:"uppercase", fontFamily:"'Courier Prime', 'Courier New', monospace", textAlign:"center", fontWeight:700 }}>Vac</div>
+        {hasFest && <div style={{ fontSize:9, color:"#6a4a8a", letterSpacing:"0.1em", textTransform:"uppercase", fontFamily:"'Courier Prime', 'Courier New', monospace", textAlign:"center", fontWeight:700 }}>Fest</div>}
+      </div>
+
+      {desglose.map((d,i) => {
+        const partes = d.mes.split(" de ");
+        const mesNombre = partes[0] || d.mes;
+        const anio = partes[1] || "";
+        return (
+        <div key={i} style={{ display:"grid", gridTemplateColumns:cols, gap:6, marginBottom:8, alignItems:"center", minHeight:44 }}>
+          <div style={{ fontFamily:"'Courier Prime', 'Courier New', monospace", lineHeight:1.25, paddingRight:4 }}>
+            <div style={{ fontSize:10.5, color:"#1a1a1a", fontWeight:600, textTransform:"capitalize", letterSpacing:"0.02em" }}>
+              {mesNombre}
+            </div>
+            <div style={{ fontSize:9, color:"#888", marginTop:1, letterSpacing:"0.03em" }}>
+              {anio}{!d.esCompleto && <span style={{ color:"#4ec9b8", marginLeft:4 }}>({d.desde}–{d.hasta})</span>}
+            </div>
+          </div>
+          {(() => {
+            const autoH = Math.round(d.semanasLaborables * 5);
+            const valorActual = horasPorMes[i];
+            const hasVal = valorActual !== undefined && valorActual !== null && valorActual !== "";
+            const valorMostrar = hasVal ? valorActual : autoH;
+            const esEstimadoOriginal = hasVal && valorActual === autoH;
+            return (
+              <div>
+                <div style={{ fontSize:8, color: esEstimadoOriginal ? "#4a6a9a" : "#8aa0b8", fontFamily:"'Courier Prime', 'Courier New', monospace", letterSpacing:"0.05em", textAlign:"center", lineHeight:1, fontWeight: esEstimadoOriginal ? 700 : 400, marginBottom:2, whiteSpace:"nowrap" }}>
+                  {autoH}d
+                </div>
+                <input type="number" min="0" step="0.5"
+                  value={valorMostrar}
+                  onChange={e=>{
+                    const v = e.target.value;
+                    const a = [...horasPorMes];
+                    a[i] = v === "" ? "" : (parseFloat(v) || 0);
+                    setHorasPorMes(a);
+                  }}
+                  title={`Estimado L-V: ${autoH}h (puedes modificarlo)`}
+                  style={{ background: esEstimadoOriginal?"#eef3f8":"#dfe4e8", border:`1px solid ${esEstimadoOriginal?"#d5d9dc":"#4a6a9a"}`, borderRadius:4, color:"#1a1a1a", fontFamily:"'Courier Prime', 'Courier New', monospace", fontSize:11, padding:"4px 4px", outline:"none", textAlign:"center", colorScheme:"light", minWidth:0, width:"100%", boxSizing:"border-box" }}
+                  onFocus={e=>e.target.style.borderColor="#4a6a9a"} onBlur={e=>e.target.style.borderColor=esEstimadoOriginal?"#d5d9dc":"#4a6a9a"} />
+              </div>
+            );
+          })()}
+          {hasO45 && <div>
+            <div style={{ fontSize:8, lineHeight:1, marginBottom:2, visibility:"hidden" }}>·</div>
+            <input type="number" min="0" step="0.5" value={(over45PorMes||[])[i]||""} placeholder="0"
+              onChange={e=>setO45(i,parseFloat(e.target.value)||0)}
+              title="Horas extra over 45h — se pagan al precio pactado, aparte de las del calendario"
+              style={{ background:"#fdf4ea", border:"1px solid #e0c090", borderRadius:4, color:"#b07030", fontFamily:"'Courier Prime', 'Courier New', monospace", fontSize:11, padding:"4px 4px", outline:"none", textAlign:"center", colorScheme:"light", minWidth:0, width:"100%", boxSizing:"border-box" }}
+              onFocus={e=>e.target.style.borderColor="#b07030"} onBlur={e=>e.target.style.borderColor="#e0c090"} />
+          </div>}
+          {hasJE && <div>
+            <div style={{ fontSize:8, lineHeight:1, marginBottom:2, visibility:"hidden" }}>·</div>
+            <input type="number" min="0" step="1" value={(jornadasEspecialesPorMes||[])[i]||""} placeholder="0"
+              onChange={e=>setJE(i,parseFloat(e.target.value)||0)}
+              title="Jornadas especiales (cada una = 1 HX + 20€)"
+              style={{ background:"#fff0f6", border:"1px solid #f0b0d0", borderRadius:4, color:"#8a1e4a", fontFamily:"'Courier Prime', 'Courier New', monospace", fontSize:11, padding:"4px 4px", outline:"none", textAlign:"center", colorScheme:"light", minWidth:0, width:"100%", boxSizing:"border-box" }}
+              onFocus={e=>e.target.style.borderColor="#d63a7a"} onBlur={e=>e.target.style.borderColor="#f0b0d0"} />
+          </div>}
+          <div>
+            <div style={{ fontSize:8, lineHeight:1, marginBottom:2, visibility:"hidden" }}>·</div>
+            <input type="number" min="0" step="1" value={vacDiasPorMes[i]||""} placeholder="0"
+              onChange={e=>setV(i,parseFloat(e.target.value)||0)}
+              style={{ background:"#dfe4e8", border:"1px solid #e0c8b0", borderRadius:4, color:"#8a2a20", fontFamily:"'Courier Prime', 'Courier New', monospace", fontSize:11, padding:"4px 4px", outline:"none", textAlign:"center", colorScheme:"light", minWidth:0, width:"100%", boxSizing:"border-box" }}
+              onFocus={e=>e.target.style.borderColor="#4ec9b8"} onBlur={e=>e.target.style.borderColor="#e0c8b0"} />
+          </div>
+          {hasFest && <div>
+            <div style={{ fontSize:8, lineHeight:1, marginBottom:2, visibility:"hidden" }}>·</div>
+            <input type="number" min="0" step="1" value={(festivosPorMes||[])[i]||""} placeholder="0"
+              onChange={e=>setF(i,parseFloat(e.target.value)||0)}
+              style={{ background:"#dfe4e8", border:"1px solid #c8b0d8", borderRadius:4, color:"#6a3a9a", fontFamily:"'Courier Prime', 'Courier New', monospace", fontSize:11, padding:"4px 4px", outline:"none", textAlign:"center", colorScheme:"light", minWidth:0, width:"100%", boxSizing:"border-box" }}
+              onFocus={e=>e.target.style.borderColor="#8a5aaa"} onBlur={e=>e.target.style.borderColor="#c8b0d8"} />
+          </div>}
+        </div>
+        );
+      })}
+
+      <div style={{ display:"grid", gridTemplateColumns:cols, gap:6, marginTop:8, paddingTop:8, borderTop:"1px solid #d5d9dc" }}>
+        <div style={{ fontSize:9, color:"#777", textTransform:"uppercase", letterSpacing:"0.1em", fontFamily:"'Courier Prime', 'Courier New', monospace", display:"flex", alignItems:"center" }}>Total</div>
+        <div style={{ textAlign:"center", fontSize:12, fontWeight:700, color:"#1a1a1a", fontFamily:"'Courier Prime', 'Courier New', monospace" }}>
+          {desglose.reduce((s,d,i)=>{
+            const v = horasPorMes[i];
+            if (v === undefined || v === null || v === "") return s + Math.round(d.semanasLaborables * 5);
+            return s + (v || 0);
+          },0)}h
+        </div>
+        {hasO45 && <div style={{ textAlign:"center", fontSize:12, fontWeight:700, color:"#b07030", fontFamily:"'Courier Prime', 'Courier New', monospace" }}>{totalO45}h</div>}
+        {hasJE && <div style={{ textAlign:"center", fontSize:12, fontWeight:700, color:"#8a1e4a", fontFamily:"'Courier Prime', 'Courier New', monospace" }}>{totalJE}d</div>}
+        <div style={{ textAlign:"center", fontSize:12, fontWeight:700, color:"#8a2a20", fontFamily:"'Courier Prime', 'Courier New', monospace" }}>{totalV}d</div>
+        {hasFest && <div style={{ textAlign:"center", fontSize:12, fontWeight:700, color:"#6a3a9a", fontFamily:"'Courier Prime', 'Courier New', monospace" }}>{totalF}d</div>}
+      </div>
+    </div>
+  );
+}
+
+// ─── APP 40H ─────────────────────────────────────────────────────────────────
+
+// ═══════════════════════════════════════════════════════════════════════
+// MODAL CSV — Muestra el contenido del CSV en un textarea seleccionable
+// con botón de copiar al portapapeles. El usuario puede:
+//   - Pulsar "Copiar al portapapeles" (usa Clipboard API o execCommand)
+//   - Hacer Ctrl+A, Ctrl+C en el textarea
+//   - Seleccionar manualmente con el ratón y copiar
+// ═══════════════════════════════════════════════════════════════════════
+function ModalCSV({ contenido, filename, onClose }) {
+  const [copiado, setCopiado] = useState(false);
+  const [descargado, setDescargado] = useState(false);
+
+  const copiar = async () => {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(contenido);
+        setCopiado(true);
+      } else {
+        const ta = document.getElementById("csv-textarea-export");
+        ta.select();
+        document.execCommand("copy");
+        setCopiado(true);
+      }
+      setTimeout(() => setCopiado(false), 2500);
+    } catch (e) {
+      const ta = document.getElementById("csv-textarea-export");
+      ta.focus();
+      ta.select();
+      alert("No pudo copiarse automáticamente. El texto está seleccionado: pulsa Ctrl+C (o Cmd+C en Mac).");
+    }
+  };
+
+  const descargar = () => {
+    try {
+      const blob = new Blob([contenido], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.style.display = "none";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setDescargado(true);
+      setTimeout(() => setDescargado(false), 2500);
+    } catch (e) {
+      console.error("Error al descargar:", e);
+      alert("Error al iniciar la descarga: " + e.message);
+    }
+  };
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed", inset: 0,
+        background: "rgba(0,0,0,0.7)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        zIndex: 9999, padding: 20,
+      }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          background: "#f2f5f7", borderRadius: 8,
+          maxWidth: 900, width: "100%", maxHeight: "90vh",
+          display: "flex", flexDirection: "column",
+          fontFamily: "'Courier Prime', 'Courier New', monospace",
+          boxShadow: "0 10px 40px rgba(0,0,0,0.5)",
+        }}
+      >
+        {/* cabecera */}
+        <div style={{
+          background: "#1a1a1a", color: "#f0f0f0",
+          padding: "14px 20px", borderRadius: "8px 8px 0 0",
+          display: "flex", justifyContent: "space-between", alignItems: "center",
+          borderBottom: "2px solid #4ec9b8",
+        }}>
+          <div>
+            <div style={{ fontSize: 9, letterSpacing: "0.2em", color: "#4ec9b8", textTransform: "uppercase", marginBottom: 2 }}>
+              EXPORTAR CSV
+            </div>
+            <div style={{ fontSize: 14, fontWeight: 700 }}>{filename}</div>
+          </div>
+          <button onClick={onClose}
+            style={{ background: "transparent", border: "1px solid #4ec9b8", color: "#4ec9b8",
+              padding: "6px 14px", fontSize: 11, fontFamily: "'Courier Prime', 'Courier New', monospace",
+              fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase",
+              borderRadius: 3, cursor: "pointer" }}>
+            ✕ Cerrar
+          </button>
+        </div>
+
+        {/* instrucciones */}
+        <div style={{ padding: "12px 20px", background: "#fdf8f0", borderBottom: "1px solid #d5d9dc", fontSize: 11, color: "#555", lineHeight: 1.5 }}>
+          <strong style={{ color: "#1a1a1a" }}>3 formas de guardar el CSV:</strong>
+          <br/>• <strong>"Descargar archivo"</strong> (recomendado): genera el .csv y lo descarga directamente
+          <br/>• <strong>"Copiar al portapapeles"</strong>: pega luego en Excel o Bloc de notas
+          <br/>• Selecciona el texto manualmente (Ctrl+A, Ctrl+C)
+        </div>
+
+        {/* botones de acción */}
+        <div style={{ padding: "10px 20px", borderBottom: "1px solid #d5d9dc", display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <button onClick={descargar}
+            style={{ padding: "8px 16px", background: descargado ? "#2a7a50" : "#4ec9b8", color: "#f2f5f7",
+              border: "none", borderRadius: 3, cursor: "pointer", fontFamily: "'Courier Prime', 'Courier New', monospace",
+              fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 700,
+              transition: "background 0.2s" }}>
+            {descargado ? "✓ Descargado" : "⬇ Descargar archivo"}
+          </button>
+          <button onClick={copiar}
+            style={{ padding: "8px 16px", background: copiado ? "#2a7a50" : "transparent", color: copiado ? "#f2f5f7" : "#4ec9b8",
+              border: "1px solid #4ec9b8", borderRadius: 3, cursor: "pointer", fontFamily: "'Courier Prime', 'Courier New', monospace",
+              fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 700,
+              transition: "background 0.2s" }}>
+            {copiado ? "✓ Copiado" : "📋 Copiar al portapapeles"}
+          </button>
+        </div>
+
+        {/* textarea con el CSV */}
+        <div style={{ padding: 20, flex: 1, overflow: "hidden" }}>
+          <textarea
+            id="csv-textarea-export"
+            readOnly
+            value={contenido}
+            onFocus={e => e.target.select()}
+            style={{
+              width: "100%", height: "50vh",
+              fontFamily: "'Courier Prime', 'Courier New', monospace", fontSize: 11, lineHeight: 1.5,
+              padding: 12, border: "1px solid #d5d9dc", borderRadius: 4,
+              background: "#fafaf7", color: "#1a1a1a",
+              resize: "none", outline: "none",
+              whiteSpace: "pre", overflowX: "auto",
+            }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// MODAL PDF — Vista pantalla completa del documento maquetado
+// con CSS @media print que oculta TODO menos el documento al imprimir
+// ═══════════════════════════════════════════════════════════════════════
+function ModalPDF({ contenidoPrint, onClose, filename = "calculadora_45h.pdf" }) {
+  const [estado, setEstado] = useState("preparando"); // preparando | listo | generando | error
+  const [mensaje, setMensaje] = useState("Cargando librería PDF…");
+  const [logs, setLogs] = useState([]);
+
+  const log = (msg) => {
+    console.log("[PDF]", msg);
+    setLogs(prev => [...prev, `${new Date().toLocaleTimeString()} ${msg}`]);
+  };
+
+  // Pre-cargar html2pdf.js al montar el modal
+  useEffect(() => {
+    const cargar = async () => {
+      if (window.html2pdf) {
+        log("html2pdf ya estaba cargado");
+        setEstado("listo");
+        setMensaje("");
+        return;
+      }
+      log("Cargando html2pdf desde CDN…");
+      try {
+        await new Promise((resolve, reject) => {
+          const script = document.createElement("script");
+          script.src = "https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js";
+          script.onload = () => {
+            log("html2pdf cargado correctamente");
+            resolve();
+          };
+          script.onerror = (e) => {
+            log("Error al cargar el script: " + (e.message || "evento error"));
+            reject(new Error("CDN bloqueado o sin red"));
+          };
+          document.head.appendChild(script);
+        });
+        // verificar que la variable global existe
+        if (!window.html2pdf) {
+          throw new Error("script cargado pero window.html2pdf no está definido");
+        }
+        setEstado("listo");
+        setMensaje("");
+      } catch (e) {
+        log("FALLO carga librería: " + e.message);
+        setEstado("error");
+        setMensaje("No se pudo cargar la librería PDF. Usa el botón de impresión del navegador.");
+      }
+    };
+    cargar();
+  }, []);
+
+  const generarPDF = async () => {
+    setEstado("generando");
+    setMensaje("Generando PDF…");
+    log("Inicio de generación");
+    try {
+      if (!window.html2pdf) throw new Error("html2pdf no disponible");
+
+      const elemento = document.getElementById("pdf-doc-content");
+      if (!elemento) throw new Error("elemento del documento no encontrado");
+      log(`Elemento encontrado: ${elemento.offsetWidth}×${elemento.offsetHeight}px`);
+
+      // Avisar si el elemento es enorme (puede provocar fallos de memoria)
+      const estimadoMB = (elemento.offsetWidth * elemento.offsetHeight * 4 * 1.5 * 1.5) / (1024 * 1024);
+      log(`Memoria canvas estimada: ~${estimadoMB.toFixed(1)} MB`);
+      if (estimadoMB > 80) {
+        log("⚠ Documento muy grande, reduciendo escala");
+      }
+
+      const scale = estimadoMB > 80 ? 1 : 1.5;
+
+      const opciones = {
+        margin: [10, 10, 10, 10],
+        filename,
+        image: { type: "jpeg", quality: 0.92 },
+        html2canvas: {
+          scale,
+          useCORS: true,
+          allowTaint: true,
+          logging: false,
+          backgroundColor: "#ffffff",
+          letterRendering: true,
+          // imageTimeout en ms (importante para imgs grandes en base64)
+          imageTimeout: 15000,
+        },
+        jsPDF: {
+          unit: "mm",
+          format: "a4",
+          orientation: "portrait",
+          compress: true,
+        },
+      };
+
+      log("Paso 1: html2pdf().set(opciones)…");
+      const worker = window.html2pdf().set(opciones).from(elemento);
+
+      log("Paso 2: convertir a canvas…");
+      setMensaje("Renderizando contenido…");
+      await worker.toCanvas();
+      log("✓ Canvas creado");
+
+      log("Paso 3: generar PDF…");
+      setMensaje("Construyendo PDF…");
+      await worker.toPdf();
+      log("✓ PDF en memoria");
+
+      log("Paso 4: obtener Blob…");
+      const blob = await worker.output("blob");
+      log(`✓ Blob obtenido (${(blob.size / 1024).toFixed(1)} KB)`);
+
+      log("Paso 5: descargar archivo…");
+      setMensaje("Descargando…");
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.style.display = "none";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+      log("✓ Descarga iniciada");
+      setEstado("listo");
+      setMensaje("✓ PDF generado correctamente");
+      setTimeout(() => setMensaje(""), 4000);
+    } catch (e) {
+      const errMsg = e?.message || String(e);
+      log("ERROR: " + errMsg);
+      if (e?.stack) log("Stack: " + e.stack.split('\n').slice(0, 3).join(' / '));
+      console.error("Error generando PDF:", e);
+      setEstado("error");
+      setMensaje("Error: " + errMsg);
+    }
+  };
+
+  // Plan B: imprimir directamente con window.print() (puede que el sandbox lo permita ahora)
+  const imprimirNavegador = () => {
+    log("Intento window.print() directo");
+    try {
+      window.print();
+    } catch (e) {
+      log("window.print falló: " + e.message);
+      alert("La impresión nativa también está bloqueada. Solución: copia el contenido del modal y pégalo en un editor.");
+    }
+  };
+
+  const ocupado = estado === "preparando" || estado === "generando";
+
+  return (
+    <div
+      style={{
+        position: "fixed", inset: 0,
+        background: "rgba(0,0,0,0.85)",
+        display: "flex", flexDirection: "column",
+        zIndex: 9999,
+        fontFamily: "'Courier Prime', 'Courier New', monospace",
+      }}
+    >
+      <style>{`
+        @media print {
+          @page { size: A4 portrait; margin: 10mm; }
+          body * { visibility: hidden !important; }
+          #pdf-doc-content, #pdf-doc-content * { visibility: visible !important; }
+          #pdf-doc-content {
+            position: absolute !important;
+            left: 0 !important; top: 0 !important;
+            width: 100% !important; max-width: none !important;
+            margin: 0 !important; padding: 0 !important;
+            box-shadow: none !important;
+          }
+        }
+      `}</style>
+
+      {/* toolbar */}
+      <div style={{
+        background: "#1a1a1a", color: "#f0f0f0",
+        padding: "12px 20px",
+        display: "flex", justifyContent: "space-between", alignItems: "center",
+        borderBottom: "2px solid #4ec9b8",
+        flexWrap: "wrap", gap: 10,
+      }}>
+        <div>
+          <div style={{ fontSize: 9, letterSpacing: "0.2em", color: "#4ec9b8", textTransform: "uppercase", marginBottom: 2 }}>
+            EXPORTAR PDF
+          </div>
+          <div style={{ fontSize: 13, fontWeight: 700 }}>{filename}</div>
+        </div>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          {mensaje && (
+            <span style={{
+              fontSize: 10,
+              color: estado === "error" ? "#ff8080" : estado === "listo" && mensaje.startsWith("✓") ? "#80ff80" : "#4ec9b8",
+              fontFamily: "'Courier Prime', 'Courier New', monospace",
+              maxWidth: 280,
+            }}>
+              {mensaje}
+            </span>
+          )}
+          <button
+            onClick={generarPDF}
+            disabled={ocupado || estado === "error"}
+            style={{
+              padding: "8px 16px",
+              background: ocupado || estado === "error" ? "#444" : "#4ec9b8",
+              color: "#f2f5f7", border: "none", borderRadius: 3,
+              cursor: ocupado ? "wait" : (estado === "error" ? "not-allowed" : "pointer"),
+              fontFamily: "'Courier Prime', 'Courier New', monospace", fontSize: 11,
+              letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 700,
+              opacity: estado === "error" ? 0.4 : 1,
+            }}>
+            {estado === "preparando" ? "⏳ Cargando…" : estado === "generando" ? "⏳ Generando…" : "⬇ Descargar PDF"}
+          </button>
+          <button onClick={imprimirNavegador}
+            style={{ padding: "8px 16px", background: "transparent", color: "#4ec9b8",
+              border: "1px solid #4ec9b8", borderRadius: 3, cursor: "pointer",
+              fontFamily: "'Courier Prime', 'Courier New', monospace", fontSize: 11,
+              letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 700 }}
+            title="Plan B: imprimir con el diálogo del navegador">
+            🖨 Imprimir
+          </button>
+          <button onClick={onClose}
+            style={{ padding: "8px 16px", background: "transparent", color: "#888",
+              border: "1px solid #888", borderRadius: 3, cursor: "pointer",
+              fontFamily: "'Courier Prime', 'Courier New', monospace", fontSize: 11,
+              letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 700 }}>
+            ✕ Cerrar
+          </button>
+        </div>
+      </div>
+
+      {/* hint */}
+      <div style={{
+        padding: "10px 20px", background: "#fdf8f0",
+        fontSize: 11, color: "#555", borderBottom: "1px solid #d5d9dc",
+      }}>
+        {estado === "error" ? (
+          <div>
+            <strong style={{ color: "#b02020" }}>⚠ La librería PDF no se pudo cargar.</strong>
+            <br/>Soluciones:
+            <br/>• Pulsa <strong>"🖨 Imprimir"</strong> y elige "Guardar como PDF" en el diálogo del navegador
+            <br/>• Haz una captura de pantalla del documento
+            <br/>• Si el problema persiste, abre la consola del navegador (F12) y revisa los logs de abajo
+          </div>
+        ) : (
+          <>
+            <strong>Para guardar:</strong> pulsa <strong>"⬇ Descargar PDF"</strong> (genera y descarga automáticamente)
+            o <strong>"🖨 Imprimir"</strong> (usa el diálogo nativo del navegador → "Guardar como PDF").
+          </>
+        )}
+      </div>
+
+      {/* logs (solo si hay error) */}
+      {(estado === "error" || logs.length > 0) && (
+        <details style={{ background: "#1a1a1a", color: "#888", padding: "8px 20px", fontSize: 10, fontFamily: "monospace", borderBottom: "1px solid #444" }}>
+          <summary style={{ cursor: "pointer", color: "#4ec9b8", fontWeight: 700 }}>Logs de diagnóstico ({logs.length})</summary>
+          <pre style={{ margin: "8px 0 0", whiteSpace: "pre-wrap", fontSize: 9, lineHeight: 1.5 }}>
+            {logs.join("\n")}
+          </pre>
+        </details>
+      )}
+
+      {/* área de scroll con el documento */}
+      <div style={{
+        flex: 1, overflow: "auto", padding: 20, background: "#666",
+      }}>
+        <div
+          id="pdf-doc-content"
+          style={{
+            background: "#f2f5f7",
+            maxWidth: "210mm",
+            margin: "0 auto",
+            padding: "15mm",
+            boxShadow: "0 4px 20px rgba(0,0,0,0.5)",
+            borderRadius: 4,
+            color: "#1a1a1a",
+            fontSize: 10,
+          }}
+        >
+          {contenidoPrint}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// DOCUMENTO IMPRIMIBLE — el contenido maquetado para PDF
+// ═══════════════════════════════════════════════════════════════════════
+// === NUEVO DocumentoImprimible — formato del PDF de Teresa Cepeda ===
+function DocumentoImprimible({
+  logoEmpresa, nombre, puesto, proyecto, productora,
+  fechaInicio, fechaFin, salario45efectivo, horasRef,
+  p40ref, sumaRef,
+  baseRef, vacRef, indemRef, hxRef, vHoraEx, vHora, salarioDia,
+  p, desglose45, complementos45,
+  vacAcumulada, indemAcumulada,
+  horasPorMes, importeVdMes, importeFestMes45,
+  totBase, totVac, totIndem,
+  totHx, totPlus, totVd,
+  totalVdDias, totalCompl,
+  totFinal,
+  totalVac45, totalIndem45,
+  totalFestDias45, totalFestImport45,
+  totJEDias = 0, totJEImporte = 0, // v73: jornadas especiales
+  totOver45Horas = 0, totOver45Importe = 0, over45Precio = 0, over45Aplica = false, // v150
+  valorFestivo45 = 0, festPactadoAplica = false, // v150
+  plusHerramienta, plusCoche, plusVivienda, plusSeguroVida, plusComida,
+  es40h = false,
+  codigoContable = "",
+  esFijoDiscontinuo = false, // v47: solo 40H
+}) {
+  // Estilos reutilizables
+  const sectionTitle = {
+    marginTop: 14, marginBottom: 6,
+    fontSize: 8, fontWeight: 700,
+    letterSpacing: "0.18em", textTransform: "uppercase",
+    color: "#1a1a1a", paddingBottom: 2,
+  };
+  // v145: paleta neutra del PDF — fuera cremas heredados, bordes con más contraste
+  const PDF_BORDE  = "#a8b0b6";   // v145: antes #d5d9dc / #d8d4ce
+  const PDF_FONDO  = "#e8ecef";   // v145: antes #fafaf7 / #fdf8f0
+  const PDF_AZUL   = "#e3eefa";   // v145: fondo de las filas de total
+  const PDF_AZUL_B = "#b4cde6";   // v145: borde de las filas de total
+  const tdHead = {
+    padding: "5px 6px", fontSize: 8,              // v145: 7 -> 8 para que se lea
+    letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 700,
+    color: "#333", background: PDF_FONDO,          // v145: #666 -> #333
+    border: `1px solid ${PDF_BORDE}`,
+  };
+  const tdCell = (extra = {}) => ({
+    padding: "4px 6px", fontSize: 9,
+    border: `1px solid ${PDF_BORDE}`,
+    fontFamily: "'Courier Prime', 'Courier New', monospace",
+    ...extra,
+  });
+  const tdLabel = {
+    padding: "5px 8px", fontSize: 9,
+    background: PDF_FONDO,
+    border: `1px solid ${PDF_BORDE}`,
+    color: "#1a1a1a",
+    fontWeight: 700,                               // v145: valores en negrita
+    fontFamily: "'Courier Prime', 'Courier New', monospace",
+  };
+  const tdValue = {
+    padding: "5px 8px", fontSize: 9,
+    border: `1px solid ${PDF_BORDE}`,
+    color: "#1a1a1a",
+    fontWeight: 700,                               // v145: valores en negrita
+    fontFamily: "'Courier Prime', 'Courier New', monospace",
+  };
+
+  const tieneCompl = totalCompl > 0;
+  const totalConExtras = totFinal + totalFestImport45 + totalCompl;
+
+  return (
+    <div style={{ fontFamily: "'Courier Prime', 'Courier New', monospace", color: "#1a1a1a", fontSize: 10, position: "relative" }}>
+
+      {/* ═══ MARCA DE AGUA "SIMULACRO DE NOMINA" ═══ */}
+      {/* Marca única, centrada en la página, en diagonal a -28°.
+          Tres líneas: SIMULACRO / DE / NOMINA. Opacidad sutil 0.06.
+          z-index alto + pointer-events:none para que quede sobre el
+          contenido sin bloquear interacción. */}
+      <div
+        aria-hidden="true"
+        style={{
+          position: "absolute",
+          top: 0, left: 0, right: 0, bottom: 0,
+          pointerEvents: "none",
+          overflow: "hidden",
+          zIndex: 10,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          WebkitPrintColorAdjust: "exact",
+          printColorAdjust: "exact",
+        }}
+      >
+        <div
+          style={{
+            transform: "rotate(-28deg)",
+            color: "#1a1a1a",
+            opacity: 0.06,
+            fontFamily: "'Courier Prime', 'Courier New', monospace",
+            fontWeight: 700,
+            textAlign: "center",
+            lineHeight: 0.95,
+            letterSpacing: "0.08em",
+            whiteSpace: "nowrap",
+            userSelect: "none",
+          }}
+        >
+          <div style={{ fontSize: 110 }}>SIMULACRO</div>
+          <div style={{ fontSize: 110 }}>DE</div>
+          <div style={{ fontSize: 110 }}>NOMINA</div>
+        </div>
+      </div>
+
+      {/* Contenido del documento (z-index 1 para quedar SOBRE la marca de agua) */}
+      <div style={{ position: "relative", zIndex: 1 }}>
+
+      {/* ═══ CABECERA ═══ */}
+      {/* v145: cabecera convertida en banner de marca (logo 58px + filo turquesa) */}
+      <div style={{ marginBottom: 14, WebkitPrintColorAdjust: "exact", printColorAdjust: "exact" }}>
+        <div style={{
+          background: "#1a1a1a", padding: "18px 20px",
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          borderRadius: "4px 4px 0 0",
+        }}>
+          <img src="/logo.png" alt="Bdprodtools" style={{ height: 58, width: "auto", display: "block" }} />
+          <div style={{ textAlign: "right", color: "#ffffff" }}>
+            <div style={{ fontSize: 8, color: "#9aa5ab", fontWeight: 700, letterSpacing: "0.3em", textTransform: "uppercase", marginBottom: 4 }}>
+              Desglose Salarial · {es40h ? "40 Horas" : "45 Horas"}
+            </div>
+            <div style={{ fontSize: 17, fontWeight: 700, letterSpacing: "0.06em", marginBottom: 6 }}>
+              CALCULADORA DE SALARIOS
+            </div>
+            <span style={{
+              display: "inline-block", border: "1px solid rgba(255,255,255,0.18)",
+              color: "#f2f5f7", padding: "2px 9px", fontSize: 8,
+              letterSpacing: "0.14em", borderRadius: 3,
+            }}>
+              {(proyecto || "—") + " · " + (productora || "—")}
+            </span>
+          </div>
+        </div>
+        {/* v145: filo con el turquesa de marca BD PROD TOOLS */}
+        <div style={{ height: 3, background: "#4ec9b8", borderRadius: "0 0 4px 4px" }} />
+      </div>
+
+      {/* ═══ TRABAJADOR ═══ */}
+      <div style={sectionTitle}>▸ TRABAJADOR</div>
+      <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 4 }}>
+        <tbody>
+          <tr>
+            <td style={tdLabel}><strong>Proyecto:</strong> {proyecto || "—"}</td>
+            <td style={tdValue}><strong>Productora:</strong> {productora || "—"}</td>
+          </tr>
+          <tr>
+            <td style={tdLabel}><strong>Nombre:</strong> {nombre || "—"}</td>
+            <td style={tdValue}><strong>Puesto:</strong> {puesto || "—"}{codigoContable ? <span style={{ color: "#444", marginLeft: 6, fontWeight: 700, fontSize: 10 }}>· {codigoContable}</span> : null}</td>
+          </tr>
+          {!es40h && (
+            <tr>
+              <td style={tdLabel}><strong>Salario pactado 45h:</strong> <span style={{ color: "#1a1a1a", fontWeight: 700 }}>{fmtE(salario45efectivo)}</span></td>
+              <td style={tdValue}><strong>Horas referencia:</strong> {horasRef}h/mes</td>
+            </tr>
+          )}
+          {/* v47: fila fijo discontinuo (solo 40H) */}
+          {es40h && esFijoDiscontinuo && (
+            <tr>
+              <td colSpan={2} style={{ ...tdLabel, background: "#faf1e0" }}>
+                <span style={{
+                  display: "inline-block",
+                  padding: "2px 8px",
+                  background: "#c8963a",
+                  color: "#f2f5f7",
+                  fontSize: 9,
+                  fontWeight: 700,
+                  letterSpacing: "0.12em",
+                  borderRadius: 3,
+                }}>FIJO DISCONTINUO</span>
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+
+      {/* ═══ REFERENCIA MES COMPLETO ═══ */}
+      <div style={sectionTitle}>▸ REFERENCIA MES COMPLETO (40H BASE + HORAS EXTRA)</div>
+      <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 4 }}>
+        <tbody>
+          <tr>
+            {[
+              { l: "BASE 40H",      v: baseRef,  s: (es40h && esFijoDiscontinuo) ? "Salario ÷ 1,14190" : "× 0,89286" },
+              { l: "VACACIONES",    v: vacRef,   s: "Base ÷ 11,478452" },
+              { l: "INDEMNIZACIÓN", v: indemRef, s: (es40h && esFijoDiscontinuo) ? "(Base/30) × 1,6433333" : "(Base/30) × 0,98632" },
+              ...(es40h ? [] : [{ l: `H.EXTRA (${horasRef}H)`, v: hxRef, s: `${horasRef}h × ${fmt(vHoraEx)} €`, blue: true }]),
+            ].map((it, idx, arr) => (
+              <td key={idx} style={{
+                width: `${100/arr.length}%`,
+                border: `1px solid ${PDF_BORDE}`,
+                padding: "10px 6px",
+                textAlign: "center",
+                background: PDF_FONDO,
+              }}>
+                {/* v145: etiqueta y fórmula subidas de 7px a 8px y oscurecidas */}
+                <div style={{ fontSize: 8, color: "#444", fontWeight: 700, letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: 5 }}>{it.l}</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: it.blue ? "#1a1a1a" : "#1a1a1a" }}>{fmt(it.v)} €</div>
+                <div style={{ fontSize: 8, color: "#666", fontWeight: 600, marginTop: 4 }}>{it.s}</div>
+              </td>
+            ))}
+          </tr>
+        </tbody>
+      </table>
+      {es40h ? (
+        <>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <tbody>
+              <tr>
+                <td style={{ background: PDF_FONDO, border: `1px solid ${PDF_BORDE}`, padding: "7px 10px", textAlign: "center", fontSize: 10, fontWeight: 700, color: "#1a1a1a", letterSpacing: "0.04em", width: "50%" }}>
+                  TOTAL MES 40H · <span style={{ color: "#1a1a1a", fontSize: 12 }}>{fmt(baseRef + vacRef + indemRef)} €</span> <span style={{ display: "inline-block", background: "#1a1a1a", color: "#f2f5f7", fontSize: 8, fontWeight: 700, letterSpacing: "0.1em", padding: "1px 5px", borderRadius: 3, marginLeft: 4, verticalAlign: "middle" }}>BRUTOS</span>
+                </td>
+                <td style={{ background: "#f0f6fc", border: "1px solid #c8d8e8", padding: "7px 10px", textAlign: "center", fontSize: 10, fontWeight: 700, color: "#1a1a1a", letterSpacing: "0.04em", width: "50%" }}>
+                  SALARIO EN CONTRATO · <span style={{ color: "#1a1a1a", fontSize: 12 }}>{fmt(vacAcumulada ? baseRef : (baseRef + vacRef))} €</span> <span style={{ display: "inline-block", background: "#1a1a1a", color: "#f2f5f7", fontSize: 8, fontWeight: 700, letterSpacing: "0.1em", padding: "1px 5px", borderRadius: 3, marginLeft: 4, verticalAlign: "middle" }}>BRUTOS</span>
+                  {vacAcumulada && <div style={{ fontSize: 7.5, color: "#5a7a9a", marginTop: 2, letterSpacing: "0.05em", fontStyle: "italic", fontWeight: 400 }}>Base 40h · vacaciones al final</div>}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          {!vacAcumulada && (
+            <div style={{ marginTop: 8, padding: "7px 10px", background: PDF_FONDO, border: `1px solid ${PDF_BORDE}`, borderRadius: 3, fontSize: 9, color: "#444", lineHeight: 1.5 }}>
+              <strong style={{ color: "#1a1a1a", fontStyle: "normal" }}>Nota:</strong> Salario en contrato es la suma del salario base + las vacaciones.
+            </div>
+          )}
+        </>
+      ) : (
+        <>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <tbody>
+              <tr>
+                <td style={{ background: PDF_FONDO, border: `1px solid ${PDF_BORDE}`, padding: "7px 10px", textAlign: "center", fontSize: 10, fontWeight: 700, color: "#1a1a1a", letterSpacing: "0.04em", width: "50%" }}>
+                  TOTAL MES 45H TODO INCLUIDO · <span style={{ color: "#1a1a1a", fontSize: 12 }}>{fmt(sumaRef)} €</span> <span style={{ display: "inline-block", background: "#1a1a1a", color: "#f2f5f7", fontSize: 8, fontWeight: 700, letterSpacing: "0.1em", padding: "1px 5px", borderRadius: 3, marginLeft: 4, verticalAlign: "middle" }}>BRUTOS</span>
+                </td>
+                <td style={{ background: "#f0f6fc", border: "1px solid #c8d8e8", padding: "7px 10px", textAlign: "center", fontSize: 10, fontWeight: 700, color: "#1a1a1a", letterSpacing: "0.04em", width: "50%" }}>
+                  SALARIO EN CONTRATO · <span style={{ color: "#1a1a1a", fontSize: 12 }}>{fmt(baseRef + vacRef)} €</span> <span style={{ display: "inline-block", background: "#1a1a1a", color: "#f2f5f7", fontSize: 8, fontWeight: 700, letterSpacing: "0.1em", padding: "1px 5px", borderRadius: 3, marginLeft: 4, verticalAlign: "middle" }}>BRUTOS</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <div style={{ marginTop: 8, padding: "7px 10px", background: PDF_FONDO, border: `1px solid ${PDF_BORDE}`, borderRadius: 3, fontSize: 9, color: "#444", lineHeight: 1.5 }}>
+            <strong style={{ color: "#1a1a1a", fontStyle: "normal" }}>Nota:</strong> El salario que figura en contrato es la suma del salario base 40h más las vacaciones.
+          </div>
+        </>
+      )}
+
+      {/* ═══ CÁLCULO DE HORAS ═══ */}
+      <div style={sectionTitle}>▸ CÁLCULO DE HORAS</div>
+      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+        <tbody>
+          <tr>
+            <td style={tdLabel}><strong>Salario / Día:</strong> {fmtE(salarioDia)}</td>
+            <td style={tdLabel}><strong>Salario / Semana:</strong> {fmtE(salarioDia * 7)}</td>
+            <td style={tdLabel}><strong>Valor Hora:</strong> {fmtE(vHora)}</td>
+          </tr>
+          <tr>
+            <td style={tdLabel}><strong>Hora Extra ×1,5:</strong> <span style={{ color: "#1a1a1a" }}>{fmtE(vHoraEx)}</span></td>
+            <td style={tdLabel}><strong>{festPactadoAplica ? "Festivo pactado:" : "Festivo ×1,75:"}</strong> <span style={{ color: "#6a3a9a" }}>{fmtE(valorFestivo45 || salarioDia * 1.75)}</span></td>
+            <td style={tdLabel}><strong>Total H.Extra:</strong> {fmtE(totHx)} ({horasPorMes.reduce((s,v)=>s+(v||0),0)}h)</td>
+          </tr>
+        </tbody>
+      </table>
+
+      {/* ═══ NÓMINA 45H POR MES TRABAJADO ═══ */}
+      <div style={sectionTitle}>▸ NÓMINA {es40h ? "40H" : "45H"} POR MES TRABAJADO <span style={{ display: "inline-block", background: "#1a1a1a", color: "#f2f5f7", fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", padding: "2px 7px", borderRadius: 3, marginLeft: 8, verticalAlign: "middle", textTransform: "uppercase" }}>Importes Brutos</span></div>
+      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+        <thead>
+          <tr>
+            {[
+              { l: "MES", a: "left" },
+              { l: "FRAC.", a: "right" },
+              { l: "BASE 40H", a: "right" },
+              { l: "VAC.", a: "right" },
+              { l: "INDEM.", a: "right" },
+              { l: "H.EX H", a: "right" },
+              { l: "H.EX €", a: "right" },
+              ...(es40h ? [] : [{ l: "PLUS ACT.", a: "right" }]),
+              { l: "−VAC.D", a: "right" },
+              { l: "FEST. €", a: "right" },
+              { l: "J.ESP €", a: "right" },
+              { l: "PLUSES", a: "right" },
+              { l: "COMIDA", a: "right" },
+              { l: "TOTAL", a: "right", gold: true },
+            ].map((h, hi) => (
+              <th key={hi} style={{
+                padding: "5px 4px", fontSize: 8,                 // v145: 7 -> 8
+                textAlign: h.a, letterSpacing: "0.05em", textTransform: "uppercase", fontWeight: 700,
+                color: h.gold ? "#1a1a1a" : "#333",              // v145: #666 -> #333
+                background: PDF_FONDO,
+                border: `1px solid ${PDF_BORDE}`,
+              }}>{h.l}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {desglose45.map((d, i) => {
+            const c = complementos45[i] || {};
+            const fest = importeFestMes45[i] || 0;
+            const vd   = importeVdMes[i] || 0;
+            // PLUSES = total de complementos SIN comida
+            const plusesSinComida = (c.herramienta || 0) + (c.coche || 0) + (c.vivienda || 0) + (c.seguroVida || 0);
+            const comida = c.comida || 0;
+            // TOTAL = totalMes (que incluye base+vac+indem+h.extra+plusAct−vd) + festivos + complementos
+            // En 40H restamos el plusAct del totalMes porque esa columna se elimina
+            const totalRow = (es40h ? (d.totalMes - (d.plusAct || 0)) : d.totalMes) + fest + (c.total || 0);
+            return (
+              <tr key={i} style={{ background: i % 2 === 0 ? "#ffffff" : "#f2f5f7" }}>
+                <td style={tdCell({ textTransform: "capitalize", fontWeight: 700 })}>
+                  {d.mes}
+                  {!d.esCompleto && <span style={{ fontSize: 8, color: "#555", marginLeft: 3 }}>({d.desde}-{d.hasta})</span>}
+                </td>
+                <td style={tdCell({ textAlign: "right", color: "#555" })}>{fmtM(d.fraccion)}</td>
+                <td style={tdCell({ textAlign: "right" })}>{fmt(d.base40)}</td>
+                <td style={tdCell({ textAlign: "right", color: d.vac40 === 0 ? "#999" : "#1a1a1a" })}>{d.vac40 === 0 ? "—" : fmt(d.vac40)}</td>
+                <td style={tdCell({ textAlign: "right", color: d.indem40 === 0 ? "#999" : "#1a1a1a" })}>{d.indem40 === 0 ? "—" : fmt(d.indem40)}</td>
+                <td style={tdCell({ textAlign: "right", color: "#1a1a1a" })}>{d.hMes}h</td>
+                <td style={tdCell({ textAlign: "right", color: "#1a1a1a" })}>{fmt(d.cobroHx)}</td>
+                {!es40h && <td style={tdCell({ textAlign: "right", color: d.plusAct > 0 ? "#4a5157" : "#999", fontWeight: d.plusAct > 0 ? 600 : 400 })}>{d.plusAct > 0 ? fmt(d.plusAct) : "—"}</td>}
+                <td style={tdCell({ textAlign: "right", color: vd > 0 ? "#8a2a20" : "#999" })}>{vd > 0 ? `−${fmt(vd)}` : "—"}</td>
+                <td style={tdCell({ textAlign: "right", color: fest > 0 ? "#6a3a9a" : "#999" })}>{fest > 0 ? fmt(fest) : "—"}</td>
+                <td style={tdCell({ textAlign: "right", color: (d.importeJE || 0) > 0 ? "#8a1e4a" : "#999" })}>{(d.importeJE || 0) > 0 ? fmt(d.importeJE) : "—"}</td>
+                <td style={tdCell({ textAlign: "right", color: plusesSinComida > 0 ? "#5a8a5a" : "#999" })}>{plusesSinComida > 0 ? fmt(plusesSinComida) : "—"}</td>
+                <td style={tdCell({ textAlign: "right", color: comida > 0 ? "#5a8a5a" : "#999" })}>{comida > 0 ? fmt(comida) : "—"}</td>
+                <td style={tdCell({ textAlign: "right", color: "#1a1a1a", fontWeight: 700 })}>{fmt(totalRow)}</td>
+              </tr>
+            );
+          })}
+          {/* Fila TOTAL */}
+          <tr style={{ background: PDF_AZUL, fontWeight: 700 }}>
+            <td style={tdCell({ background: PDF_AZUL, color: "#1a1a1a", letterSpacing: "0.1em", textTransform: "uppercase", fontSize: 8 })}>TOTAL</td>
+            <td style={tdCell({ background: PDF_AZUL, textAlign: "right", color: "#555" })}>—</td>
+            <td style={tdCell({ background: PDF_AZUL, textAlign: "right" })}>{fmt(totBase)}</td>
+            <td style={tdCell({ background: PDF_AZUL, textAlign: "right" })}>{fmt(totVac)}</td>
+            <td style={tdCell({ background: PDF_AZUL, textAlign: "right" })}>{fmt(totIndem)}</td>
+            <td style={tdCell({ background: PDF_AZUL, textAlign: "right", color: "#1a1a1a" })}>
+              {horasPorMes.reduce((s, v, i) => {
+                if (v === undefined || v === null || v === "") return s + Math.round((p?.desglose[i]?.semanasLaborables || 0) * 5);
+                return s + (v || 0);
+              }, 0)}h
+            </td>
+            <td style={tdCell({ background: PDF_AZUL, textAlign: "right", color: "#1a1a1a" })}>{fmt(totHx)}</td>
+            {!es40h && <td style={tdCell({ background: PDF_AZUL, textAlign: "right", color: totPlus > 0 ? "#4a5157" : "#999" })}>{totPlus > 0 ? fmt(totPlus) : "—"}</td>}
+            <td style={tdCell({ background: PDF_AZUL, textAlign: "right", color: totVd > 0 ? "#8a2a20" : "#999" })}>{totVd > 0 ? `−${fmt(totVd)}` : "—"}</td>
+            <td style={tdCell({ background: PDF_AZUL, textAlign: "right", color: totalFestImport45 > 0 ? "#6a3a9a" : "#999" })}>{totalFestImport45 > 0 ? fmt(totalFestImport45) : "—"}</td>
+            <td style={tdCell({ background: PDF_AZUL, textAlign: "right", color: totJEImporte > 0 ? "#8a1e4a" : "#999" })} title={totJEDias > 0 ? `${totJEDias} JE` : ""}>{totJEImporte > 0 ? fmt(totJEImporte) : "—"}</td>
+            <td style={tdCell({ background: PDF_AZUL, textAlign: "right", color: "#5a8a5a" })}>
+              {fmt(complementos45.reduce((s,c)=>s+(c.herramienta||0)+(c.coche||0)+(c.vivienda||0)+(c.seguroVida||0), 0))}
+            </td>
+            <td style={tdCell({ background: PDF_AZUL, textAlign: "right", color: "#5a8a5a" })}>
+              {fmt(complementos45.reduce((s,c)=>s+(c.comida||0), 0))}
+            </td>
+            <td style={tdCell({ background: PDF_AZUL, textAlign: "right", color: "#1a1a1a" })}>{fmt(es40h ? (totalConExtras - (totPlus || 0)) : totalConExtras)}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      {/* ═══ PERÍODO DE CONTRATACIÓN ═══ */}
+      <div style={sectionTitle}>▸ PERÍODO DE CONTRATACIÓN</div>
+      {p && (
+        <>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <tbody>
+              <tr>
+                <td style={{ ...tdLabel, textAlign: "center", padding: "8px" }}><strong>Inicio:</strong> {fechaInicio}</td>
+                <td style={{ ...tdValue, textAlign: "center", padding: "8px" }}><strong>Fin:</strong> {fechaFin}</td>
+                <td style={{ ...tdLabel, textAlign: "center", padding: "8px" }}><strong>Días:</strong> {p.diasNormalizados}</td>
+                <td style={{ ...tdValue, textAlign: "center", padding: "8px" }}><strong>Meses:</strong> {fmtM(p.mesesTotales)}</td>
+                <td style={{ ...tdLabel, textAlign: "center", padding: "8px" }}><strong>Sem. L-V:</strong> {fmt(p.semanasTotales, 1)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </>
+      )}
+
+      {/* ═══ RESUMEN DEL PERÍODO ═══ */}
+      <div style={sectionTitle}>▸ RESUMEN DEL PERÍODO <span style={{ display: "inline-block", background: "#1a1a1a", color: "#f2f5f7", fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", padding: "2px 7px", borderRadius: 3, marginLeft: 8, verticalAlign: "middle", textTransform: "uppercase" }}>Importes Brutos</span></div>
+      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+        <tbody>
+          <tr>
+            <td style={tdLabel}>Base 40h equivalente</td>
+            <td style={{ ...tdValue, textAlign: "right", fontWeight: 700 }}>{fmtE(totBase)}</td>
+          </tr>
+          <tr>
+            <td style={{ ...tdLabel, paddingLeft: 18, color: "#444", fontWeight: 400 }}>· Vacaciones</td>
+            <td style={{ ...tdValue, textAlign: "right", color: "#444", fontWeight: 400 }}>{fmtE(totalVac45)}</td>
+          </tr>
+          <tr>
+            <td style={{ ...tdLabel, paddingLeft: 18, color: "#444", fontWeight: 400 }}>· Indemnización</td>
+            <td style={{ ...tdValue, textAlign: "right", color: "#444", fontWeight: 400 }}>{fmtE(totalIndem45)}</td>
+          </tr>
+          <tr>
+            <td style={tdLabel}>+ Horas extra ({horasPorMes.reduce((s,v)=>s+(v||0),0)}h)</td>
+            <td style={{ ...tdValue, textAlign: "right", color: "#1a1a1a", fontWeight: 700 }}>+ {fmtE(totHx)}</td>
+          </tr>
+          {totPlus > 0 && !es40h && (
+            <tr>
+              <td style={tdLabel}>+ Plus de Actividad</td>
+              <td style={{ ...tdValue, textAlign: "right", color: "#4a5157", fontWeight: 700 }}>+ {fmtE(totPlus)}</td>
+            </tr>
+          )}
+          {totVd > 0 && (
+            <tr>
+              <td style={tdLabel}>− Vacaciones disfrutadas ({totalVdDias}d)</td>
+              <td style={{ ...tdValue, textAlign: "right", color: "#8a2a20", fontWeight: 700 }}>− {fmtE(totVd)}</td>
+            </tr>
+          )}
+          {totOver45Horas > 0 && (
+            <tr>
+              <td style={tdLabel}>+ Horas extra over 45h ({totOver45Horas}h × {fmtE(over45Precio)})</td>
+              <td style={{ ...tdValue, textAlign: "right", color: "#4a5157", fontWeight: 700 }}>+ {fmtE(totOver45Importe)}</td>
+            </tr>
+          )}
+          {totalFestDias45 > 0 && (
+            <tr>
+              <td style={tdLabel}>+ Festivos trabajados ({totalFestDias45}d){festPactadoAplica ? " · pactado" : ""}</td>
+              <td style={{ ...tdValue, textAlign: "right", color: "#6a3a9a", fontWeight: 700 }}>+ {fmtE(totalFestImport45)}</td>
+            </tr>
+          )}
+          {totJEDias > 0 && (
+            <tr>
+              <td style={tdLabel}>+ Jornadas especiales ({totJEDias}d)</td>
+              <td style={{ ...tdValue, textAlign: "right", color: "#8a1e4a", fontWeight: 700 }}>+ {fmtE(totJEImporte)}</td>
+            </tr>
+          )}
+          <tr style={{ background: PDF_AZUL }}>
+            <td style={{ ...tdLabel, background: PDF_AZUL, border: `1px solid ${PDF_AZUL_B}`, color: "#1a1a1a", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", fontSize: 10, padding: "8px 8px" }}>
+              TOTAL A PERCIBIR ({es40h ? "40h" : "45h"}) {tieneCompl ? "(sin extras)" : ""} <span style={{ display: "inline-block", background: "#1a1a1a", color: "#f2f5f7", fontSize: 8, fontWeight: 700, letterSpacing: "0.12em", padding: "1px 6px", borderRadius: 3, marginLeft: 6, verticalAlign: "middle", textTransform: "uppercase" }}>Importe Bruto</span>
+            </td>
+            <td style={{ ...tdValue, background: PDF_AZUL, border: `1px solid ${PDF_AZUL_B}`, textAlign: "right", fontSize: 13, fontWeight: 700, color: "#1a1a1a", padding: "8px 8px" }}>
+              {fmtE((es40h ? (totFinal - (totPlus || 0)) : totFinal) + (totalFestImport45 || 0))}
+            </td>
+          </tr>
+          <tr>
+            <td style={{ ...tdLabel, paddingLeft: 18, color: "#444", fontWeight: 400 }}>· Promedio mensual ({fmtM(p?.mesesTotales || 0)} meses)</td>
+            <td style={{ ...tdValue, textAlign: "right", color: "#1a7a58", fontWeight: 700 }}>{p && p.mesesTotales > 0 ? fmtE((es40h ? (totFinal - (totPlus || 0)) : totFinal) / p.mesesTotales) : "—"}</td>
+          </tr>
+          <tr>
+            <td style={{ ...tdLabel, paddingLeft: 18, color: "#444", fontWeight: 400 }}>· Promedio semanal ({fmt(p?.semanasTotales || 0, 1)} sem L-V)</td>
+            <td style={{ ...tdValue, textAlign: "right", color: "#1a7a58" }}>{p && p.semanasTotales > 0 ? fmtE((es40h ? (totFinal - (totPlus || 0)) : totFinal) / p.semanasTotales) : "—"}</td>
+          </tr>
+
+          {/* EXTRAS DEL PERÍODO */}
+          {tieneCompl && (
+            <>
+              <tr>
+                <td colSpan={2} style={{
+                  padding: "6px 8px", textAlign: "center", fontSize: 8,
+                  letterSpacing: "0.18em", textTransform: "uppercase",
+                  background: PDF_FONDO, color: "#444", fontWeight: 700,   // v145
+                  border: `1px solid ${PDF_BORDE}`,
+                }}>
+                  EXTRAS DEL PERÍODO
+                </td>
+              </tr>
+              <tr>
+                <td style={tdLabel}>+ Complementos (pluses)</td>
+                <td style={{ ...tdValue, textAlign: "right", color: "#5a8a5a", fontWeight: 700 }}>+ {fmtE(totalCompl)}</td>
+              </tr>
+              <tr style={{ background: "#1a1a1a" }}>
+                <td style={{
+                  padding: "10px 8px", color: "#f0c878", fontWeight: 700,
+                  letterSpacing: "0.1em", textTransform: "uppercase", fontSize: 11,
+                  border: "1px solid #1a1a1a",
+                }}>
+                  TOTAL CON EXTRAS
+                </td>
+                <td style={{
+                  padding: "10px 8px", textAlign: "right",
+                  fontSize: 14, fontWeight: 700, color: "#f0c878",
+                  border: "1px solid #1a1a1a",
+                  fontFamily: "'Courier Prime', 'Courier New', monospace",
+                }}>
+                  {fmtE(totalConExtras)}
+                </td>
+              </tr>
+            </>
+          )}
+        </tbody>
+      </table>
+
+      {/* Aviso orientativo — v68 compacto pero legible */}
+      <div style={{ marginTop: 12, padding: "8px 12px", background: PDF_FONDO, border: `1px solid ${PDF_BORDE}`, borderRadius: 3, textAlign: "center", fontSize: 9, fontWeight: 700, color: "#1a1a1a", letterSpacing: "0.02em", lineHeight: 1.4 }}>
+        Cálculo orientativo del salario mensual bruto, que puede diferir ligeramente de la nómina real generada en cada periodo.
+      </div>
+
+      {/* ═══ PIE ═══ v68 compacto pero legible (una sola línea combinada) */}
+      {/* v145: pie sin autoría personal, aviso bilingüe y grises más legibles */}
+      <div style={{ marginTop: 12, paddingTop: 8, borderTop: `1px solid ${PDF_BORDE}`, textAlign: "center" }}>
+        <div style={{ fontSize: 8, color: "#555", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 700, marginBottom: 3 }}>
+          BD PROD TOOLS · All Rights Reserved
+        </div>
+        <div style={{ fontSize: 7, color: "#777", letterSpacing: "0.05em" }}>
+          Prohibido el uso no autorizado · Unauthorized use prohibited · {new Date().toLocaleString("es-ES")}
+        </div>
+      </div>
+
+      </div>
+    </div>
+  );
+}
+
+
+function App45({ modoTab = "iruna45" }) {
+  // Usuario actual de la sesión (para mostrar autor en exports)
+  const usuarioSesion = useContext(UsuarioContext);
+  const esAdmin = !!usuarioSesion?.es_admin; // v84: para mostrar box Coste Empresa a admins
+  const esCoordinadorApp45 = usuarioSesion?.rol === "coordinador"; // v93
+  const [mostrarExportarListado, setMostrarExportarListado] = useState(false); // v93
+  // v98: nuevos modales de perfiles en la barra
+  const [mostrarModalCargar, setMostrarModalCargar] = useState(false);
+  const [mostrarModalGuardar, setMostrarModalGuardar] = useState(false);
+  const [nombreGuardarModal, setNombreGuardarModal] = useState("");
+  const [accionesPerfiles, setAccionesPerfiles] = useState(null); // {guardarConNombre, cargarPerfil, exportarJSON, ...}
+  const [perfilesLista, setPerfilesLista] = useState([]); // v130: lista viva para re-render del modal
+  const [perfilEnEdicionEstado, setPerfilEnEdicionEstado] = useState(null); // v131: perfil actualmente cargado
+  const proyectoActivoCtx = useContext(ProyectoContext); // v45
+
+  // === FLAG PESTAÑA 40H ===
+  // Cuando es40h=true, varios textos y bloques cambian para reflejar la jornada de 40h
+  const es40h = modoTab === "tab40";
+  const labelHoras = es40h ? "40h" : "45h";
+  const labelHorasUpper = es40h ? "40H" : "45h";
+  const labelTotalRef = es40h ? "TOTAL ≈ 40" : "TOTAL ≈ P45";
+
+  const [proyecto,         setProyecto]       = useState(proyectoActivoCtx?.nombre || "");
+  const [productora,       setProductora]     = useState(proyectoActivoCtx?.productora || "");
+  const [logoEmpresa,      setLogoEmpresa]    = useState("bizkaia");
+  const [nombre,           setNombre]          = useState("");
+  const [puesto,           setPuesto]          = useState("");
+  const [codigoContable,   setCodigoContable]  = useState("");
+  const [departamento,     setDepartamento]    = useState(""); // v97: obligatorio para exportar
+  const [esFijoDiscontinuo, setEsFijoDiscontinuo] = useState(false); // v47: solo 40H
+  const [salario45,        setSalario45]       = useState("");
+  const [horasRef,         setHorasRef]        = useState(22);
+  const [modoInverso45,    setModoInverso45]   = useState(false);
+  const [objetivoSemanal45,setObjetivoSemanal45]=useState(1500);
+  const [fechaInicio,      setFechaInicio]     = useState(proyectoActivoCtx?.__calendario?.fecha_inicio || "2026-01-05");
+  const [fechaFin,         setFechaFin]        = useState(proyectoActivoCtx?.__calendario?.fecha_fin || "2026-03-20");
+  const [fechasPendientes, setFechasPendientes] = useState(false); // v139: perfil guardado sin fechas conocidas
+  const [horasPorMes,      setHorasPorMes]     = useState([]);
+  const [vacDiasPorMes,    setVacDiasPorMes]   = useState([]);
+  const [festivosPorMes,   setFestivosPorMes]  = useState([]);
+  const [jornadasEspecialesPorMes, setJornadasEspecialesPorMes] = useState([]); // v73: JE por mes (editable)
+  // v150: horas extra "over 45h" — solo 45H. Horas POR ENCIMA de las que marca el
+  // calendario, pagadas a un precio pactado aparte. Las del calendario no cambian.
+  const [over45Activo,     setOver45Activo]    = useState(false);
+  const [over45PrecioManual, setOver45PrecioManual] = useState(""); // vacío = usar el calculado
+  const [over45PorMes,     setOver45PorMes]    = useState([]);
+  // v150: festivo trabajado a precio pactado — salario pactado / 30 * 1,75
+  // (el ordinario usa la base 40h). No afecta a las jornadas especiales.
+  const [festPactadoActivo, setFestPactadoActivo] = useState(false);
+  const [festPactadoPrecioManual, setFestPactadoPrecioManual] = useState("");
+  const [festivosActivos,  setFestivosActivos] = useState({});
+  const [vacAcumulada,     setVacAcumulada]    = useState(false);
+  const [indemAcumulada,   setIndemAcumulada]  = useState(false);
+  const [finiquitoAparte,  setFiniquitoAparte] = useState(false); // v90: si ON, indemnización NO se descuenta del salario pactado (se paga aparte al final)
+
+  // v90: cuando "finiquito aparte" está ON, forzar indemAcumulada = true (siempre se paga al final)
+  useEffect(() => {
+    if (finiquitoAparte && !indemAcumulada) setIndemAcumulada(true);
+  }, [finiquitoAparte]);
+  const perfilCargadoRef = useRef(false); // v87: marca si el usuario cargó un perfil (para no sobreescribir sus toggles)
+  const modosToggleadoManualRef = useRef({ vac: false, ind: false }); // v87: si el user tocó el toggle a mano, respetarlo
+  const [hxPorRodaje40,    setHxPorRodaje40]   = useState(false); // v59: solo 40H, 1 HX por día de rodaje del calendario
+  const [mostrarFestivosLegacy, setMostrarFestivosLegacy] = useState(false); // v62: panel viejo festivos oculto por defecto si hay calendario
+  const saltarAutoRellenoRef = useRef(false); // v71: cuando acabamos de cargar un perfil, saltamos el próximo auto-relleno
+
+  const [festivosComunidadCal, setFestivosComunidadCal] = useState([]); // v63: fechas de festivos de la comunidad del calendario del proyecto
+
+  // v87: cuando el calendario del proyecto se carga (o cambia), aplicar los modos por defecto
+  // SOLO si el usuario no ha cargado un perfil ni ha tocado los toggles a mano
+  useEffect(() => {
+    const cal = proyectoActivoCtx?.__calendario;
+    if (!cal) return;
+    if (perfilCargadoRef.current) return; // hay perfil cargado, no tocar
+    const modoVacProy = cal.modo_vacaciones === "al_final";
+    const modoIndProy = cal.modo_indemnizacion === "al_final";
+    if (!modosToggleadoManualRef.current.vac) setVacAcumulada(modoVacProy);
+    if (!modosToggleadoManualRef.current.ind) setIndemAcumulada(modoIndProy);
+  }, [proyectoActivoCtx?.__calendario?.id, proyectoActivoCtx?.__calendario?.modo_vacaciones, proyectoActivoCtx?.__calendario?.modo_indemnizacion]);
+
+  // v63: cargar festivos de la comunidad del calendario del proyecto activo
+  useEffect(() => {
+    (async () => {
+      const cal = proyectoActivoCtx?.__calendario;
+      if (!cal?.comunidad) { setFestivosComunidadCal([]); return; }
+      try {
+        const lista = await listarFestivosSupabase(cal.comunidad);
+        setFestivosComunidadCal((lista || []).map(f => f.fecha));
+      } catch { setFestivosComunidadCal([]); }
+    })();
+  }, [proyectoActivoCtx?.__calendario?.id, proyectoActivoCtx?.__calendario?.comunidad]);
+
+  // v71/v73: recalcular horas/JE/festivos/vacaciones desde el calendario y aplicar (sobrescribiendo)
+  const aplicarCalendarioAhora = () => {
+    const p = calcularPeriodo(fechaInicio, fechaFin);
+    if (!p) return;
+    const cal = proyectoActivoCtx?.__calendario;
+    if (!cal || !cal.dias) return;
+    const n = p.desglose.length;
+
+    // Horas por mes (SIN JE — las JE van aparte)
+    let contadoresHoras;
+    if (es40h) {
+      if (hxPorRodaje40) {
+        contadoresHoras = contarDiasCalendarioPorMes(cal, "rodaje", fechaInicio, fechaFin, festivosComunidadCal);
+      } else {
+        contadoresHoras = {};
+      }
+    } else {
+      contadoresHoras = contarDiasCalendarioPorMes(cal, "laboral", fechaInicio, fechaFin, festivosComunidadCal);
+    }
+    const nuevasHoras = mapearContadoresADesglose(p.desglose, contadoresHoras);
+
+    // Jornadas especiales (aparte)
+    let contadoresJE;
+    if (es40h && !hxPorRodaje40) contadoresJE = {};
+    else contadoresJE = contarDiasCalendarioPorMes(cal, "especial", fechaInicio, fechaFin, festivosComunidadCal);
+    const nuevasJE = mapearContadoresADesglose(p.desglose, contadoresJE);
+
+    // Festivos trabajados
+    const festTrabajadosPorMes = {};
+    for (const [fecha, info] of Object.entries(cal.dias || {})) {
+      if (fecha < fechaInicio || fecha > fechaFin) continue;
+      if (!info?.festivo_trabajado) continue;
+      const ym = fecha.slice(0, 7);
+      festTrabajadosPorMes[ym] = (festTrabajadosPorMes[ym] || 0) + 1;
+    }
+    const nuevosFestivos = mapearContadoresADesglose(p.desglose, festTrabajadosPorMes);
+
+    // Vacaciones
+    const vacacionesPorMes = {};
+    for (const [fecha, info] of Object.entries(cal.dias || {})) {
+      if (fecha < fechaInicio || fecha > fechaFin) continue;
+      if (!info?.vacaciones) continue;
+      const ym = fecha.slice(0, 7);
+      vacacionesPorMes[ym] = (vacacionesPorMes[ym] || 0) + 1;
+    }
+    const nuevasVac = mapearContadoresADesglose(p.desglose, vacacionesPorMes);
+
+    if (es40h && !hxPorRodaje40) {
+      // no cambiar horas ni JE
+    } else {
+      setHorasPorMes(nuevasHoras);
+      setJornadasEspecialesPorMes(nuevasJE);
+    }
+    setFestivosPorMes(nuevosFestivos);
+    setVacDiasPorMes(nuevasVac);
+    return true;
+  };
+
+  // v71: detectar si el perfil cargado difiere de lo que dictaría el calendario
+  const hayDiferenciasConCalendario = (() => {
+    const cal = proyectoActivoCtx?.__calendario;
+    if (!cal || !cal.dias || Object.keys(cal.dias).length === 0) return false;
+    if (!fechaInicio || !fechaFin) return false;
+    const p = calcularPeriodo(fechaInicio, fechaFin);
+    if (!p) return false;
+
+    // Calcular lo esperado (HX SIN JE)
+    let contadoresHorasEsperados;
+    if (es40h) {
+      if (hxPorRodaje40) {
+        contadoresHorasEsperados = contarDiasCalendarioPorMes(cal, "rodaje", fechaInicio, fechaFin, festivosComunidadCal);
+      } else {
+        contadoresHorasEsperados = null;
+      }
+    } else {
+      contadoresHorasEsperados = contarDiasCalendarioPorMes(cal, "laboral", fechaInicio, fechaFin, festivosComunidadCal);
+    }
+
+    if (contadoresHorasEsperados !== null) {
+      const horasEsperadas = mapearContadoresADesglose(p.desglose, contadoresHorasEsperados);
+      for (let i = 0; i < horasEsperadas.length; i++) {
+        if ((horasPorMes[i] || 0) !== (horasEsperadas[i] || 0)) return true;
+      }
+    }
+
+    // JE (aparte)
+    let contadoresJEEsperados;
+    if (es40h && !hxPorRodaje40) contadoresJEEsperados = null;
+    else contadoresJEEsperados = contarDiasCalendarioPorMes(cal, "especial", fechaInicio, fechaFin, festivosComunidadCal);
+    if (contadoresJEEsperados !== null) {
+      const jeEsperadas = mapearContadoresADesglose(p.desglose, contadoresJEEsperados);
+      for (let i = 0; i < jeEsperadas.length; i++) {
+        if ((jornadasEspecialesPorMes[i] || 0) !== (jeEsperadas[i] || 0)) return true;
+      }
+    }
+
+    // Festivos
+    const festTrabajadosPorMes = {};
+    for (const [fecha, info] of Object.entries(cal.dias || {})) {
+      if (fecha < fechaInicio || fecha > fechaFin) continue;
+      if (!info?.festivo_trabajado) continue;
+      const ym = fecha.slice(0, 7);
+      festTrabajadosPorMes[ym] = (festTrabajadosPorMes[ym] || 0) + 1;
+    }
+    const festEsperados = mapearContadoresADesglose(p.desglose, festTrabajadosPorMes);
+    for (let i = 0; i < festEsperados.length; i++) {
+      if ((festivosPorMes[i] || 0) !== (festEsperados[i] || 0)) return true;
+    }
+
+    // Vacaciones
+    const vacacionesPorMes = {};
+    for (const [fecha, info] of Object.entries(cal.dias || {})) {
+      if (fecha < fechaInicio || fecha > fechaFin) continue;
+      if (!info?.vacaciones) continue;
+      const ym = fecha.slice(0, 7);
+      vacacionesPorMes[ym] = (vacacionesPorMes[ym] || 0) + 1;
+    }
+    const vacEsperadas = mapearContadoresADesglose(p.desglose, vacacionesPorMes);
+    for (let i = 0; i < vacEsperadas.length; i++) {
+      if ((vacDiasPorMes[i] || 0) !== (vacEsperadas[i] || 0)) return true;
+    }
+
+    return false;
+  })();
+  const [plusHerramienta,  setPlusHerramienta] = useState({ importe: 0, modo: "mes" });
+  const [plusCoche,        setPlusCoche]       = useState({ importe: 0, modo: "mes" });
+  const [plusVivienda,     setPlusVivienda]    = useState({ importe: 0, modo: "mes" });
+  const [plusSeguroVida,   setPlusSeguroVida]  = useState({ importe: 0 });
+  const [plusComida,       setPlusComida]      = useState({ importeDia: 0 });
+  const [comidaDiasPorMes, setComidaDiasPorMes]= useState([]);
+
+  // === Estados para los modales de exportación ===
+  const [modalCSV, setModalCSV]   = useState(null);  // { contenido, filename } o null
+  const [exportError, setExportError] = useState(null); // mensaje de error visible
+  const [modalPDF, setModalPDF]   = useState(false); // boolean: mostrar vista PDF en pantalla completa
+
+  const [periodo, setPeriodo] = useState(null);
+
+  useEffect(() => {
+    const p = calcularPeriodo(fechaInicio, fechaFin);
+    setPeriodo(p);
+    // v71: si acabamos de cargar un perfil, no autorrellenamos (respeta los valores guardados)
+    if (saltarAutoRellenoRef.current) {
+      saltarAutoRellenoRef.current = false;
+      return;
+    }
+    if (p) {
+      const n = p.desglose.length;
+      const cal = proyectoActivoCtx?.__calendario;
+      const hayCalendario = cal && cal.dias && Object.keys(cal.dias).length > 0;
+
+      // v59/v73: si hay calendario, autorrellenar horas, JE y festivos desde el calendario del proyecto
+      if (hayCalendario) {
+        // v73: las JE se cuentan APARTE (ya no se suman a horasPorMes). Van a jornadasEspecialesPorMes.
+        let contadoresHoras;
+        if (es40h) {
+          if (hxPorRodaje40) {
+            // 40H con checkbox: HX = días de rodaje (SIN JE, van aparte)
+            contadoresHoras = contarDiasCalendarioPorMes(cal, "rodaje", fechaInicio, fechaFin, festivosComunidadCal);
+          } else {
+            contadoresHoras = {}; // no auto-rellenar
+          }
+        } else {
+          // 45H: HX = días laborales (SIN JE, van aparte)
+          contadoresHoras = contarDiasCalendarioPorMes(cal, "laboral", fechaInicio, fechaFin, festivosComunidadCal);
+        }
+        const nuevasHoras = mapearContadoresADesglose(p.desglose, contadoresHoras);
+
+        // v73: Jornadas especiales aparte (aplican a 45H siempre y a 40H si el checkbox está activo)
+        let contadoresJE;
+        if (es40h && !hxPorRodaje40) {
+          contadoresJE = {}; // en 40H sin checkbox, no auto-rellenar JE
+        } else {
+          contadoresJE = contarDiasCalendarioPorMes(cal, "especial", fechaInicio, fechaFin, festivosComunidadCal);
+        }
+        const nuevasJE = mapearContadoresADesglose(p.desglose, contadoresJE);
+
+        // Festivos trabajados por mes (aplica siempre)
+        const festTrabajadosPorMes = {};
+        for (const [fecha, info] of Object.entries(cal.dias || {})) {
+          if (fecha < fechaInicio || fecha > fechaFin) continue;
+          if (!info?.festivo_trabajado) continue;
+          const ym = fecha.slice(0, 7);
+          festTrabajadosPorMes[ym] = (festTrabajadosPorMes[ym] || 0) + 1;
+        }
+        const nuevosFestivos = mapearContadoresADesglose(p.desglose, festTrabajadosPorMes);
+
+        // v63: vacaciones del calendario por mes → vacDiasPorMes
+        const vacacionesPorMes = {};
+        for (const [fecha, info] of Object.entries(cal.dias || {})) {
+          if (fecha < fechaInicio || fecha > fechaFin) continue;
+          if (!info?.vacaciones) continue;
+          const ym = fecha.slice(0, 7);
+          vacacionesPorMes[ym] = (vacacionesPorMes[ym] || 0) + 1;
+        }
+        const nuevasVac = mapearContadoresADesglose(p.desglose, vacacionesPorMes);
+
+        // En 40H sin checkbox: no tocamos horas (deja lo que había o vacío)
+        if (es40h && !hxPorRodaje40) {
+          setHorasPorMes(prev => Array.from({ length: n }, (_, i) => prev[i] ?? 0));
+          setJornadasEspecialesPorMes(prev => Array.from({ length: n }, (_, i) => prev[i] ?? 0));
+        } else {
+          setHorasPorMes(nuevasHoras);
+          setJornadasEspecialesPorMes(nuevasJE);
+        }
+        setFestivosPorMes(nuevosFestivos);
+        setVacDiasPorMes(nuevasVac);
+        setComidaDiasPorMes(prev => Array.from({ length: n }, (_, i) => prev[i] ?? null));
+      } else {
+        // Comportamiento original si no hay calendario
+        setHorasPorMes(prev => Array.from({ length: n }, (_, i) => {
+          if (prev[i] !== undefined && prev[i] !== null && prev[i] !== "") return prev[i];
+          return Math.round((p.desglose[i]?.semanasLaborables || 0) * 5);
+        }));
+        setVacDiasPorMes(prev    => Array.from({ length: n }, (_, i) => prev[i] ?? 0));
+        setComidaDiasPorMes(prev => Array.from({ length: n }, (_, i) => prev[i] ?? null));
+        setJornadasEspecialesPorMes(prev => Array.from({ length: n }, (_, i) => prev[i] ?? 0));
+      }
+    }
+  }, [fechaInicio, fechaFin, proyectoActivoCtx?.__calendario?.id, es40h, hxPorRodaje40, festivosComunidadCal]);
+
+  // v61: cuando llega el calendario del proyecto, precargar fechas si el usuario NO ha tocado nada
+  // (para evitar sobrescribir un perfil cargado o cambios manuales)
+  const [fechasInicializadasDesdeCal, setFechasInicializadasDesdeCal] = useState(false);
+  useEffect(() => {
+    const cal = proyectoActivoCtx?.__calendario;
+    if (!cal || !cal.fecha_inicio || !cal.fecha_fin) return;
+    if (fechasInicializadasDesdeCal) return;
+    // Solo si las fechas siguen siendo las de por defecto (no las han cambiado)
+    if (fechaInicio === "2026-01-05" && fechaFin === "2026-03-20") {
+      setFechaInicio(cal.fecha_inicio);
+      setFechaFin(cal.fecha_fin);
+      setFechasInicializadasDesdeCal(true);
+    }
+  }, [proyectoActivoCtx?.__calendario?.id]);
+
+  // v61: validación segura de fechas — evita cuelgues por typos (ej. año 22026) y respeta rango del calendario
+  const RANGO_MAX_ANIOS = 2; // límite duro entre inicio y fin
+
+  const validarFechaContraCalendario = (nuevaFecha) => {
+    const cal = proyectoActivoCtx?.__calendario;
+    if (!cal || !cal.fecha_inicio || !cal.fecha_fin) return { ok: true };
+    if (nuevaFecha < cal.fecha_inicio || nuevaFecha > cal.fecha_fin) {
+      return { ok: false, motivo: `La fecha está fuera del rango del calendario (${cal.fecha_inicio} → ${cal.fecha_fin})` };
+    }
+    return { ok: true };
+  };
+
+  const validarRangoDuro = (fIni, fFin) => {
+    if (!fIni || !fFin) return { ok: true };
+    // Formato válido YYYY-MM-DD
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(fIni) || !/^\d{4}-\d{2}-\d{2}$/.test(fFin)) return { ok: true }; // aún tecleando
+    const anioI = parseInt(fIni.slice(0, 4), 10);
+    const anioF = parseInt(fFin.slice(0, 4), 10);
+    if (anioI < 2000 || anioI > 2100) return { ok: false, motivo: `Año de inicio fuera de rango razonable (${anioI})` };
+    if (anioF < 2000 || anioF > 2100) return { ok: false, motivo: `Año de fin fuera de rango razonable (${anioF})` };
+    if (fIni > fFin) return { ok: false, motivo: "La fecha de inicio no puede ser posterior a la de fin" };
+    const dI = new Date(fIni + "T12:00:00");
+    const dF = new Date(fFin + "T12:00:00");
+    const diffMs = dF - dI;
+    const diffAnios = diffMs / (365.25 * 24 * 60 * 60 * 1000);
+    if (diffAnios > RANGO_MAX_ANIOS) {
+      return { ok: false, motivo: `El rango entre inicio y fin supera los ${RANGO_MAX_ANIOS} años (posible error de tecleo)` };
+    }
+    return { ok: true };
+  };
+
+  const setFechaInicioSeguro = (nueva) => {
+    // v63: onChange nunca bloquea (permite escribir libremente). La validación se hace en onBlur.
+    setFechaInicio(nueva);
+  };
+
+  const setFechaFinSeguro = (nueva) => {
+    setFechaFin(nueva);
+  };
+
+  // v139: al activar, vacía las fechas (cálculos a "—"); al desactivar, restaura las últimas válidas
+  const togglearFechasPendientes = (activar) => {
+    if (activar) {
+      if (fechaInicio) setFechaInicioAnterior(fechaInicio);
+      if (fechaFin) setFechaFinAnterior(fechaFin);
+      setFechaInicio("");
+      setFechaFin("");
+    } else {
+      setFechaInicio(fechaInicioAnterior || proyectoActivoCtx?.__calendario?.fecha_inicio || "2026-01-05");
+      setFechaFin(fechaFinAnterior || proyectoActivoCtx?.__calendario?.fecha_fin || "2026-03-20");
+    }
+    setFechasPendientes(activar);
+  };
+
+  // v63: validar al perder el foco (blur). Si falla, avisar y revertir a valor válido más cercano.
+  const [fechaInicioAnterior, setFechaInicioAnterior] = useState(fechaInicio);
+  const [fechaFinAnterior, setFechaFinAnterior] = useState(fechaFin);
+
+  const validarFechaInicioBlur = (nueva) => {
+    if (fechasPendientes) return; // v139: sin fechas, no se valida
+    if (!nueva || !/^\d{4}-\d{2}-\d{2}$/.test(nueva)) { setFechaInicio(fechaInicioAnterior); return; }
+    const anio = parseInt(nueva.slice(0, 4), 10);
+    if (anio < 2000 || anio > 2100) { alert("Año fuera de rango razonable"); setFechaInicio(fechaInicioAnterior); return; }
+    const v1 = validarFechaContraCalendario(nueva);
+    if (!v1.ok) { alert(v1.motivo); setFechaInicio(fechaInicioAnterior); return; }
+    const v2 = validarRangoDuro(nueva, fechaFin);
+    if (!v2.ok) { alert(v2.motivo); setFechaInicio(fechaInicioAnterior); return; }
+    setFechaInicioAnterior(nueva);
+  };
+
+  const validarFechaFinBlur = (nueva) => {
+    if (fechasPendientes) return; // v139: sin fechas, no se valida
+    if (!nueva || !/^\d{4}-\d{2}-\d{2}$/.test(nueva)) { setFechaFin(fechaFinAnterior); return; }
+    const anio = parseInt(nueva.slice(0, 4), 10);
+    if (anio < 2000 || anio > 2100) { alert("Año fuera de rango razonable"); setFechaFin(fechaFinAnterior); return; }
+    const v1 = validarFechaContraCalendario(nueva);
+    if (!v1.ok) { alert(v1.motivo); setFechaFin(fechaFinAnterior); return; }
+    const v2 = validarRangoDuro(fechaInicio, nueva);
+    if (!v2.ok) { alert(v2.motivo); setFechaFin(fechaFinAnterior); return; }
+    setFechaFinAnterior(nueva);
+  };
+
+  const p = periodo;
+
+  const FACTOR_HX = FACTOR_BASE / 30 * 7 / 40 * 1.5;
+
+  const K_BASE_45 = FACTOR_BASE * (1 + 1/DIVISOR_VAC + FACTOR_INDEM_DIA/30);
+  const p45Inverso = (() => {
+    if (!p || !modoInverso45 || !(horasRef > 0)) return null;
+    const divRef = 1 + FACTOR_HX * horasRef;
+    const K_total = p.desglose.reduce((sum, d, i) => {
+      const H = horasPorMes[i] || 0;
+      const k = Math.max((d.fraccion * K_BASE_45 + FACTOR_HX * H) / divRef, d.fraccion);
+      return sum + k;
+    }, 0);
+    if (K_total <= 0) return null;
+    return (objetivoSemanal45 * p.semanasTotales) / K_total;
+  })();
+  const salario45efectivo = modoInverso45 && p45Inverso ? p45Inverso : (Number(salario45) || 0);
+
+  const divisorRef = 1 + FACTOR_HX * (horasRef || 1);
+  const p40ref     = salario45efectivo / divisorRef;
+
+  // ===== CÁLCULO BASE / VAC / INDEM =====
+  // En 45H: Base = P40 × 0,89286 (factor jornada 40/45)
+  // En 40H: Base = Salario_pactado / 1,119996 (descomposición directa)
+  // v47: en 40H con fijo discontinuo, cambia el factor de indemnización (1,6433333 en vez de 0,98632)
+  // y también el divisor 40H para que Base + Vac + Indem siga dando el salario pactado
+  const factorIndemActivo = (es40h && esFijoDiscontinuo) ? FACTOR_INDEM_FIJO_DISC : FACTOR_INDEM_DIA;
+  // v90: si finiquitoAparte, el divisor NO incluye el término de indem (base+vac = salario pactado; indem se paga aparte)
+  const DIVISOR_40H_ACTIVO = finiquitoAparte
+    ? (1 + 1/DIVISOR_VAC)                              // v90: sin indem
+    : (1 + 1/DIVISOR_VAC + factorIndemActivo/30);       // comportamiento actual
+  const baseRef    = es40h
+    ? (Number(salario45) || 0) / DIVISOR_40H_ACTIVO
+    : p40ref * FACTOR_BASE;
+  const vacRef     = baseRef / DIVISOR_VAC;
+  const indemRef   = (baseRef / 30) * factorIndemActivo;
+  const vHora      = (baseRef / 30 * 7) / 40;
+  const vHoraEx    = vHora * 1.5;
+  const hxRef      = vHoraEx * (horasRef || 0);
+  // sumaRef solo se usa en 45H (incluye h.extra). En 40H no aplica
+  const sumaRef    = baseRef + vacRef + indemRef + hxRef;
+  const salarioDia = baseRef / 30;
+
+  // v150: precio de la hora extra "over 45h". Fórmula distinta de la ordinaria:
+  // parte del salario pactado ÍNTEGRO (no de la base 40h) y divide entre 45 (no 40).
+  //   salario45 / 30 * 7 / 45 * 1,5
+  // Sale más caro que la hora ordinaria; es el precio que se negocia aparte para
+  // las horas que superan las que marca el calendario. No toca el cálculo vigente.
+  const over45PrecioCalc = es40h ? 0 : ((Number(salario45) || 0) / 30 * 7 / 45) * 1.5;
+  const over45Precio = es40h ? 0
+    : (over45PrecioManual !== "" && over45PrecioManual !== null && !isNaN(parseFloat(over45PrecioManual))
+        ? parseFloat(over45PrecioManual)
+        : over45PrecioCalc);
+  const over45Aplica = !es40h && over45Activo;
+  const over45HorasMes = (i) => over45Aplica ? (Number(over45PorMes[i]) || 0) : 0;
+  const totalOver45Horas = p ? p.desglose.reduce((s,_,i)=>s+over45HorasMes(i), 0) : 0;
+  const totalOver45Importe = totalOver45Horas * over45Precio;
+
+  // v150: valor del festivo trabajado. Ordinario = salarioDia (base 40h) x 1,75.
+  // Pactado = salario pactado ÍNTEGRO / 30 x 1,75. Solo en 45H.
+  const festPactadoPrecioCalc = es40h ? 0 : ((Number(salario45) || 0) / 30) * 1.75;
+  const festPactadoAplica = !es40h && festPactadoActivo;
+  const valorFestivoOrdinario = salarioDia * 1.75;
+  const valorFestivo45 = festPactadoAplica
+    ? ((festPactadoPrecioManual !== "" && festPactadoPrecioManual !== null && !isNaN(parseFloat(festPactadoPrecioManual)))
+        ? parseFloat(festPactadoPrecioManual)
+        : festPactadoPrecioCalc)
+    : valorFestivoOrdinario;
+
+  const rawMes45 = p ? p.desglose.map((d, i) => ({
+    vac40:   vacRef   * d.fraccion,
+    indem40: indemRef * d.fraccion,
+  })) : [];
+  const totalVac45   = rawMes45.reduce((s,m)=>s+m.vac40,   0);
+  const totalIndem45 = rawMes45.reduce((s,m)=>s+m.indem40, 0);
+
+  const importeVdMes  = p ? p.desglose.map((d,i) => (vacDiasPorMes[i]||0) * salarioDia) : [];
+  const totalVdImporte= importeVdMes.reduce((s,v)=>s+v, 0);
+  const totalVdDias   = vacDiasPorMes.reduce((s,v)=>s+(v||0), 0);
+
+  const n = p ? p.desglose.length : 0;
+  const horasParaMes = (i, d) => {
+    const v = horasPorMes[i];
+    if (v === undefined || v === null || v === "") {
+      return Math.round((d?.semanasLaborables || 0) * 5);
+    }
+    return v || 0;
+  };
+  // v73: Jornadas especiales — importe por mes
+  // Cada JE = 1 HX (festiva si el día es festivo trabajado, normal si no) + 20€ fijos
+  // Para saber cuántas caen en festivo, contamos por mes desde el calendario
+  const jeInfoPorMes = (() => {
+    const cal = proyectoActivoCtx?.__calendario;
+    if (!cal || !cal.dias) {
+      // Sin calendario: asumimos JE normal (no festiva). Solo el contador manual.
+      return (p?.desglose || []).map((d, i) => {
+        const totalJE = jornadasEspecialesPorMes[i] || 0;
+        return { totalJE, jeFestivas: 0, jeNormales: totalJE };
+      });
+    }
+    // Con calendario: contar por mes cuántas JE hay marcadas y cuántas de ellas caen en festivo trabajado
+    const setFest = new Set(festivosComunidadCal || []);
+    const jeFestivasPorMes = {};
+    for (const [fecha, info] of Object.entries(cal.dias || {})) {
+      if (fecha < fechaInicio || fecha > fechaFin) continue;
+      if (!info?.especial) continue;
+      if (setFest.has(fecha) && info.festivo_trabajado) {
+        const ym = fecha.slice(0, 7);
+        jeFestivasPorMes[ym] = (jeFestivasPorMes[ym] || 0) + 1;
+      }
+    }
+    return (p?.desglose || []).map((d, i) => {
+      const totalJE = jornadasEspecialesPorMes[i] || 0;
+      const ym = `${d.anio}-${String(d.mesNum + 1).padStart(2, "0")}`;
+      const jeFestivasCal = jeFestivasPorMes[ym] || 0;
+      const jeFestivas = Math.min(jeFestivasCal, totalJE); // no puede haber más festivas que totales
+      const jeNormales = totalJE - jeFestivas;
+      return { totalJE, jeFestivas, jeNormales };
+    });
+  })();
+
+  const importeJEPorMes = jeInfoPorMes.map(je => {
+    const importeHX = je.jeNormales * vHoraEx + je.jeFestivas * salarioDia * 1.75;
+    const importe20 = je.totalJE * IMPORTE_JORNADA_ESPECIAL;
+    return importeHX + importe20;
+  });
+
+  const desglose45 = p ? p.desglose.map((d, i) => {
+    const hMes      = horasParaMes(i, d);
+    const esUltimo  = i === n - 1;
+    const vacNat    = vacRef   * d.fraccion;
+    const indemNat  = indemRef * d.fraccion;
+    const base40  = baseRef * d.fraccion;
+    const vac40   = vacAcumulada  ? (esUltimo ? totalVac45   : 0) : vacNat;
+    // v90: si finiquitoAparte, indem SIEMPRE va al final (no prorrateada) y no descuenta del pactado mensual
+    const indem40 = (indemAcumulada || finiquitoAparte) ? (esUltimo ? totalIndem45 : 0) : indemNat;
+    const cobroHx = vHoraEx * hMes;
+    // v90: si finiquitoAparte, cobroNatural NO incluye indemNat (para que plusAct no lo descuente del pactado)
+    const cobroNatural = base40 + vacNat + (finiquitoAparte ? 0 : indemNat) + cobroHx;
+    const objetivo     = salario45efectivo * d.fraccion;
+    const plusAct      = Math.max(0, objetivo - cobroNatural);
+    const vdShow   = vacAcumulada ? (esUltimo ? totalVdImporte : 0) : (importeVdMes[i]||0);
+    // v73: importe JE por mes (aparte del pool objetivo)
+    const importeJE = importeJEPorMes[i] || 0;
+    const totalJEDias = jeInfoPorMes[i]?.totalJE || 0;
+    // v150: las horas over 45h van POR ENCIMA del salario pactado, igual que las JE.
+    // Por eso NO entran en cobroNatural: si entraran, reducirían el Plus de Actividad.
+    const over45Horas   = over45HorasMes(i);
+    const over45Importe = over45Horas * over45Precio;
+    const totalMes = base40 + vac40 + indem40 + cobroHx + plusAct - vdShow + importeJE + over45Importe;
+    // v50: Vacación mostrada en pantalla = prorrateada − días disfrutados
+    const vacMostrar = vac40 - vdShow;
+    return {
+      mes: d.mes, desde: d.desde, hasta: d.hasta,
+      esCompleto: d.esCompleto, fraccion: d.fraccion,
+      semanasLab: d.semanasLaborables,
+      hMes, base40, vac40, vacMostrar, indem40, cobroHx, plusAct,
+      vdDias: vacDiasPorMes[i]||0, vdShow,
+      importeJE, totalJEDias, // v73
+      over45Horas, over45Importe, // v150
+      objetivo, totalMes,
+    };
+  }) : [];
+
+  const totBase   = desglose45.reduce((s,d)=>s+d.base40,   0);
+  const totVac    = desglose45.reduce((s,d)=>s+d.vac40,    0);
+  const totVacMostrar = desglose45.reduce((s,d)=>s+d.vacMostrar, 0); // v50: total real percibido
+  const totIndem  = desglose45.reduce((s,d)=>s+d.indem40,  0);
+  const totHx     = desglose45.reduce((s,d)=>s+d.cobroHx,  0);
+  const totPlus   = desglose45.reduce((s,d)=>s+d.plusAct,  0);
+  const totVd     = desglose45.reduce((s,d)=>s+d.vdShow,   0);
+  const totFinal  = desglose45.reduce((s,d)=>s+d.totalMes, 0);
+  const totJEDias = desglose45.reduce((s,d)=>s+(d.totalJEDias||0), 0); // v73
+  const totJEImporte = desglose45.reduce((s,d)=>s+(d.importeJE||0), 0); // v73
+  const totOver45Horas   = desglose45.reduce((s,d)=>s+(d.over45Horas||0), 0);   // v150
+  const totOver45Importe = desglose45.reduce((s,d)=>s+(d.over45Importe||0), 0); // v150
+
+  const complementos45 = p ? p.desglose.map((d, i) => {
+    const calcPlus = (plus) => !plus.importe ? 0 :
+      plus.modo === "sem" ? plus.importe * d.semanasLaborables : plus.importe * d.fraccion;
+    const herramienta = calcPlus(plusHerramienta);
+    const coche       = calcPlus(plusCoche);
+    const vivienda    = calcPlus(plusVivienda);
+    const seguroVida  = (plusSeguroVida.importe || 0) * d.fraccion;
+    const diasLV      = Math.round(d.semanasLaborables * 5);
+    const diasComida  = (comidaDiasPorMes[i] !== null && comidaDiasPorMes[i] !== undefined) ? (comidaDiasPorMes[i]||0) : diasLV;
+    const comida      = (plusComida.importeDia||0) * diasComida;
+    const total       = herramienta + coche + vivienda + seguroVida + comida;
+    return { herramienta, coche, vivienda, seguroVida, comida, diasComida, diasLV, total };
+  }) : [];
+  const totalCompl = complementos45.reduce((s,c)=>s+c.total, 0);
+
+  const importeFestMes45 = p ? p.desglose.map((_,i)=>(festivosPorMes[i]||0)*valorFestivo45) : [];   // v150
+  const totalFestDias45  = festivosPorMes.reduce((s,v)=>s+(v||0),0);
+  const totalFestImport45= importeFestMes45.reduce((s,v)=>s+v,0);
+
+  // ── EXPORTAR CSV (45h) - genera contenido y abre modal ───────────────
+  const exportarCSV45 = () => {
+    if (!p || desglose45.length === 0) return;
+    const sep = ";";
+    const decimal = (n) => parseFloat(n).toFixed(2).replace(".", ",");
+    const lines = [];
+
+    lines.push([`CALCULADORA SALARIAL · ${es40h ? "40 HORAS" : "45 HORAS"}`].join(sep));
+    if (usuarioSesion) {
+      const fechaGen = new Date().toLocaleString("es-ES");
+      lines.push(["Generado por", `${usuarioSesion.nombre} · ${fechaGen}`].join(sep));
+    }
+    lines.push([""].join(sep));
+    lines.push(["Proyecto", proyecto || "—"].join(sep));
+    lines.push(["Productora", productora || "—"].join(sep));
+    lines.push(["Trabajador", nombre || "—"].join(sep));
+    lines.push(["Puesto", puesto || "—"].join(sep));
+    lines.push(["Código Contable", codigoContable || "—"].join(sep));
+    lines.push(["Período", `${fechaInicio} → ${fechaFin}`].join(sep));
+    lines.push([`Salario pactado ${es40h ? "40h" : "45h"} (€/mes)`, decimal(salario45efectivo)].join(sep));
+    if (!es40h) lines.push(["Horas extra de referencia (h/mes)", horasRef].join(sep));
+    lines.push(["P40 equivalente (€/mes)", decimal(p40ref)].join(sep));
+    lines.push(["Días normalizados", p.diasNormalizados].join(sep));
+    lines.push(["Meses totales", decimal(p.mesesTotales)].join(sep));
+    lines.push(["Semanas L-V totales", decimal(p.semanasTotales)].join(sep));
+    lines.push([""].join(sep));
+
+    lines.push(["MODOS DE PAGO"].join(sep));
+    lines.push(["Vacaciones", vacAcumulada ? "Acumuladas al final" : "Prorrateadas"].join(sep));
+    lines.push(["Indemnización", indemAcumulada ? "Acumuladas al final" : "Prorrateadas"].join(sep));
+    lines.push([""].join(sep));
+
+    lines.push(["REFERENCIA MES COMPLETO"].join(sep));
+    lines.push(["Base 40h (€)", decimal(baseRef)].join(sep));
+    lines.push(["Vacaciones (€)", decimal(vacRef)].join(sep));
+    lines.push(["Indemnización (€)", decimal(indemRef)].join(sep));
+    if (!es40h) lines.push([`H.Extra (${horasRef}h) (€)`, decimal(hxRef)].join(sep));
+    lines.push([`Total ≈ ${es40h ? "40" : "P45"} (€)`, decimal(es40h ? (baseRef + vacRef + indemRef) : sumaRef)].join(sep));
+    lines.push([""].join(sep));
+
+    lines.push(["VALORES DE CÁLCULO"].join(sep));
+    lines.push(["Salario / día (€)", decimal(salarioDia)].join(sep));
+    lines.push(["Salario / semana (€)", decimal(salarioDia * 7)].join(sep));
+    lines.push(["Valor hora (€)", decimal(vHora)].join(sep));
+    lines.push(["Hora extra ×1,5 (€)", decimal(vHoraEx)].join(sep));
+    lines.push([festPactadoAplica ? "Festivo pactado (€)" : "Festivo ×1,75 (€)", decimal(valorFestivo45)].join(sep));   // v150
+    lines.push([""].join(sep));
+
+    lines.push(["NÓMINA POR MES"].join(sep));
+    const headers = [
+      "Mes","Fracción","Base 40h €","Vacaciones €","Indemnización €",
+      "H.Extra (h)","H.Extra €",
+      ...(es40h ? [] : ["Plus Actividad €"]),
+      "Vac. disfr. (días)","Vac. disfr. €",
+      "Festivos (días)","Festivos €",
+      "Jorn. Especiales (días)","Jorn. Especiales €",
+      "Plus Herramienta €","Plus Coche €","Plus Vivienda €",
+      "Plus Seguro Vida €","Días comida","Plus Comida €",
+      "Total mes (€)","Complementos mes (€)","Total mes + complementos (€)"
+    ];
+    lines.push(headers.join(sep));
+    desglose45.forEach((d, i) => {
+      const c = complementos45[i] || {};
+      const totalMesAjustado = es40h ? (d.totalMes - (d.plusAct || 0)) : d.totalMes;
+      lines.push([
+        d.mes + (d.esCompleto ? "" : ` (${d.desde}-${d.hasta})`),
+        decimal(d.fraccion),
+        decimal(d.base40),
+        decimal(d.vac40),
+        decimal(d.indem40),
+        d.hMes,
+        decimal(d.cobroHx),
+        ...(es40h ? [] : [decimal(d.plusAct)]),
+        d.vdDias,
+        decimal(d.vdShow),
+        festivosPorMes[i] || 0,
+        decimal(importeFestMes45[i] || 0),
+        d.totalJEDias || 0,
+        decimal(d.importeJE || 0),
+        decimal(c.herramienta || 0),
+        decimal(c.coche || 0),
+        decimal(c.vivienda || 0),
+        decimal(c.seguroVida || 0),
+        c.diasComida || 0,
+        decimal(c.comida || 0),
+        decimal(totalMesAjustado - (d.importeJE || 0)),
+        decimal(c.total || 0),
+        decimal(totalMesAjustado + (c.total || 0)),
+      ].join(sep));
+    });
+    lines.push([""].join(sep));
+
+    lines.push(["TOTALES"].join(sep));
+    lines.push(["Base 40h (€)", decimal(totBase)].join(sep));
+    lines.push(["Vacaciones (€)", decimal(totVac)].join(sep));
+    lines.push(["Indemnización (€)", decimal(totIndem)].join(sep));
+    lines.push([`H.Extra totales (${horasPorMes.reduce((s,v)=>s+(v||0),0)}h) €`, decimal(totHx)].join(sep));
+    if (totPlus > 0 && !es40h) lines.push(["Plus Actividad (€)", decimal(totPlus)].join(sep));
+    if (totVd > 0)   lines.push([`− Vac. disfrutadas (${totalVdDias}d) €`, decimal(totVd)].join(sep));
+    if (totOver45Horas > 0) lines.push([`+ Horas extra over 45h (${totOver45Horas}h) €`, decimal(totOver45Importe)].join(sep));   // v150
+    if (totalFestDias45 > 0) lines.push([`+ Festivos trabajados (${totalFestDias45}d) €`, decimal(totalFestImport45)].join(sep));
+    if (totJEDias > 0)       lines.push([`+ Jornadas especiales (${totJEDias}d) €`, decimal(totJEImporte)].join(sep));
+    if (totalCompl > 0)      lines.push(["+ Complementos (€)", decimal(totalCompl)].join(sep));
+    const totFinalAjustado = es40h ? (totFinal - (totPlus || 0)) : totFinal;
+    lines.push(["TOTAL A PERCIBIR (€)", decimal(totFinalAjustado + totalFestImport45 + totalCompl)].join(sep));
+    lines.push(["Promedio mensual (€)", decimal(totFinalAjustado / p.mesesTotales)].join(sep));
+    lines.push(["Promedio semanal (€)", decimal(totFinalAjustado / p.semanasTotales)].join(sep));
+    lines.push([""].join(sep));
+    lines.push([DISCLAIMER_PDF].join(sep));
+
+    const csv = "\uFEFF" + lines.join("\n");
+    const partes = [proyecto, productora, nombre].filter(Boolean).map(s => s.replace(/[^a-zA-Z0-9]/g, "_"));
+    const filename = (partes.length ? partes.join("_") : "calculadora") + (es40h ? "_40h.csv" : "_45h.csv");
+
+    // Abrir modal con el contenido del CSV
+    setModalCSV({ contenido: csv, filename });
+
+    // Registrar log de exportación
+    if (usuarioSesion) {
+      const detalle = [proyecto, productora, nombre].filter(Boolean).join(" | ") || "(sin datos)";
+      registrarLog(usuarioSesion.nombre, "export_csv", `[${modoTab === "tab40" ? "40H" : "45H"}] ${filename} · ${detalle}`);
+    }
+  };
+
+  // ── EXPORTAR PDF (45h) - muestra vista print y dispara window.print ──
+  const exportarPDF45 = () => {
+    setExportError(null);
+    try {
+      if (!p || desglose45.length === 0) {
+        setExportError("Introduce primero las fechas y datos para generar el documento.");
+        return;
+      }
+
+      // Leer el HTML del componente DocumentoImprimible
+      const docElement = document.getElementById("doc-imprimible-oculto");
+      if (!docElement) {
+        setExportError("No se encuentra el contenido del documento. Recarga la página y vuelve a intentarlo.");
+        return;
+      }
+      const docHTML = docElement.innerHTML;
+      if (!docHTML || docHTML.length < 100) {
+        setExportError("El documento aún no se ha renderizado completamente. Espera 1 segundo y vuelve a intentarlo.");
+        return;
+      }
+
+      const partes = [proyecto, productora, nombre].filter(Boolean).map(s => s.replace(/[^a-zA-Z0-9]/g, "_"));
+      const baseFilename = partes.length ? partes.join("_") : "calculadora";
+      const titulo = [proyecto, productora, nombre].filter(Boolean).join(" - ") || "Calculadora 45h";
+      // Nombre para el diálogo "Guardar como PDF" (el navegador usa document.title como sugerencia)
+      const tituloPDF = baseFilename + (es40h ? "_40h" : "_45h");
+
+      // Plantilla HTML completa
+      const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>${tituloPDF}</title>
+<style>
+  body {
+    background: #fff;
+    margin: 0;
+    padding: 8mm 10mm;
+    font-family: 'Courier Prime', 'Courier New', monospace;
+    color: #1a1a1a;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    font-size: 10px;
+  }
+  .toolbar {
+    position: fixed;
+    top: 12px;
+    right: 12px;
+    display: flex;
+    gap: 8px;
+    z-index: 9999;
+  }
+  .toolbar button {
+    background: #1a1a1a;
+    color: #f5ead8;
+    border: none;
+    border-radius: 5px;
+    padding: 10px 18px;
+    font-family: 'Courier Prime', 'Courier New', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  }
+  .toolbar button:hover { background: #4ec9b8; }
+  .info {
+    background: #fdf8f0;
+    border: 1px solid #d5d9dc;
+    border-radius: 6px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    font-size: 11px;
+    color: #555;
+    line-height: 1.5;
+  }
+  .info b { color: #4ec9b8; }
+  .autor-box {
+    text-align: right;
+    font-size: 9px;
+    color: #888;
+    padding: 4px 0;
+    margin-bottom: 8px;
+    border-bottom: 1px dotted #d5d9dc;
+    letter-spacing: 0.05em;
+  }
+  .autor-box b { color: #1a1a1a; }
+
+  /* === BORDES DE TABLAS EN PDF === */
+  /* Garantiza que todas las tablas tengan bordes visibles al imprimir */
+  table {
+    border-collapse: collapse !important;
+    width: 100%;
+  }
+  table, table th, table td {
+    border: 1px solid #c0bcb5 !important;
+  }
+  table th {
+    border-bottom: 1.5px solid #888 !important;
+  }
+  /* Pequeñas excepciones: tablas dentro de cards (header del documento, etc.)
+     mantienen su look pero con bordes más sutiles */
+  table th, table td {
+    padding: 5px 7px !important;
+  }
+
+  @media print {
+    .toolbar, .info { display: none !important; }
+    body { padding: 0; }
+    @page { size: A4 portrait; margin: 8mm 10mm; }
+    /* Forzar que los bordes se impriman aunque el navegador intente optimizarlos */
+    table, table th, table td {
+      border: 1px solid #888 !important;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="toolbar">
+  <button onclick="guardarHTML()">💾 Guardar HTML</button>
+  <button onclick="window.print()">⎙ Imprimir / Guardar PDF</button>
+  <button onclick="window.close()">✕ Cerrar</button>
+</div>
+<div class="info">
+  <b>📄 Versión imprimible — ${titulo}</b><br>
+  <b>Guardar HTML</b>: descarga esta página como archivo <code>.html</code> (para archivar o compartir).<br>
+  <b>Imprimir / Guardar PDF</b>: abre el diálogo del navegador; elige "Guardar como PDF" como destino.<br>
+  <b>Ajustes recomendados:</b> Márgenes Por defecto · Escala Predeterminado · Activa "Gráficos en segundo plano".
+</div>
+${usuarioSesion ? `<div class="autor-box">Generado por <b>${usuarioSesion.nombre}</b> · ${new Date().toLocaleString("es-ES")}</div>` : ""}
+${docHTML}
+<script>
+  // v89: forzar document.title al cargar y antes de imprimir
+  // (el navegador usa document.title como sugerencia de nombre al guardar como PDF)
+  document.title = ${JSON.stringify(tituloPDF)};
+  window.addEventListener("beforeprint", function() {
+    document.title = ${JSON.stringify(tituloPDF)};
+  });
+  window.addEventListener("afterprint", function() {
+    document.title = ${JSON.stringify(tituloPDF)};
+  });
+  // Reforzar cada vez que la ventana recobra foco (por si el navegador cambió el título)
+  window.addEventListener("focus", function() {
+    document.title = ${JSON.stringify(tituloPDF)};
+  });
+
+  // Guardar la página actual como archivo HTML
+  function guardarHTML() {
+    try {
+      var html = "<!DOCTYPE html>\\n" + document.documentElement.outerHTML;
+      var blob = new Blob([html], { type: "text/html;charset=utf-8" });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement("a");
+      a.href = url;
+      a.download = ${JSON.stringify(baseFilename + (es40h ? "_40h.html" : "_45h.html"))};
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(function(){ URL.revokeObjectURL(url); }, 2000);
+    } catch(e) { alert("No se pudo guardar el HTML: " + e.message); }
+  }
+</script>
+</body>
+</html>`;
+
+      // v90: abrir con document.write en vez de blob URL para que el navegador use document.title
+      // como nombre de archivo (blob URLs los ignoran y usan el UUID del blob).
+      const nuevaVentana = window.open("", "_blank");
+      if (!nuevaVentana) {
+        // Bloqueado por popup: fallback a descarga con blob
+        const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = baseFilename + (es40h ? "_40h.html" : "_45h.html");
+        a.style.display = "none";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 30000);
+        setExportError({ tipo: "aviso", mensaje: "⚠ El navegador bloqueó la ventana emergente. Se ha descargado el HTML. Permite ventanas emergentes para esta web y el PDF se abrirá directamente." });
+      } else {
+        nuevaVentana.document.open();
+        nuevaVentana.document.write(html);
+        nuevaVentana.document.close();
+      }
+
+      // Confirmación visual breve
+      setExportError({ tipo: "ok", mensaje: `✓ Descargando: ${baseFilename}${es40h ? "_40h.html" : "_45h.html"}` });
+      setTimeout(() => setExportError(null), 4000);
+
+      // Registrar log de exportación
+      if (usuarioSesion) {
+        const detalle = [proyecto, productora, nombre].filter(Boolean).join(" | ") || "(sin datos)";
+        registrarLog(usuarioSesion.nombre, "export_pdf", `[${modoTab === "tab40" ? "40H" : "45H"}] ${baseFilename}${es40h ? "_40h.html" : "_45h.html"} · ${detalle}`);
+      }
+    } catch (e) {
+      console.error("Error al exportar:", e);
+      setExportError("Error al generar el archivo: " + (e?.message || String(e)));
+    }
+  };
+
+  return (
+    <div style={{ color:"#1a1a1a", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", padding:"32px 32px" }}>
+
+      {/* v113: Header rediseñado con logo Bdprodtools + Payroll cost calculator + botones nueva estética */}
+      <div style={{ maxWidth:2100, margin:"0 auto 24px" }}>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center",
+                      background:"#1a1a1a", borderRadius:10, padding:"24px 28px",
+                      border: "1px solid rgba(255,255,255,0.05)" }}>
+          {/* Logo Bdprodtools real */}
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <img src="/logo.png" alt="Bdprodtools" style={{ height: 80, width: "auto" }} />
+          </div>
+          <div style={{ textAlign:"right" }}>
+            <div style={{ fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontSize:14, letterSpacing:"0.18em", color:"#4ec9b8", textTransform:"uppercase", fontWeight: 700, marginBottom:6 }}>Desglose Salarial · {es40h ? "40 Horas" : "45 Horas"}</div>
+            <div style={{ fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontSize:24, fontWeight:500, letterSpacing:"-0.01em", color:"#f0f0f0" }}>Payroll cost calculator</div>
+            {(nombre||puesto) && <div style={{ fontFamily: "'Inter', sans-serif", fontSize:12, color:"#888", marginTop:6 }}>{[nombre,puesto].filter(Boolean).join(" · ")}</div>}
+            <div className="no-print" style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 14, justifyContent: "flex-end", alignItems: "center" }}>
+              {/* v138: modo edición — guardar encima de la tarjeta abierta o salir */}
+              {perfilEnEdicionEstado && (
+                <div style={{ display: "flex", alignItems: "center", gap: 6, background: "rgba(78,201,184,0.12)", border: "1px solid rgba(78,201,184,0.35)", borderRadius: 6, padding: "5px 8px", marginRight: 4 }}>
+                  <span style={{ fontSize: 10, color: "#4ec9b8", fontWeight: 600, letterSpacing: "0.03em", maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    Editando: {perfilEnEdicionEstado.nombre}
+                  </span>
+                  <button
+                    onClick={async () => { if (accionesPerfiles?.modificarPerfilActivo) await accionesPerfiles.modificarPerfilActivo(); }}
+                    style={{ padding: "6px 12px", fontSize: 11, fontFamily: "'Inter', sans-serif", borderRadius: 5, cursor: "pointer", fontWeight: 600, border: "none", background: "#4ec9b8", color: "#0a0a0a" }}
+                    title="Guardar los cambios encima de este mismo perfil"
+                  >Guardar cambios</button>
+                  <button
+                    onClick={() => { if (accionesPerfiles?.salirEdicion) accionesPerfiles.salirEdicion(); }}
+                    style={{ padding: "6px 10px", fontSize: 11, fontFamily: "'Inter', sans-serif", borderRadius: 5, cursor: "pointer", fontWeight: 600, border: "1px solid rgba(255,255,255,0.2)", background: "transparent", color: "#ddd" }}
+                    title="Salir del modo edición (los datos siguen en el formulario)"
+                  >Salir</button>
+                </div>
+              )}
+              {/* v113: Cargar (turquesa sólido — acción principal) */}
+              <button
+                onClick={() => { setMostrarModalCargar(true); if (accionesPerfiles?.recargar) accionesPerfiles.recargar(); }}
+                style={{ padding: "8px 14px", fontSize: 11, fontFamily: "'Inter', sans-serif", letterSpacing: "0.03em", borderRadius: 6, cursor: "pointer", fontWeight: 600, border: "none", background: "#4ec9b8", color: "#0a0a0a", display: "flex", alignItems: "center", gap: 5, transition: "background 0.15s" }}
+                onMouseEnter={e => e.currentTarget.style.background = "#5ed9c8"}
+                onMouseLeave={e => e.currentTarget.style.background = "#4ec9b8"}
+                title="Cargar un perfil guardado"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                Cargar
+              </button>
+              {/* Guardar (turquesa outline) */}
+              <button
+                onClick={() => {
+                  const partes = [proyecto, productora, nombre, puesto].filter(Boolean);
+                  const sug = partes.join(" · ") || "Nuevo perfil";
+                  setNombreGuardarModal(sug);
+                  setMostrarModalGuardar(true);
+                }}
+                style={{ padding: "8px 14px", fontSize: 11, fontFamily: "'Inter', sans-serif", letterSpacing: "0.03em", borderRadius: 6, cursor: "pointer", fontWeight: 600, border: "1px solid rgba(78,201,184,0.35)", background: "transparent", color: "#4ec9b8", display: "flex", alignItems: "center", gap: 5, transition: "all 0.15s" }}
+                onMouseEnter={e => { e.currentTarget.style.background = "rgba(78,201,184,0.1)"; e.currentTarget.style.borderColor = "#4ec9b8"; }}
+                onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = "rgba(78,201,184,0.35)"; }}
+                title="Guardar el perfil actual"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                Guardar
+              </button>
+              {/* Importar (gris outline — utilidad) */}
+              <label
+                style={{ padding: "8px 14px", fontSize: 11, fontFamily: "'Inter', sans-serif", letterSpacing: "0.03em", borderRadius: 6, cursor: "pointer", fontWeight: 600, border: "1px solid rgba(255,255,255,0.15)", background: "transparent", color: "#ddd", display: "inline-flex", alignItems: "center", gap: 5, transition: "all 0.15s" }}
+                onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.05)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.3)"; }}
+                onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.15)"; }}
+                title="Importar perfil desde archivo JSON"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Importar
+                <input type="file" accept=".json,application/json" onChange={(e) => { if (accionesPerfiles?.importarDesdeArchivo && e.target.files[0]) { accionesPerfiles.importarDesdeArchivo(e.target.files[0]); e.target.value = ""; } }} style={{ display: "none" }} />
+              </label>
+              {/* JSON (gris outline) */}
+              <button
+                onClick={() => accionesPerfiles?.exportarJSON && accionesPerfiles.exportarJSON()}
+                style={{ padding: "8px 14px", fontSize: 11, fontFamily: "'Inter', sans-serif", letterSpacing: "0.03em", borderRadius: 6, cursor: "pointer", fontWeight: 600, border: "1px solid rgba(255,255,255,0.15)", background: "transparent", color: "#ddd", display: "flex", alignItems: "center", gap: 5, transition: "all 0.15s" }}
+                onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.05)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.3)"; }}
+                onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.15)"; }}
+                title="Descargar el perfil actual como JSON"
+              >JSON</button>
+              {/* Limpiar (naranja outline — destructiva) */}
+              <button
+                onClick={() => {
+                  if (!confirm("¿Vaciar TODOS los campos del perfil actual?\n\nSe perderán los datos no guardados.")) return;
+                  window.location.reload();
+                }}
+                style={{ padding: "8px 14px", fontSize: 11, fontFamily: "'Inter', sans-serif", letterSpacing: "0.03em", borderRadius: 6, cursor: "pointer", fontWeight: 600, border: "1px solid rgba(255,145,0,0.4)", background: "transparent", color: "#ff9100", display: "flex", alignItems: "center", gap: 5, transition: "all 0.15s" }}
+                onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,145,0,0.1)"; e.currentTarget.style.borderColor = "#ff9100"; }}
+                onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = "rgba(255,145,0,0.4)"; }}
+                title="Vaciar todos los campos"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
+                Limpiar
+              </button>
+              {/* Separador */}
+              <span style={{ width: 1, background: "rgba(255,255,255,0.1)", height: 20, margin: "0 4px" }}></span>
+              {/* CSV (azul — exportación) */}
+              <button
+                onClick={exportarCSV45}
+                disabled={!p || desglose45.length === 0}
+                style={{
+                  padding: "8px 14px", fontSize: 11, fontFamily: "'Inter', sans-serif",
+                  letterSpacing: "0.03em", borderRadius: 6,
+                  cursor: (p && desglose45.length) ? "pointer" : "not-allowed", fontWeight: 600,
+                  border: "none",
+                  background: (p && desglose45.length) ? "#2196f3" : "rgba(33,150,243,0.2)",
+                  color: (p && desglose45.length) ? "#fff" : "#666",
+                  opacity: (p && desglose45.length) ? 1 : 0.5,
+                  display: "flex", alignItems: "center", gap: 5,
+                  transition: "background 0.15s",
+                }}
+                onMouseEnter={e => { if (p && desglose45.length) e.currentTarget.style.background = "#42a5f5"; }}
+                onMouseLeave={e => { if (p && desglose45.length) e.currentTarget.style.background = "#2196f3"; }}
+                title="Descargar nómina como CSV (Excel)"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                CSV
+              </button>
+              {/* PDF (rojo — exportación) */}
+              <button
+                onClick={exportarPDF45}
+                disabled={!p || desglose45.length === 0}
+                style={{
+                  padding: "8px 14px", fontSize: 11, fontFamily: "'Inter', sans-serif",
+                  letterSpacing: "0.03em", borderRadius: 6,
+                  cursor: (p && desglose45.length) ? "pointer" : "not-allowed", fontWeight: 600,
+                  border: "none",
+                  background: (p && desglose45.length) ? "#d32f2f" : "rgba(211,47,47,0.2)",
+                  color: (p && desglose45.length) ? "#fff" : "#666",
+                  opacity: (p && desglose45.length) ? 1 : 0.5,
+                  display: "flex", alignItems: "center", gap: 5,
+                  transition: "background 0.15s",
+                }}
+                onMouseEnter={e => { if (p && desglose45.length) e.currentTarget.style.background = "#f44336"; }}
+                onMouseLeave={e => { if (p && desglose45.length) e.currentTarget.style.background = "#d32f2f"; }}
+                title="Abrir vista de PDF (Guardar HTML / Imprimir / Cerrar)"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="14" y2="17"/></svg>
+                PDF
+              </button>
+              {/* Listado (turquesa sólido — acción especial admin) */}
+              {(esAdmin || esCoordinadorApp45) && (
+                <button
+                  onClick={() => setMostrarExportarListado(true)}
+                  style={{
+                    padding: "8px 14px", fontSize: 11, fontFamily: "'Inter', sans-serif",
+                    letterSpacing: "0.03em", borderRadius: 6,
+                    cursor: "pointer", fontWeight: 700,
+                    border: "none",
+                    background: "#4ec9b8",
+                    color: "#0a0a0a",
+                    display: "flex", alignItems: "center", gap: 5,
+                    transition: "background 0.15s",
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = "#5ed9c8"}
+                  onMouseLeave={e => e.currentTarget.style.background = "#4ec9b8"}
+                  title="Exportar listado de perfiles del proyecto a Excel/CSV"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                  Listado
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="print-grid" style={{ maxWidth:2100, margin:"0 auto", display:"grid", gridTemplateColumns:"340px minmax(0, 1fr)", gap:20 }}>
+
+        {/* COLUMNA IZQUIERDA */}
+        <div className="no-print">
+
+          <GestorPerfiles
+            tabId={modoTab === "tab40" ? "40h" : "45h"}
+            onRegistrarAcciones={setAccionesPerfiles}
+            onPerfilesActualizados={setPerfilesLista}
+            onPerfilEnEdicionCambio={setPerfilEnEdicionEstado}
+            datosActuales={{
+              proyecto, productora, nombre, puesto, codigoContable, departamento, esFijoDiscontinuo, hxPorRodaje40, salario45, horasRef, modoInverso45, objetivoSemanal45,
+              fechaInicio, fechaFin, fechasPendientes, vacAcumulada, indemAcumulada, finiquitoAparte,
+              horasPorMes, vacDiasPorMes, festivosPorMes, jornadasEspecialesPorMes, festivosActivos, comidaDiasPorMes,
+              // v150: horas over 45h y festivo pactado
+              over45Activo, over45PrecioManual, over45PorMes,
+              festPactadoActivo, festPactadoPrecioManual,
+              plusHerramienta, plusCoche, plusVivienda, plusSeguroVida, plusComida,
+              // Snapshot de resultados calculados (para Coste Empresa)
+              _calculado: {
+                desglose45: desglose45 || [],
+                complementos45: complementos45 || [],
+                baseRef, vacRef, indemRef, hxRef, vHora, vHoraEx,
+                p40ref, sumaRef, salarioDia,
+                totBase, totVac, totIndem, totHx, totPlus, totVd,
+                totFinal, totalCompl,
+                totalVac45, totalIndem45, totalFestDias45, totalFestImport45,
+                totOver45Horas, totOver45Importe, over45Precio, valorFestivo45, // v150
+                // v77: festivos e importes JE por mes (Coste Empresa los necesita)
+                importeFestMes45: importeFestMes45 || [],
+                festivosPorMesSnapshot: festivosPorMes || [],
+                jornadasEspecialesPorMesSnapshot: jornadasEspecialesPorMes || [],
+                totJEDias, totJEImporte,
+              },
+            }}
+            onCargarPerfil={(d) => {
+              // v71: al cargar un perfil, saltamos el próximo auto-relleno para no machacar los valores guardados
+              saltarAutoRellenoRef.current = true;
+              // v45: si hay proyecto activo, los campos Proyecto/Productora se mantienen del activo (no del perfil cargado)
+              if (proyectoActivoCtx) {
+                setProyecto(proyectoActivoCtx.nombre);
+                setProductora(proyectoActivoCtx.productora);
+              } else {
+                if (d.proyecto !== undefined) setProyecto(d.proyecto);
+                if (d.productora !== undefined) setProductora(d.productora);
+              }
+              if (d.nombre !== undefined) setNombre(d.nombre);
+              if (d.puesto !== undefined) setPuesto(d.puesto);
+              if (d.codigoContable !== undefined) setCodigoContable(d.codigoContable);
+              if (d.departamento !== undefined) setDepartamento(d.departamento); // v97
+              if (d.esFijoDiscontinuo !== undefined) setEsFijoDiscontinuo(d.esFijoDiscontinuo);
+              if (d.hxPorRodaje40 !== undefined) setHxPorRodaje40(d.hxPorRodaje40);
+              if (d.salario45 !== undefined) setSalario45(d.salario45);
+              if (d.horasRef !== undefined) setHorasRef(d.horasRef);
+              if (d.modoInverso45 !== undefined) setModoInverso45(d.modoInverso45);
+              if (d.objetivoSemanal45 !== undefined) setObjetivoSemanal45(d.objetivoSemanal45);
+              if (d.fechaInicio !== undefined) setFechaInicio(d.fechaInicio);
+              if (d.fechaFin !== undefined) setFechaFin(d.fechaFin);
+              setFechasPendientes(!!d.fechasPendientes); // v139
+              if (d.vacAcumulada !== undefined) setVacAcumulada(d.vacAcumulada);
+              if (d.indemAcumulada !== undefined) setIndemAcumulada(d.indemAcumulada);
+              if (d.finiquitoAparte !== undefined) setFiniquitoAparte(d.finiquitoAparte); // v90
+              perfilCargadoRef.current = true; // v87: hay perfil cargado, no aplicar defaults del proyecto
+              // v86: si el proyecto tiene modos definidos y difieren, preguntar si actualizar
+              const calProy = proyectoActivoCtx?.__calendario;
+              if (calProy) {
+                const modoVacProy = calProy.modo_vacaciones === "al_final";
+                const modoIndProy = calProy.modo_indemnizacion === "al_final";
+                const vacGuardada = d.vacAcumulada;
+                const indGuardada = d.indemAcumulada;
+                const diffVac = vacGuardada !== undefined && vacGuardada !== modoVacProy;
+                const diffInd = indGuardada !== undefined && indGuardada !== modoIndProy;
+                if (diffVac || diffInd) {
+                  setTimeout(() => {
+                    const partes = [];
+                    if (diffVac) partes.push(`• Vacaciones: perfil "${vacGuardada?"al final":"mes a mes"}" → proyecto "${modoVacProy?"al final":"mes a mes"}"`);
+                    if (diffInd) partes.push(`• Indemnización: perfil "${indGuardada?"al final":"mes a mes"}" → proyecto "${modoIndProy?"al final":"mes a mes"}"`);
+                    if (confirm(`El proyecto ha cambiado el modo por defecto:\n\n${partes.join("\n")}\n\n¿Actualizar este perfil?`)) {
+                      if (diffVac) setVacAcumulada(modoVacProy);
+                      if (diffInd) setIndemAcumulada(modoIndProy);
+                    }
+                  }, 300);
+                }
+              }
+              if (d.horasPorMes !== undefined) setHorasPorMes(d.horasPorMes);
+              if (d.vacDiasPorMes !== undefined) setVacDiasPorMes(d.vacDiasPorMes);
+              if (d.festivosPorMes !== undefined) setFestivosPorMes(d.festivosPorMes);
+              if (d.jornadasEspecialesPorMes !== undefined) setJornadasEspecialesPorMes(d.jornadasEspecialesPorMes);
+              // v150: horas over 45h y festivo pactado. Los perfiles antiguos no
+              // los llevan, así que se quedan desactivados y calculan como siempre.
+              setOver45Activo(!!d.over45Activo);
+              setOver45PrecioManual(d.over45PrecioManual ?? "");
+              setOver45PorMes(d.over45PorMes || []);
+              setFestPactadoActivo(!!d.festPactadoActivo);
+              setFestPactadoPrecioManual(d.festPactadoPrecioManual ?? "");
+              if (d.festivosActivos !== undefined) setFestivosActivos(d.festivosActivos);
+              if (d.comidaDiasPorMes !== undefined) setComidaDiasPorMes(d.comidaDiasPorMes);
+              if (d.plusHerramienta !== undefined) setPlusHerramienta(d.plusHerramienta);
+              if (d.plusCoche !== undefined) setPlusCoche(d.plusCoche);
+              if (d.plusVivienda !== undefined) setPlusVivienda(d.plusVivienda);
+              if (d.plusSeguroVida !== undefined) setPlusSeguroVida(d.plusSeguroVida);
+              if (d.plusComida !== undefined) setPlusComida(d.plusComida);
+            }}
+          />
+
+          <div style={P}>
+            <div style={ST}>▸ Trabajador</div>
+            <Field label="Proyecto" value={proyecto} onChange={setProyecto} type="text" hint="Nombre del proyecto / producción" readOnly={!!proyectoActivoCtx} lockHint="Del proyecto activo" />
+            <Field label="Productora" value={productora} onChange={setProductora} type="text" hint="Empresa productora" readOnly={!!proyectoActivoCtx} lockHint="Del proyecto activo" />
+            <Field label="Nombre" value={nombre} onChange={setNombre} type="text" />
+            <PuestoSelector
+              puesto={puesto}
+              codigoContable={codigoContable}
+              onPuesto={setPuesto}
+              onCodigoContable={setCodigoContable}
+            />
+            {/* v97: Departamento (obligatorio, rojo si vacío) */}
+            <div style={{ marginTop: 8 }}>
+              <label style={{ display: "block", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: departamento ? "#666" : "#c00", marginBottom: 4, fontWeight: 700 }}>
+                Departamento {!departamento && <span style={{ color: "#c00", fontSize: 9 }}>· obligatorio</span>}
+              </label>
+              <select
+                value={departamento}
+                onChange={(e) => setDepartamento(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "9px 11px",
+                  borderRadius: 5,
+                  border: `1px solid ${departamento ? "#d5d9dc" : "#c04040"}`,
+                  background: departamento ? "#dfe4e8" : "#fff4f4",
+                  fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+                  fontSize: 12,
+                  color: departamento ? "#1a1a1a" : "#c04040",
+                  cursor: "pointer",
+                  fontWeight: departamento ? 700 : 400,
+                }}
+              >
+                <option value="">— Elegir departamento —</option>
+                {DEPARTAMENTOS.map(d => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
+              </select>
+            </div>
+            {/* v47: Toggle Fijo Discontinuo — solo 40H */}
+            {es40h && (
+              <div
+                onClick={() => setEsFijoDiscontinuo(v => !v)}
+                style={{
+                  display: "flex", justifyContent: "space-between", alignItems: "center",
+                  padding: "11px 13px",
+                  background: esFijoDiscontinuo ? "#faf1e0" : "#dfe4e8",
+                  borderRadius: 6,
+                  border: `1px solid ${esFijoDiscontinuo ? "#c8963a" : "#d5d9dc"}`,
+                  marginTop: 10, cursor: "pointer",
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: 11, color: esFijoDiscontinuo ? "#7a5a2a" : "#999", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 700 }}>
+                    Fijo discontinuo
+                  </div>
+                  <div style={{ fontSize: 9, color: "#777", marginTop: 2, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>
+                    {esFijoDiscontinuo ? "Indemnización × 1,6433333" : "Indemnización estándar × 0,98632"}
+                  </div>
+                </div>
+                <div style={{ position: "relative", width: 38, height: 20, flexShrink: 0, marginLeft: 12 }}>
+                  <div style={{ width: "100%", height: "100%", borderRadius: 10, background: esFijoDiscontinuo ? "#4ec9b8" : "#222", transition: "background 0.25s" }} />
+                  <div style={{ position: "absolute", top: 3, left: esFijoDiscontinuo ? 19 : 3, width: 14, height: 14, borderRadius: "50%", background: esFijoDiscontinuo ? "#f2f5f7" : "#aaa", transition: "left 0.25s", boxShadow: "0 1px 3px rgba(0,0,0,0.5)" }} />
+                </div>
+              </div>
+            )}
+
+            {/* v59: Toggle 40H "1 HX por día de rodaje" — solo si hay calendario del proyecto */}
+            {es40h && proyectoActivoCtx?.__calendario?.dias && Object.keys(proyectoActivoCtx.__calendario.dias).length > 0 && (
+              <div
+                onClick={() => setHxPorRodaje40(v => !v)}
+                style={{
+                  display: "flex", justifyContent: "space-between", alignItems: "center",
+                  padding: "11px 13px",
+                  background: hxPorRodaje40 ? "#faf1e0" : "#dfe4e8",
+                  borderRadius: 6,
+                  border: `1px solid ${hxPorRodaje40 ? "#c8963a" : "#d5d9dc"}`,
+                  marginTop: 10, cursor: "pointer",
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: 11, color: hxPorRodaje40 ? "#7a5a2a" : "#999", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 700 }}>
+                    1 HX por día de rodaje
+                  </div>
+                  <div style={{ fontSize: 9, color: "#777", marginTop: 2, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>
+                    {hxPorRodaje40 ? "Rellena horas extra desde el calendario (días de rodaje)" : "Las horas extra no se autorrellenan"}
+                  </div>
+                </div>
+                <div style={{ position: "relative", width: 38, height: 20, flexShrink: 0, marginLeft: 12 }}>
+                  <div style={{ width: "100%", height: "100%", borderRadius: 10, background: hxPorRodaje40 ? "#4ec9b8" : "#222", transition: "background 0.25s" }} />
+                  <div style={{ position: "absolute", top: 3, left: hxPorRodaje40 ? 19 : 3, width: 14, height: 14, borderRadius: "50%", background: hxPorRodaje40 ? "#f2f5f7" : "#aaa", transition: "left 0.25s", boxShadow: "0 1px 3px rgba(0,0,0,0.5)" }} />
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div style={P}>
+            <div style={ST}>▸ Salario de Referencia</div>
+
+            <div onClick={() => setModoInverso45(v=>!v)} style={{
+              display:"flex", alignItems:"center", gap:8, cursor:"pointer",
+              padding:"8px 12px", borderRadius:5, marginBottom:10,
+              background: modoInverso45?"rgba(184,134,74,0.08)":"transparent",
+              border:`1px solid ${modoInverso45?"#c8963a":"#d5d9dc"}`,
+            }}>
+              <div style={{ position:"relative", width:34, height:18, flexShrink:0 }}>
+                <div style={{ width:"100%", height:"100%", borderRadius:9, background:modoInverso45?"#4ec9b8":"#ddd", transition:"background 0.25s" }} />
+                <div style={{ position:"absolute", top:2, left:modoInverso45?17:2, width:14, height:14, borderRadius:"50%", background:modoInverso45?"#f2f5f7":"#aaa", transition:"left 0.25s" }} />
+              </div>
+              <span style={{ fontSize:10, color:modoInverso45?"#7a5a2a":"#999", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", letterSpacing:"0.1em", textTransform:"uppercase", fontWeight:700 }}>Cálculo inverso</span>
+            </div>
+
+            {!modoInverso45 ? (
+              <Field label={`Salario Pactado ${es40h ? "40h" : "45h"}`} value={salario45} onChange={setSalario45} prefix="€" hint={es40h ? "Bruto mensual: salario 40h + vacaciones + indemnización" : "Bruto mensual 45h: base 40h + vac + indem + horas extra"} />
+            ) : (
+              <div style={{ marginBottom:14 }}>
+                <label style={LS}>Salario Pactado {es40h ? "40h" : "45h"}</label>
+                <div style={{ padding:"10px 14px", background:"#dfe4e8", borderRadius:4, border:"1px solid #c8963a", textAlign:"center", marginBottom:4 }}>
+                  {p && p45Inverso
+                    ? <span style={{ fontSize:20, fontWeight:700, color:"#4ec9b8", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>{fmtE(p45Inverso)}</span>
+                    : <span style={{ fontSize:12, color:"#aaa" }}>— introduce fechas y horas —</span>}
+                </div>
+                <p style={{ margin:"0 0 8px", fontSize:9, color:"#888", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>Para {fmtE(objetivoSemanal45)}/semana</p>
+                <Field label="Objetivo €/semana" value={objetivoSemanal45} onChange={setObjetivoSemanal45} prefix="€" />
+              </div>
+            )}
+
+            {!es40h && <Field label="Horas de referencia / mes" value={horasRef} onChange={setHorasRef} hint="Nº horas extra del mes tipo (ej. 22)" />}
+
+            <div style={{ padding:12, background:"#dfe4e8", borderRadius:6, border:"1px solid #d5d9dc" }}>
+              <div style={{ fontSize:9, color:"#666", letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:8 }}>Desglose mensual referencia</div>
+              <div style={{ display:"grid", gridTemplateColumns: es40h ? "1fr 1fr 1fr" : "1fr 1fr", gap:6 }}>
+                {[
+                  { l:"Base 40h",     v:baseRef,  s:(es40h && esFijoDiscontinuo) ? "Salario÷1,14190" : "×0,89286" },
+                  { l:"Vacaciones",   v:vacRef,   s:"Base÷11,478" },
+                  { l:"Indemnización",v:indemRef, s:(es40h && esFijoDiscontinuo) ? "(Base/30)×1,6433" : "(Base/30)×0,986" },
+                  ...(es40h ? [] : [{ l:`H.Extra (${horasRef}h)`,v:hxRef,s:`${horasRef}h×${fmt(vHoraEx)}€`, blue:true }]),
+                ].map(it=>(
+                  <div key={it.l} style={{ background:"#f2f5f7", borderRadius:4, padding:"7px", border:"1px solid #e8e4de", textAlign:"center" }}>
+                    <div style={{ fontSize:8, color:"#666", textTransform:"uppercase", marginBottom:3 }}>{it.l}</div>
+                    <div style={{ fontSize:12, fontWeight:700, color:it.blue?"#1a1a1a":"#1a1a1a" }}>{fmt(it.v)} €</div>
+                    <div style={{ fontSize:8, color:"#888", marginTop:2 }}>{it.s}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ marginTop:8, display:"flex", justifyContent:"space-between", alignItems:"center", padding:"6px 10px", background:"#f2f5f7", borderRadius:4, border:"1px solid #d8d4ce" }}>
+                <span style={{ fontSize:9, color:"#666", textTransform:"uppercase", letterSpacing:"0.1em" }}>{es40h ? "TOTAL ≈ P40" : "TOTAL ≈ P45"}</span>
+                <span style={{ fontSize:15, fontWeight:700, color:"#4ec9b8", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>{fmt(es40h ? (baseRef + vacRef + indemRef) : sumaRef)} €</span>
+              </div>
+            </div>
+          </div>
+
+          <div style={P}>
+            <div style={ST}>▸ Período de Contratación</div>
+            {/* v59: indicador de calendario del proyecto activo */}
+            {proyectoActivoCtx?.__calendario?.fecha_inicio && proyectoActivoCtx?.__calendario?.fecha_fin && (
+              <div style={{ marginBottom: 10, padding: "8px 12px", background: "#f5efe0", border: "1px solid #4ec9b8", borderRadius: 4, fontSize: 10, color: "#7a5a2a", display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: 14 }}>📅</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>Calendario del proyecto</div>
+                  <div style={{ marginTop: 2, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>
+                    {proyectoActivoCtx.__calendario.fecha_inicio} → {proyectoActivoCtx.__calendario.fecha_fin}
+                    {proyectoActivoCtx.__calendario.comunidad && (
+                      <span style={{ marginLeft: 8, textTransform: "capitalize" }}>· {proyectoActivoCtx.__calendario.comunidad.replace("_", " ")}</span>
+                    )}
+                  </div>
+                </div>
+                {/* v71: botón para aplicar calendario si hay diferencias con el perfil cargado */}
+                {hayDiferenciasConCalendario && (
+                  <button
+                    onClick={() => {
+                      if (confirm("Esto sobrescribirá las horas extra, festivos y vacaciones con los datos del calendario del proyecto. ¿Continuar?")) {
+                        aplicarCalendarioAhora();
+                      }
+                    }}
+                    title="El perfil cargado difiere del calendario. Pulsa para recalcular desde el calendario."
+                    style={{ background: "#4ec9b8", color: "#f2f5f7", border: "none", padding: "6px 10px", borderRadius: 3, cursor: "pointer", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", flexShrink: 0 }}
+                  >📅 Aplicar calendario</button>
+                )}
+              </div>
+            )}
+            <label style={{ display:"flex", alignItems:"center", gap:8, marginBottom:8, cursor:"pointer", fontSize:11, color: fechasPendientes ? "#b26a00" : "#666", fontWeight: fechasPendientes ? 700 : 500 }}>
+              <input type="checkbox" checked={fechasPendientes} onChange={(e) => togglearFechasPendientes(e.target.checked)} style={{ cursor:"pointer" }} />
+              Fechas pendientes (guardar sin fechas)
+            </label>
+            {fechasPendientes && (
+              <div style={{ marginBottom:8, padding:"8px 10px", background:"#fdf3e3", border:"1px solid #e8c98a", borderRadius:6, fontSize:10, color:"#8a5a00", lineHeight:1.4 }}>
+                Sin fechas no hay cálculo: los importes salen a "—". Cuando las sepas, abre el perfil con ✎ Modificar, desmarca esta casilla, pon las fechas y pulsa Guardar cambios.
+              </div>
+            )}
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, overflow:"hidden", opacity: fechasPendientes ? 0.45 : 1, pointerEvents: fechasPendientes ? "none" : "auto" }}>
+              <Field
+                label="Inicio" value={fechaInicio} onChange={setFechaInicioSeguro} onBlur={validarFechaInicioBlur} type="date" hint="Primer día"
+                min={proyectoActivoCtx?.__calendario?.fecha_inicio || undefined}
+                max={proyectoActivoCtx?.__calendario?.fecha_fin || undefined}
+              />
+              <Field
+                label="Fin" value={fechaFin} onChange={setFechaFinSeguro} onBlur={validarFechaFinBlur} type="date" hint="Último día"
+                min={proyectoActivoCtx?.__calendario?.fecha_inicio || undefined}
+                max={proyectoActivoCtx?.__calendario?.fecha_fin || undefined}
+              />
+            </div>
+            {p ? (
+              <div style={{ marginTop:8, padding:12, background:"#dfe4e8", borderRadius:6, border:"1px solid #d5d9dc" }}>
+                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:6, marginBottom:8 }}>
+                  {[
+                    { l:"Días",     v:p.diasNormalizados, d:0 },
+                    { l:"Meses",    v:p.mesesTotales,     d:4 },
+                    { l:"Sem. L-V", v:p.semanasTotales,   d:1 },
+                  ].map(it=>(
+                    <div key={it.l} style={{ textAlign:"center", padding:"6px 4px", background:"#f2f5f7", borderRadius:4 }}>
+                      <div style={{ fontSize:8, color:"#666", textTransform:"uppercase", marginBottom:3 }}>{it.l}</div>
+                      <div style={{ fontSize:13, fontWeight:700, color:"#4ec9b8" }}>{it.d===0?it.v:it.d===1?fmt(it.v,1):fmtM(it.v)}</div>
+                    </div>
+                  ))}
+                </div>
+                {p.desglose.map((d,i)=>(
+                  <div key={i} style={{ display:"flex", justifyContent:"space-between", padding:"3px 0", borderBottom:"1px solid #e8e4de" }}>
+                    <span style={{ fontSize:10, color:"#444", textTransform:"capitalize" }}>
+                      {d.mes}{d.esCompleto?<span style={{fontSize:8,color:"#2a7a50",marginLeft:4}}>✓</span>:<span style={{fontSize:8,color:"#888",marginLeft:4}}>{d.desde}–{d.hasta}</span>}
+                    </span>
+                    <span style={{ fontSize:10, color:"#4ec9b8", fontWeight:600 }}>{fmtM(d.fraccion)}</span>
+                  </div>
+                ))}
+              </div>
+            ) : fechaInicio && fechaFin ? (
+              <div style={{ marginTop:8, padding:10, background:"#fdf0f0", borderRadius:6, border:"1px solid #e8c0c0", fontSize:10, color:"#b02020" }}>⚠ Fecha fin debe ser posterior al inicio</div>
+            ) : null}
+          </div>
+
+          {p && (
+            <div style={P}>
+              <div style={ST}>▸ Horas Extra{over45Aplica ? ", Over 45" : ""}, Jornadas Especiales, Vacaciones, Festivos</div>
+
+              {/* v150: horas extra "over 45h" — solo en la pestaña 45H */}
+              {!es40h && (
+                <div style={{ marginBottom:14, padding:"12px 14px", background:"#f2f5f7", border:`1px solid ${over45Activo ? "#c8963a" : "#d5d9dc"}`, borderRadius:6 }}>
+                  <label style={{ display:"flex", alignItems:"center", gap:10, cursor:"pointer" }}>
+                    <input type="checkbox" checked={over45Activo} onChange={e=>setOver45Activo(e.target.checked)}
+                      style={{ width:16, height:16, accentColor:"#c8963a", cursor:"pointer" }} />
+                    <span>
+                      <span style={{ fontSize:12, fontWeight:700, color:"#1a1a1a" }}>Horas extra over 45h a precio pactado</span>
+                      <span style={{ display:"block", fontSize:10.5, color:"#666", marginTop:2 }}>
+                        Solo para las horas por encima de las que marca el calendario. Las del calendario no cambian.
+                      </span>
+                    </span>
+                  </label>
+                  {over45Activo && (
+                    <div style={{ marginTop:12, display:"flex", gap:12, alignItems:"flex-end", flexWrap:"wrap" }}>
+                      <div>
+                        <label style={{ display:"block", fontSize:10, fontWeight:600, letterSpacing:"0.08em", textTransform:"uppercase", color:"#666", marginBottom:5 }}>Precio hora over 45</label>
+                        <input type="number" min="0" step="0.01"
+                          value={over45PrecioManual}
+                          placeholder={fmt(over45PrecioCalc)}
+                          onChange={e=>setOver45PrecioManual(e.target.value)}
+                          onWheel={e=>e.target.blur()}
+                          style={{ width:130, padding:"9px 12px", fontSize:13, fontWeight:700, border:"1px solid #c8963a", borderRadius:6, background:"#fff", color:"#b07030", outline:"none", colorScheme:"light" }} />
+                      </div>
+                      <div style={{ fontSize:10.5, color:"#666", lineHeight:1.5, flex:1, minWidth:220 }}>
+                        Calculado: <strong style={{ color:"#b07030" }}>{fmtE(over45PrecioCalc)}</strong> ·
+                        salario pactado ÷ 30 × 7 ÷ 45 × 1,5.<br />
+                        Hora extra ordinaria: {fmtE(vHoraEx)}. Déjalo vacío para usar el calculado.
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* v150: festivo trabajado a precio pactado — interruptor propio */}
+              {!es40h && (
+                <div style={{ marginBottom:14, padding:"12px 14px", background:"#f2f5f7", border:`1px solid ${festPactadoActivo ? "#c8963a" : "#d5d9dc"}`, borderRadius:6 }}>
+                  <label style={{ display:"flex", alignItems:"center", gap:10, cursor:"pointer" }}>
+                    <input type="checkbox" checked={festPactadoActivo} onChange={e=>setFestPactadoActivo(e.target.checked)}
+                      style={{ width:16, height:16, accentColor:"#c8963a", cursor:"pointer" }} />
+                    <span>
+                      <span style={{ fontSize:12, fontWeight:700, color:"#1a1a1a" }}>Festivo trabajado a precio pactado</span>
+                      <span style={{ display:"block", fontSize:10.5, color:"#666", marginTop:2 }}>
+                        Afecta a todos los festivos trabajados. Las jornadas especiales no cambian.
+                      </span>
+                    </span>
+                  </label>
+                  {festPactadoActivo && (
+                    <div style={{ marginTop:12, display:"flex", gap:12, alignItems:"flex-end", flexWrap:"wrap" }}>
+                      <div>
+                        <label style={{ display:"block", fontSize:10, fontWeight:600, letterSpacing:"0.08em", textTransform:"uppercase", color:"#666", marginBottom:5 }}>Precio festivo</label>
+                        <input type="number" min="0" step="0.01"
+                          value={festPactadoPrecioManual}
+                          placeholder={fmt(festPactadoPrecioCalc)}
+                          onChange={e=>setFestPactadoPrecioManual(e.target.value)}
+                          onWheel={e=>e.target.blur()}
+                          style={{ width:130, padding:"9px 12px", fontSize:13, fontWeight:700, border:"1px solid #c8963a", borderRadius:6, background:"#fff", color:"#6a3a9a", outline:"none", colorScheme:"light" }} />
+                      </div>
+                      <div style={{ fontSize:10.5, color:"#666", lineHeight:1.5, flex:1, minWidth:220 }}>
+                        Calculado: <strong style={{ color:"#6a3a9a" }}>{fmtE(festPactadoPrecioCalc)}</strong> ·
+                        salario pactado ÷ 30 × 1,75.<br />
+                        Festivo ordinario: {fmtE(valorFestivoOrdinario)}. Déjalo vacío para usar el calculado.
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <InputsPorMes
+                desglose={p.desglose}
+                horasPorMes={horasPorMes}       setHorasPorMes={setHorasPorMes}
+                vacDiasPorMes={vacDiasPorMes}   setVacDiasPorMes={setVacDiasPorMes}
+                festivosPorMes={festivosPorMes} setFestivosPorMes={setFestivosPorMes}
+                jornadasEspecialesPorMes={jornadasEspecialesPorMes} setJornadasEspecialesPorMes={setJornadasEspecialesPorMes}
+                over45PorMes={over45Aplica ? over45PorMes : undefined} setOver45PorMes={over45Aplica ? setOver45PorMes : undefined}
+              />
+            </div>
+          )}
+
+          {/* Festivos del calendario laboral — v62: oculto si hay calendario del proyecto, con toggle */}
+          {p && (() => {
+            const hayCalProy = proyectoActivoCtx?.__calendario?.dias && Object.keys(proyectoActivoCtx.__calendario.dias).length > 0;
+            // Si hay calendario del proyecto y el usuario no ha pedido verlos → botón para expandir
+            if (hayCalProy && !mostrarFestivosLegacy) {
+              return (
+                <div style={P}>
+                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                    <div style={ST}>▸ Festivos Calendario Laboral</div>
+                    <button
+                      onClick={() => setMostrarFestivosLegacy(true)}
+                      style={{ background:"transparent", color:"#4ec9b8", border:"1px solid #4ec9b8", padding:"3px 8px", borderRadius:3, cursor:"pointer", fontSize:9, fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontWeight:700, letterSpacing:"0.08em", textTransform:"uppercase" }}
+                    >Ver festivos legacy</button>
+                  </div>
+                  <div style={{ fontSize:10, color:"#888", padding:"10px 0 4px", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", lineHeight:1.5 }}>
+                    Los festivos ya se gestionan desde el calendario del proyecto (marcados como trabajados). Este panel es solo para casos excepcionales.
+                  </div>
+                </div>
+              );
+            }
+            // v63: filtrar por la comunidad del calendario del proyecto (si existe)
+            const comCal = proyectoActivoCtx?.__calendario?.comunidad;
+            let festsRango = festivosEnRango(fechaInicio, fechaFin);
+            if (comCal) festsRango = festsRango.filter(f => f.comunidad === comCal);
+            if (festsRango.length === 0) return (
+              <div style={P}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                  <div style={ST}>▸ Festivos Calendario Laboral</div>
+                  {hayCalProy && (
+                    <button
+                      onClick={() => setMostrarFestivosLegacy(false)}
+                      style={{ background:"transparent", color:"#888", border:"1px solid #ccc", padding:"3px 8px", borderRadius:3, cursor:"pointer", fontSize:9, fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}
+                    >Ocultar</button>
+                  )}
+                </div>
+                <div style={{ fontSize:10, color:"#888", textAlign:"center", padding:"12px 0", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>
+                  No hay festivos oficiales en este período
+                </div>
+              </div>
+            );
+            return (
+              <div style={P}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                  <div style={ST}>▸ Festivos Calendario Laboral</div>
+                  {hayCalProy && (
+                    <button
+                      onClick={() => setMostrarFestivosLegacy(false)}
+                      style={{ background:"transparent", color:"#888", border:"1px solid #ccc", padding:"3px 8px", borderRadius:3, cursor:"pointer", fontSize:9, fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}
+                    >Ocultar</button>
+                  )}
+                </div>
+                <div style={{ fontSize:9, color:"#888", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", marginBottom:10, lineHeight:1.4 }}>
+                  Activa sólo los festivos que el trabajador efectivamente trabajó. Cada activación suma +1 al contador del mes correspondiente.
+                </div>
+                {festsRango.map(f => {
+                  const activo = !!festivosActivos[f.fecha];
+                  const idx = mesIndexParaFecha(f.fecha, p.desglose, fechaInicio);
+                  const fechaObj = new Date(f.fecha + "T00:00:00");
+                  const dow = ["dom","lun","mar","mié","jue","vie","sáb"][fechaObj.getDay()];
+                  const dia = fechaObj.getDate();
+                  const mes = fechaObj.toLocaleString("es-ES", { month: "short" }).replace(".","");
+                  return (
+                    <div key={f.fecha}
+                      onClick={() => {
+                        if (idx < 0) return;
+                        const nuevo = { ...festivosActivos };
+                        const nuevoEstado = !activo;
+                        if (nuevoEstado) nuevo[f.fecha] = true; else delete nuevo[f.fecha];
+                        setFestivosActivos(nuevo);
+                        const arr = [...festivosPorMes];
+                        arr[idx] = (arr[idx] || 0) + (nuevoEstado ? 1 : -1);
+                        if (arr[idx] < 0) arr[idx] = 0;
+                        setFestivosPorMes(arr);
+                      }}
+                      style={{
+                        display:"flex", alignItems:"center", gap:8, padding:"7px 10px", marginBottom:4,
+                        background: activo ? "rgba(106,58,154,0.08)" : "#dfe4e8",
+                        border: `1px solid ${activo ? "#8a5aaa" : "#d5d9dc"}`,
+                        borderRadius:5, cursor:"pointer",
+                      }}>
+                      <div style={{
+                        width:16, height:16, borderRadius:3, flexShrink:0,
+                        border:`1.5px solid ${activo ? "#6a3a9a" : "#bbb"}`,
+                        background: activo ? "#6a3a9a" : "#f2f5f7",
+                        display:"flex", alignItems:"center", justifyContent:"center",
+                        color:"#f2f5f7", fontSize:11, fontWeight:700,
+                      }}>
+                        {activo ? "✓" : ""}
+                      </div>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ fontSize:10, fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", color: activo ? "#6a3a9a" : "#1a1a1a", fontWeight:600 }}>
+                          {dow} {dia} {mes}
+                          <span style={{ fontSize:8, marginLeft:6, padding:"1px 5px", borderRadius:2, background: f.tipo==="nacional"?"#e8e0d0":"#d8e8d8", color:"#555", letterSpacing:"0.05em", textTransform:"uppercase", fontWeight:700 }}>
+                            {f.tipo==="nacional"?"Nac":"CCAA"}
+                          </span>
+                        </div>
+                        <div style={{ fontSize:9, color:"#777", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", marginTop:1 }}>
+                          {f.nombre}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+                <div style={{ marginTop:8, padding:"6px 10px", background:"#dfe4e8", borderRadius:4, display:"flex", justifyContent:"space-between" }}>
+                  <span style={{ fontSize:9, color:"#888", textTransform:"uppercase", letterSpacing:"0.1em", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>Activos</span>
+                  <span style={{ fontSize:11, fontWeight:700, color:"#6a3a9a", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>
+                    {Object.keys(festivosActivos).filter(k=>festsRango.some(f=>f.fecha===k)).length} / {festsRango.length}
+                  </span>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Comidas editables por mes */}
+          {p && plusComida.importeDia > 0 && (
+            <div style={P}>
+              <div style={ST}>▸ Días de Comida por Mes</div>
+              <div style={{ fontSize:9, color:"#888", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", marginBottom:10 }}>
+                Días calculados automáticamente (L-V). Edita si el trabajador no tiene comida algún día.
+              </div>
+              {p.desglose.map((d,i) => {
+                const auto = Math.round(d.semanasLaborables*5);
+                const val  = comidaDiasPorMes[i] !== null && comidaDiasPorMes[i] !== undefined ? comidaDiasPorMes[i] : auto;
+                const isOverride = comidaDiasPorMes[i] !== null && comidaDiasPorMes[i] !== undefined && comidaDiasPorMes[i] !== auto;
+                return (
+                  <div key={i} style={{ display:"grid", gridTemplateColumns:"1fr 60px 60px", gap:8, marginBottom:5, alignItems:"center" }}>
+                    <div style={{ fontSize:10, color:"#444", textTransform:"capitalize", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>
+                      {d.mes}{!d.esCompleto&&<span style={{fontSize:8,color:"#aaa",marginLeft:4}}>{d.desde}–{d.hasta}</span>}
+                    </div>
+                    <div style={{ textAlign:"center", fontSize:10, color:"#888" }}>auto:{auto}d</div>
+                    <input type="number" min="0" step="1"
+                      value={val}
+                      onChange={e => {
+                        const v = parseFloat(e.target.value);
+                        const a = [...comidaDiasPorMes];
+                        a[i] = isNaN(v) ? null : v;
+                        setComidaDiasPorMes(a);
+                      }}
+                      style={{ background: isOverride?"#fff8f0":"#dfe4e8", border:`1px solid ${isOverride?"#c8963a":"#d5d9dc"}`, borderRadius:4, color:"#1a1a1a", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontSize:12, padding:"5px 6px", outline:"none", textAlign:"center", colorScheme:"light", minWidth:0 }}
+                      onFocus={e=>e.target.style.borderColor="#4ec9b8"} onBlur={e=>e.target.style.borderColor=isOverride?"#c8963a":"#d5d9dc"} />
+                  </div>
+                );
+              })}
+              <div style={{ marginTop:8, padding:"6px 10px", background:"#dfe4e8", borderRadius:4, display:"flex", justifyContent:"space-between" }}>
+                <span style={{ fontSize:9, color:"#888", textTransform:"uppercase", letterSpacing:"0.1em" }}>Total días comida</span>
+                <span style={{ fontSize:12, fontWeight:700, color:"#4ec9b8" }}>{complementos45.reduce((s,c)=>s+c.diasComida,0)}d</span>
+              </div>
+              <button onClick={()=>setComidaDiasPorMes(p.desglose.map(()=>null))}
+                style={{ marginTop:8, width:"100%", padding:"6px", fontSize:9, fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", letterSpacing:"0.1em", textTransform:"uppercase", background:"transparent", border:"1px solid #d5d9dc", borderRadius:4, cursor:"pointer", color:"#888" }}>
+                Restablecer automático
+              </button>
+            </div>
+          )}
+
+          <div style={P}>
+            <div style={ST}>▸ Modo de Pago</div>
+            <Toggle label="Vacaciones al final"    value={vacAcumulada}   onChange={(v)=>{ modosToggleadoManualRef.current.vac = true; setVacAcumulada(v); }}   sublabel={vacAcumulada?"Total vacaciones en última nómina":"Prorrateadas cada mes"} />
+            <Toggle label="Indemnización al final" value={indemAcumulada || finiquitoAparte} onChange={(v)=>{ modosToggleadoManualRef.current.ind = true; setIndemAcumulada(v); }} sublabel={finiquitoAparte ? "Forzado por 'Finiquito aparte'" : (indemAcumulada?"Total indemnización en última nómina":"Prorrateada cada mes")} disabled={finiquitoAparte} />
+            <Toggle label="Finiquito aparte del salario pactado" value={finiquitoAparte} onChange={setFiniquitoAparte} sublabel={finiquitoAparte?"Salario pactado NO incluye indemnización (se paga aparte)":"Salario pactado incluye indemnización prorrateada"} />
+            <div style={{ fontSize:9, color:"#888", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", marginTop:4, padding:"6px 10px", background:"#dfe4e8", borderRadius:4, border:"1px solid #d5d9dc" }}>
+              ℹ Las horas extra siempre se cobran el mes que se generan
+            </div>
+          </div>
+
+          <div style={P}>
+            <div style={ST}>▸ Complementos de Nómina</div>
+            {[
+              { label:"Plus Herramienta", plus:plusHerramienta, set:setPlusHerramienta },
+              { label:"Plus Coche",       plus:plusCoche,       set:setPlusCoche },
+              { label:"Plus Ayuda Vivienda", plus:plusVivienda, set:setPlusVivienda },
+            ].map(({label,plus,set})=>(
+              <div key={label} style={{ marginBottom:12 }}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:5 }}>
+                  <label style={{ ...LS, margin:0 }}>{label}</label>
+                  <div style={{ display:"flex", gap:3 }}>
+                    {["mes","sem"].map(m=>(
+                      <button key={m} onClick={()=>set(p=>({...p,modo:m}))}
+                        style={{ padding:"2px 7px", fontSize:9, fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", letterSpacing:"0.08em", textTransform:"uppercase", border:"1px solid #d5d9dc", borderRadius:3, cursor:"pointer", fontWeight:700, background:plus.modo===m?"#1a1a1a":"#f2f5f7", color:plus.modo===m?"#f2f5f7":"#888" }}>
+                        {m==="mes"?"€/mes":"€/sem"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <Field value={plus.importe} onChange={v=>set(p=>({...p,importe:v}))} prefix="€" />
+              </div>
+            ))}
+            <div style={{ marginBottom: 12 }}>
+              <label style={LS}>Plus Seguro de Vida (€/mes)</label>
+              <Field value={plusSeguroVida.importe} onChange={v=>setPlusSeguroVida({importe:v})} prefix="€" hint="Sólo prorrateo mensual" />
+            </div>
+            <div>
+              <label style={LS}>Plus Comida (€/día L-V)</label>
+              <Field value={plusComida.importeDia} onChange={v=>setPlusComida({importeDia:v})} prefix="€" hint="Calculado automáticamente por días laborables de cada mes" />
+            </div>
+          </div>
+
+          {/* Bloque legal */}
+          <div style={{ ...P, background:"#fafaf7", border:"1px solid #e8e4de" }}>
+            <div style={{ ...ST, color:"#888", marginBottom:10 }}>▸ Aviso Legal</div>
+            <div style={{ fontSize:10, fontWeight:700, color:"#1a1a1a", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", marginBottom:8, letterSpacing:"0.05em" }}>
+              BD PROD TOOLS
+            </div>
+            <div style={{ fontSize:9, color:"#666", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", lineHeight:1.5, marginBottom:8 }}>
+              {DISCLAIMER_ES}
+            </div>
+            <div style={{ fontSize:8, color:"#888", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", lineHeight:1.5, fontStyle:"italic", marginBottom:8 }}>
+              {DISCLAIMER_EN}
+            </div>
+            <div style={{ fontSize:8, color:"#888", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", lineHeight:1.5, fontStyle:"italic" }}>
+              G &amp; G Enterprises LLC
+            </div>
+          </div>
+
+        </div>
+
+        {/* COLUMNA DERECHA */}
+        <div style={{ minWidth: 0 }}>
+          {p && desglose45.length > 0 ? (
+            <>
+              <div style={P}>
+                <div style={ST}>▸ Desglose Mensual Referencia <BadgeBrutos /></div>
+                <div style={{ display:"grid", gridTemplateColumns: es40h ? "repeat(3,1fr)" : "repeat(4,1fr)", gap:10 }}>
+                  {[
+                    { l:"Base 40h",     v:baseRef,  s:(es40h && esFijoDiscontinuo) ? "Salario ÷ 1,14190" : "× 0,89286" },
+                    { l:"Vacaciones",   v:vacRef,   s:"Base ÷ 11,478" },
+                    { l:"Indemnización",v:indemRef, s:(es40h && esFijoDiscontinuo) ? "(Base/30) × 1,6433" : "(Base/30) × 0,986" },
+                    ...(es40h ? [] : [{ l:`H.Extra (${horasRef}h)`, v:hxRef, s:`${horasRef}h × ${fmt(vHoraEx)}€` }]),
+                  ].map(it=>(
+                    <div key={it.l} style={{ background:"#fff", borderRadius:8, padding:"14px 12px", border:"1px solid #d5d9dc", textAlign:"center" }}>
+                      <div style={{ fontSize:10, color:"#666", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:6, fontFamily:"'Inter', -apple-system, sans-serif", fontWeight: 600 }}>{it.l}</div>
+                      <div style={{ fontSize:20, fontWeight:700, color:"#1a1a1a", fontFamily:"'Inter', -apple-system, sans-serif", letterSpacing: "-0.01em" }}>{fmt(it.v)} €</div>
+                      <div style={{ fontSize:10, color:"#4ec9b8", marginTop:4, fontFamily:"'Inter', -apple-system, sans-serif", fontWeight: 500 }}>{it.s}</div>
+                    </div>
+                  ))}
+                </div>
+                {es40h ? (
+                  <div style={{ marginTop:10, display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+                    <div style={{ padding:"14px 18px", background:"#f2f5f7", borderRadius:8, border:"1px solid #d5d9dc", display:"flex", justifyContent:"space-between", alignItems:"center", gap:12 }}>
+                      <span style={{ fontSize:11, color:"#666", letterSpacing:"0.08em", textTransform:"uppercase", fontFamily:"'Inter', -apple-system, sans-serif", fontWeight: 600 }}>Total Mes 40h</span>
+                      <span style={{ fontSize:15, fontWeight:700, color:"#1a1a1a", fontFamily:"'Inter', -apple-system, sans-serif", whiteSpace:"nowrap" }}>{fmt(baseRef + vacRef + indemRef)} €</span>
+                    </div>
+                    <div style={{ padding:"14px 18px", background:"#f2f5f7", borderRadius:8, border:"1px solid #d5d9dc", display:"flex", flexDirection:"column" }}>
+                      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", gap:12 }}>
+                        <span style={{ fontSize:11, color:"#666", letterSpacing:"0.08em", textTransform:"uppercase", fontFamily:"'Inter', -apple-system, sans-serif", fontWeight: 600 }}>Salario en Contrato</span>
+                        <span style={{ fontSize:15, fontWeight:700, color:"#1a1a1a", fontFamily:"'Inter', -apple-system, sans-serif", whiteSpace:"nowrap" }}>{fmt(vacAcumulada ? baseRef : (baseRef + vacRef))} €</span>
+                      </div>
+                      {vacAcumulada && (
+                        <div style={{ fontSize:10, color:"#4ec9b8", marginTop:4, textAlign:"right", letterSpacing:"0.05em", fontStyle:"italic", fontFamily:"'Inter', -apple-system, sans-serif", fontWeight: 500 }}>Base 40h · vacaciones al final</div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ marginTop:10, display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+                    <div style={{ padding:"14px 18px", background:"#f2f5f7", borderRadius:8, border:"1px solid #d5d9dc", display:"flex", justifyContent:"space-between", alignItems:"center", gap:12 }}>
+                      <span style={{ fontSize:11, color:"#666", letterSpacing:"0.08em", textTransform:"uppercase", fontFamily:"'Inter', -apple-system, sans-serif", fontWeight: 600 }}>Total Mes 45h Todo Incluido</span>
+                      <span style={{ fontSize:15, fontWeight:700, color:"#1a1a1a", fontFamily:"'Inter', -apple-system, sans-serif", whiteSpace:"nowrap" }}>{fmt(sumaRef)} €</span>
+                    </div>
+                    <div style={{ padding:"14px 18px", background:"#f2f5f7", borderRadius:8, border:"1px solid #d5d9dc", display:"flex", justifyContent:"space-between", alignItems:"center", gap:12 }}>
+                      <span style={{ fontSize:11, color:"#666", letterSpacing:"0.08em", textTransform:"uppercase", fontFamily:"'Inter', -apple-system, sans-serif", fontWeight: 600 }}>Salario en Contrato</span>
+                      <span style={{ fontSize:15, fontWeight:700, color:"#1a1a1a", fontFamily:"'Inter', -apple-system, sans-serif", whiteSpace:"nowrap" }}>{fmt(baseRef + vacRef)} €</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Nota informativa. En 45H siempre se muestra. En 40H solo si vacaciones NO van al final */}
+              {(!es40h || !vacAcumulada) && (
+                <div style={{ background:"#f2f5f7", padding:"12px 16px", borderRadius:8, border:"1px solid #d5d9dc", marginBottom:20, fontSize:12, color:"#1a1a1a", fontFamily:"'Inter', -apple-system, sans-serif", lineHeight:1.5 }}>
+                  <strong style={{ color:"#1a1a1a", fontWeight: 700 }}>Nota:</strong> {es40h
+                    ? "Salario en contrato es la suma del salario base + las vacaciones."
+                    : "El salario que figura en contrato es la suma del salario base 40h más las vacaciones."}
+                </div>
+              )}
+
+              <div style={P}>
+                <div style={ST}>▸ Valores de Referencia <BadgeBrutos /></div>
+                <div style={{ display:"grid", gridTemplateColumns:"repeat(5,1fr)", gap:10 }}>
+                  {[
+                    { l:"Salario / Día",    v: salarioDia,          s:"Base ÷ 30" },
+                    { l:"Salario / Semana", v: salarioDia * 7,      s:"Día × 7" },
+                    { l:"Valor Hora",       v: vHora,               s:"Hora Extra" },
+                    { l:"Hora Extra",       v: vHoraEx,             s:"Hora × 1,5" },
+                    { l:"Festivo",          v: valorFestivo45,      s: festPactadoAplica ? "Pactado · Día × 1,75" : "Día × 1,75" },   // v150
+                  ].map(it=>(
+                    <div key={it.l} style={{ background:"#fff", borderRadius:8, padding:"14px 10px", border:"1px solid #d5d9dc", display:"flex", flexDirection:"column", justifyContent:"space-between", minHeight:110 }}>
+                      <div style={{ fontSize:9, color:"#666", letterSpacing:"0.06em", textTransform:"uppercase", fontFamily:"'Inter', -apple-system, sans-serif", fontWeight: 600, textAlign:"center", minHeight:26, display:"flex", alignItems:"center", justifyContent:"center", whiteSpace:"nowrap" }}>{it.l}</div>
+                      <div style={{ fontSize:17, fontWeight:700, color:"#1a1a1a", fontFamily:"'Inter', -apple-system, sans-serif", textAlign:"center" }}>{fmt(it.v)} €</div>
+                      <div style={{ fontSize:10, color:"#4ec9b8", fontFamily:"'Inter', -apple-system, sans-serif", fontWeight: 500, textAlign:"center" }}>{it.s}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div style={P}>
+                <div style={{ ...ST, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                  <span>▸ Nómina {es40h ? "40h" : "45h"} por Mes <BadgeBrutos /></span>
+                  <span style={{ display:"flex", gap:5 }}>
+                    {vacAcumulada   && <span style={{ fontSize:10, background:"#f2f5f7", color:"#1a1a1a", border:"1px solid #d5d9dc", borderRadius:5, padding:"3px 8px", fontFamily:"'Inter', sans-serif", fontWeight: 600, letterSpacing:"0.05em" }}>VAC AL FINAL</span>}
+                    {indemAcumulada && <span style={{ fontSize:10, background:"#f2f5f7", color:"#1a1a1a", border:"1px solid #d5d9dc", borderRadius:5, padding:"3px 8px", fontFamily:"'Inter', sans-serif", fontWeight: 600, letterSpacing:"0.05em" }}>INDEM AL FINAL</span>}
+                  </span>
+                </div>
+                <div style={{ overflowX:"auto" }}>
+                  <table style={{ width:"100%", borderCollapse:"collapse", fontSize:11 }}>
+                    <thead>
+                      <tr>
+                        <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"left",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",borderBottom:"1px solid #d5d9dc",color:"#555"}}>Mes</th>
+                        <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",borderBottom:"1px solid #d5d9dc",color:"#555"}}>Fracc.</th>
+                        <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",borderBottom:"1px solid #d5d9dc",color:"#555"}}>Base 40h €</th>
+                        <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",borderBottom:"1px solid #d5d9dc",color:"#555"}}>Vac. €</th>
+                        <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",borderBottom:"1px solid #d5d9dc",color:"#555"}}>Indem. €</th>
+                        <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",borderBottom:"1px solid #d5d9dc",color:"#1a1a1a"}}>H.Ex h</th>
+                        <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",borderBottom:"1px solid #d5d9dc",color:"#1a1a1a"}}>H.Ex €</th>
+                        {!es40h && <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",borderBottom:"1px solid #d5d9dc",color:"#b07030"}}>Plus Act. €</th>}
+                        <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",borderBottom:"1px solid #d5d9dc",color:"#1a1a1a"}}>TOTAL MES €</th>
+                        <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",borderBottom:"1px solid #d5d9dc",color:"#8a1e4a"}} title="Jornadas especiales (por encima del salario pactado)">Jorn.Esp €</th>
+                        <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",borderBottom:"1px solid #d5d9dc",color:"#5a8a5a"}}>Compl. €</th>
+                        <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",borderBottom:"1px solid #d5d9dc",color:"#1a1a1a"}}>TOTAL MES + Compl. €</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {desglose45.map((d,i)=>(
+                        <tr key={i} style={{ background:i%2===0?"transparent":"rgba(0,0,0,0.015)" }}>
+                          <td style={{padding:"6px 6px",fontSize:10.5,fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:"#1a1a1a",borderBottom:"1px solid #eae7e2",lineHeight:1.25,whiteSpace:"nowrap"}}>
+                            {(() => {
+                              const partes = d.mes.split(" de ");
+                              const mesNom = partes[0] || d.mes;
+                              const anio = partes[1] || "";
+                              return (
+                                <>
+                                  <span style={{textTransform:"capitalize",fontWeight:600}}>{mesNom}</span>
+                                  <span style={{color:"#888",fontSize:9,marginLeft:5}}>{anio}</span>
+                                  {!d.esCompleto&&<span style={{fontSize:8,color:"#4ec9b8",marginLeft:5}}>({d.desde}–{d.hasta})</span>}
+                                </>
+                              );
+                            })()}
+                          </td>
+                          <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:"#888",borderBottom:"1px solid #eae7e2"}}>{fmtM(d.fraccion)}</td>
+                          <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:"#1a1a1a",borderBottom:"1px solid #eae7e2"}}>{fmt(d.base40)}</td>
+                          <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color: d.vacMostrar === 0 ? "#ccc" : (d.vacMostrar < 0 ? "#c04040" : "#1a1a1a"),borderBottom:"1px solid #eae7e2"}}>{d.vacMostrar === 0 ? "—" : fmt(d.vacMostrar)}</td>
+                          <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:d.indem40===0?"#ccc":"#1a1a1a",borderBottom:"1px solid #eae7e2"}}>{d.indem40===0?"—":fmt(d.indem40)}</td>
+                          <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:"#1a1a1a",borderBottom:"1px solid #eae7e2"}}>{d.hMes}h</td>
+                          <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:"#1a1a1a",borderBottom:"1px solid #eae7e2"}}>{fmt(d.cobroHx)}</td>
+                          {!es40h && <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:d.plusAct>0?"#b07030":"#ccc",fontWeight:d.plusAct>0?600:400,borderBottom:"1px solid #eae7e2"}}>{d.plusAct>0?fmt(d.plusAct):"—"}</td>}
+                          <td style={{padding:"6px 6px",fontSize:13,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:"#1a1a1a",fontWeight:700,borderBottom:"1px solid #eae7e2"}}>{fmt(es40h ? (d.totalMes - (d.plusAct || 0) - (d.importeJE || 0)) : (d.totalMes - (d.importeJE || 0)))}</td>
+                          <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:(d.importeJE || 0) > 0 ? "#8a1e4a" : "#ccc",fontWeight:(d.importeJE || 0) > 0 ? 600 : 400,borderBottom:"1px solid #eae7e2"}} title={(d.totalJEDias || 0) > 0 ? `${d.totalJEDias} JE × (1 HX + ${IMPORTE_JORNADA_ESPECIAL}€)` : ""}>{(d.importeJE || 0) > 0 ? fmt(d.importeJE) : "—"}</td>
+                          <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:(complementos45[i]?.total || 0) > 0 ? "#5a8a5a" : "#ccc",fontWeight:(complementos45[i]?.total || 0) > 0 ? 600 : 400,borderBottom:"1px solid #eae7e2"}}>{(complementos45[i]?.total || 0) > 0 ? fmt(complementos45[i].total) : "—"}</td>
+                          <td style={{padding:"6px 6px",fontSize:13,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:"#1a1a1a",fontWeight:800,borderBottom:"1px solid #eae7e2"}}>{fmt((es40h ? (d.totalMes - (d.plusAct || 0)) : d.totalMes) + (complementos45[i]?.total || 0))}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr style={{ background:"#f2f5f7" }}>
+                        <td colSpan={2} style={{padding:"8px",fontSize:10,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:"#1a1a1a",borderTop:"1px solid #d5d9dc"}}>TOTAL</td>
+                        <td style={{padding:"8px",fontSize:11,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:"#666",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{fmt(totBase)}</td>
+                        <td style={{padding:"8px",fontSize:11,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color: totVacMostrar < 0 ? "#c04040" : "#666",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{fmt(totVacMostrar)}</td>
+                        <td style={{padding:"8px",fontSize:11,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:"#666",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{fmt(totIndem)}</td>
+                        <td style={{padding:"8px",fontSize:11,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:"#1a1a1a",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{horasPorMes.reduce((s,v,i)=>{if (v === undefined || v === null || v === "") return s + Math.round((p.desglose[i]?.semanasLaborables||0)*5);return s + (v || 0);},0)}h</td>
+                        <td style={{padding:"8px",fontSize:11,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:"#1a1a1a",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{fmt(totHx)}</td>
+                        {!es40h && <td style={{padding:"8px",fontSize:11,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:totPlus>0?"#b07030":"#ccc",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{totPlus>0?fmt(totPlus):"—"}</td>}
+                        <td style={{padding:"8px",fontSize:13,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:"#1a1a1a",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{fmt(es40h ? (totFinal - (totPlus || 0) - totJEImporte) : (totFinal - totJEImporte))}</td>
+                        <td style={{padding:"8px",fontSize:11,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:totJEImporte > 0 ? "#8a1e4a" : "#ccc",fontWeight:700,borderTop:"1px solid #d8d4ce"}} title={totJEDias > 0 ? `${totJEDias} JE totales` : ""}>{totJEImporte > 0 ? fmt(totJEImporte) : "—"}</td>
+                        <td style={{padding:"8px",fontSize:11,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:totalCompl > 0 ? "#5a8a5a" : "#ccc",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{totalCompl > 0 ? fmt(totalCompl) : "—"}</td>
+                        <td style={{padding:"8px",fontSize:13,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:"#1a1a1a",fontWeight:800,borderTop:"1px solid #d8d4ce"}}>{fmt((es40h ? (totFinal - (totPlus || 0)) : totFinal) + totalCompl)}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+
+              {/* Tabla detallada de complementos por mes */}
+              {totalCompl > 0 && (
+                <div style={P}>
+                  <div style={ST}>▸ Complementos de Nómina por Mes</div>
+                  <div style={{ overflowX: "auto" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                      <thead>
+                        <tr>
+                          {["Mes","Herramienta €","Coche €","Vivienda €","Seguro Vida €","Días comida","Comida €","TOTAL PLUS €"].map((h, hi) => (
+                            <th key={hi} style={{ padding: "7px 10px", fontSize: 9, letterSpacing: "0.12em",
+                              textTransform: "uppercase", color: "#555", fontWeight: 700,
+                              textAlign: hi === 0 ? "left" : "right",
+                              fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", borderBottom: "1px solid #d5d9dc" }}>
+                              {h}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {complementos45.map((c, i) => (
+                          <tr key={i} style={{ background: i % 2 === 0 ? "transparent" : "rgba(0,0,0,0.015)" }}>
+                            <td style={{ padding: "8px 10px", fontSize: 11, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", color: "#1a1a1a", textTransform: "capitalize", borderBottom: "1px solid #eae7e2" }}>
+                              {p.desglose[i].mes}
+                              {!p.desglose[i].esCompleto && <span style={{ fontSize: 9, color: "#888", marginLeft: 6 }}>{p.desglose[i].desde}–{p.desglose[i].hasta}</span>}
+                            </td>
+                            {[
+                              plusHerramienta.importe ? fmt(c.herramienta) : "—",
+                              plusCoche.importe       ? fmt(c.coche)       : "—",
+                              plusVivienda.importe    ? fmt(c.vivienda)    : "—",
+                              plusSeguroVida.importe  ? fmt(c.seguroVida)  : "—",
+                              plusComida.importeDia   ? `${c.diasComida}d` : "—",
+                              plusComida.importeDia   ? fmt(c.comida)      : "—",
+                            ].map((v, vi) => (
+                              <td key={vi} style={{ padding: "8px 10px", fontSize: 11, textAlign: "right",
+                                fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", color: v === "—" ? "#ccc" : "#1a1a1a",
+                                borderBottom: "1px solid #eae7e2" }}>{v}</td>
+                            ))}
+                            <td style={{ padding: "8px 10px", fontSize: 12, textAlign: "right",
+                              fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", color: "#4ec9b8", fontWeight: 700,
+                              borderBottom: "1px solid #eae7e2" }}>{fmt(c.total)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr style={{ background:"rgba(184,134,74,0.06)" }}>
+                          <td style={{ padding:"8px 10px", fontSize:10, letterSpacing:"0.1em", textTransform:"uppercase", fontWeight:700, fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", color:"#4ec9b8", borderTop:"1px solid #d8d4ce" }}>TOTAL</td>
+                          <td style={{ padding:"8px 10px", fontSize:11, textAlign:"right", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", color:"#666", fontWeight:700, borderTop:"1px solid #d8d4ce" }}>{plusHerramienta.importe ? fmt(complementos45.reduce((s,c)=>s+c.herramienta,0)) : "—"}</td>
+                          <td style={{ padding:"8px 10px", fontSize:11, textAlign:"right", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", color:"#666", fontWeight:700, borderTop:"1px solid #d8d4ce" }}>{plusCoche.importe ? fmt(complementos45.reduce((s,c)=>s+c.coche,0)) : "—"}</td>
+                          <td style={{ padding:"8px 10px", fontSize:11, textAlign:"right", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", color:"#666", fontWeight:700, borderTop:"1px solid #d8d4ce" }}>{plusVivienda.importe ? fmt(complementos45.reduce((s,c)=>s+c.vivienda,0)) : "—"}</td>
+                          <td style={{ padding:"8px 10px", fontSize:11, textAlign:"right", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", color:"#666", fontWeight:700, borderTop:"1px solid #d8d4ce" }}>{plusSeguroVida.importe ? fmt(complementos45.reduce((s,c)=>s+c.seguroVida,0)) : "—"}</td>
+                          <td style={{ padding:"8px 10px", fontSize:11, textAlign:"right", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", color:"#666", fontWeight:700, borderTop:"1px solid #d8d4ce" }}>{plusComida.importeDia ? `${complementos45.reduce((s,c)=>s+c.diasComida,0)}d` : "—"}</td>
+                          <td style={{ padding:"8px 10px", fontSize:11, textAlign:"right", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", color:"#666", fontWeight:700, borderTop:"1px solid #d8d4ce" }}>{plusComida.importeDia ? fmt(complementos45.reduce((s,c)=>s+c.comida,0)) : "—"}</td>
+                          <td style={{ padding:"8px 10px", fontSize:13, textAlign:"right", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", color:"#4ec9b8", fontWeight:700, borderTop:"1px solid #d8d4ce" }}>{fmt(totalCompl)}</td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+
+                  <div style={{ marginTop: 16, padding: "16px 20px", background: "#f2f5f7",
+                    borderRadius: 8, border: "1px solid #d5d9dc", display: "flex",
+                    justifyContent: "space-between", alignItems: "center" }}>
+                    <div>
+                      <div style={{ fontSize: 12, color: "#666", letterSpacing: "0.1em", textTransform: "uppercase",
+                        fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", marginBottom: 4, fontWeight: 600 }}>Total a percibir + complementos</div>
+                      <div style={{ fontSize: 11, color: "#888", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>
+                        {fmtE(totFinal)} salario {totalFestDias45 > 0 && `+ ${fmtE(totalFestImport45)} festivos `}+ {fmtE(totalCompl)} complementos
+                      </div>
+                    </div>
+                    <div style={{ fontSize: 26, fontWeight: 800, color: "#1a1a1a", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", letterSpacing: "-0.01em" }}>
+                      {fmtE(totFinal + totalFestImport45 + totalCompl)}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div style={P}>
+                <div style={ST}>▸ Resumen del Período <BadgeBrutos /></div>
+                <Row label="Base 40h equivalente"  value={fmtE(totBase)} />
+                <Row label="  · Vacaciones"         value={fmtE(totalVac45)}   muted />
+                <Row label="  · Indemnización"      value={fmtE(totalIndem45)} muted />
+                <Div />
+                <Row label={`+ Horas extra (${horasPorMes.reduce((s,v)=>s+(v||0),0)}h)`} value={`+ ${fmtE(totHx)}`} />
+                {totPlus > 0 && !es40h && <Row label="+ Plus de Actividad" value={`+ ${fmtE(totPlus)}`} />}
+                {totVd  > 0 && <Row label={`− Vac. disfrutadas (${totalVdDias}d)`} value={`− ${fmtE(totVd)}`} />}
+                <Div />
+                <Row label={`TOTAL A PERCIBIR (${es40h ? "40h" : "45h"})`} value={fmtE((es40h ? (totFinal - (totPlus || 0)) : totFinal) + (totalFestImport45 || 0))} highlight />
+                <Row label="Promedio mensual" value={fmtE((es40h ? (totFinal - (totPlus || 0)) : totFinal)/p.mesesTotales)} sub={`sobre ${fmtM(p.mesesTotales)} meses`} green />
+                <Row label="Promedio semanal" value={fmtE((es40h ? (totFinal - (totPlus || 0)) : totFinal)/p.semanasTotales)} sub={`sobre ${p.semanasTotales} sem. L-V`} />
+                {(totalCompl > 0 || totalFestDias45 > 0 || totJEDias > 0) && (
+                  <>
+                    <Div />
+                    <div style={{ padding:"10px 12px", background:"#f8f5ff", borderRadius:6, border:"1px solid #d8c8e8" }}>
+                      <div style={{ fontSize:9, color:"#6a3a9a", letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:6 }}>Extras del período</div>
+                      {totalFestDias45 > 0 && (
+                        <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
+                          <span style={{ fontSize:11, color:"#6a3a9a", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>{totalFestDias45} festivo{totalFestDias45>1?"s":""} (incluido en total)</span>
+                          <span style={{ fontSize:12, fontWeight:700, color:"#6a3a9a", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>+ {fmtE(totalFestImport45)}</span>
+                        </div>
+                      )}
+                      {totJEDias > 0 && (
+                        <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
+                          <span style={{ fontSize:11, color:"#8a1e4a", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>{totJEDias} jornada{totJEDias>1?"s":""} especial{totJEDias>1?"es":""} (incluido en total)</span>
+                          <span style={{ fontSize:12, fontWeight:700, color:"#8a1e4a", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>+ {fmtE(totJEImporte)}</span>
+                        </div>
+                      )}
+                      {totalCompl > 0 && (
+                        <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
+                          <span style={{ fontSize:11, color:"#5a8a5a", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>Complementos</span>
+                          <span style={{ fontSize:12, fontWeight:700, color:"#5a8a5a", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>+ {fmtE(totalCompl)}</span>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+                {/* v84: Box Coste Empresa — vista rápida SS sobre datos en vivo */}
+                {/* v146: visible también para coordinadores. No consulta Supabase: calcula
+                    con los datos del formulario en pantalla, así que no expone perfiles
+                    de otros proyectos. La pestaña Coste Empresa sigue siendo solo admin. */}
+                {(esAdmin || esCoordinadorApp45) && desglose45.length > 0 && (() => {
+                  const totalPercibido45 = (es40h ? (totFinal - (totPlus || 0)) : totFinal) + (totalFestImport45 || 0);
+                  // Calcular SS por mes usando calcularCosteEmpresaMes con datos en vivo
+                  let ssPrincipalTot = 0, ssVacTot = 0, ssHxTot = 0, imeiTot = 0, solidTot = 0;
+                  desglose45.forEach((d, i) => {
+                    const c = complementos45[i] || {};
+                    const festImpM = importeFestMes45[i] || 0;
+                    const jeImpM   = d.importeJE || 0;
+                    const plusA    = es40h ? 0 : (d.plusAct || 0);
+                    const vdShow   = d.vdShow || 0;
+                    // Base bruta (con vac completa, sin restar disfrutadas)
+                    const totalBruto = (d.base40 || 0) + (d.vac40 || 0) + (d.indem40 || 0) + (d.cobroHx || 0) + plusA
+                                     + festImpM + jeImpM
+                                     + (c.herramienta || 0) + (c.coche || 0) + (c.vivienda || 0) + (c.seguroVida || 0) + (c.comida || 0);
+                    const ce = calcularCosteEmpresaMes({
+                      total: totalBruto,
+                      vacaciones: d.vac40 || 0,
+                      vacDisfrutadas: vdShow,
+                      indem: d.indem40 || 0,
+                      horasExtraEur: d.cobroHx || 0,
+                      plusVivienda: c.vivienda || 0,
+                      irpfActivo: false,      // no IRPF en vista rápida
+                      pctIRPF: 0,
+                      esPrimerMes: i === 0,
+                      importeExento: 0,       // no baja médica
+                      firmaContrato: true,
+                      incluirGestoria: false, // solo SS, sin gestoría
+                      vacAcumulada,
+                    });
+                    ssPrincipalTot += ce.ssPrincipal || 0;
+                    ssVacTot       += ce.ssVacaciones || 0;
+                    ssHxTot        += ce.ssHorasExtra || 0;
+                    imeiTot        += ce.imei || 0;
+                    solidTot       += ce.solidaridad || 0;
+                  });
+                  const costeSSTotal = ssPrincipalTot + ssVacTot + ssHxTot + imeiTot + solidTot;
+                  const costeTotal   = totalPercibido45 + costeSSTotal;
+                  const pctSobre     = totalPercibido45 > 0 ? (costeSSTotal / totalPercibido45 * 100) : 0;
+                  return (
+                    <>
+                      <Div />
+                      <details open style={{ padding:"14px 18px", background:"#e3f2fd", borderRadius:8, border:"1px solid #90caf9" }}>
+                        <summary style={{ cursor:"pointer", fontSize:12, color:"#1a1a1a", letterSpacing:"0.12em", textTransform:"uppercase", fontWeight:800, marginBottom:2, outline:"none", fontFamily:"'Inter', -apple-system, sans-serif" }}>
+                          ▸ Coste Empresa (vista rápida) <span style={{ fontSize:10, color:"#1565c0", marginLeft:8, letterSpacing:"0.05em", fontWeight: 600 }}>solo SS</span>
+                        </summary>
+                        <div style={{ marginTop:12, display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:10 }}>
+                          <div style={{ padding:"14px 16px", background:"#fff", borderRadius:8, border:"1px solid #bbdefb" }}>
+                            <div style={{ fontSize:11, color:"#1a1a1a", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:6, fontFamily:"'Inter', -apple-system, sans-serif", fontWeight: 700 }}>Coste SS Empresa</div>
+                            <div style={{ fontSize:20, fontWeight:800, color:"#1a1a1a", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", letterSpacing: "-0.01em" }}>{fmtE(costeSSTotal)}</div>
+                          </div>
+                          <div style={{ padding:"14px 16px", background:"#fff", borderRadius:8, border:"1px solid #bbdefb" }}>
+                            <div style={{ fontSize:11, color:"#1a1a1a", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:6, fontFamily:"'Inter', -apple-system, sans-serif", fontWeight: 700 }}>Coste Total</div>
+                            <div style={{ fontSize:20, fontWeight:800, color:"#1a1a1a", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", letterSpacing: "-0.01em" }}>{fmtE(costeTotal)}</div>
+                          </div>
+                          <div style={{ padding:"14px 16px", background:"#fff", borderRadius:8, border:"1px solid #bbdefb" }}>
+                            <div style={{ fontSize:11, color:"#1a1a1a", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:6, fontFamily:"'Inter', -apple-system, sans-serif", fontWeight: 700 }}>% s/Salario</div>
+                            <div style={{ fontSize:20, fontWeight:800, color:"#1a1a1a", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", letterSpacing: "-0.01em" }}>{pctSobre.toFixed(2)} %</div>
+                          </div>
+                        </div>
+                        <div style={{ marginTop:10, fontSize:10, color:"#1565c0", letterSpacing:"0.02em", fontFamily:"'Inter', sans-serif", fontWeight: 500 }}>
+                          Incluye SS Principal, SS Vac, SS H.Extra, IMEI y Solidaridad. No incluye gestoría ni IRPF vivienda. Para desglose completo, ir a la pestaña Coste Empresa.
+                        </div>
+                      </details>
+                    </>
+                  );
+                })()}
+                {/* v69: Resumen del calendario del proyecto (días del trabajador por categoría) */}
+                {proyectoActivoCtx?.__calendario?.dias && fechaInicio && fechaFin && (() => {
+                  const cal = proyectoActivoCtx.__calendario;
+                  const setFest = new Set(festivosComunidadCal || []);
+                  let cRodaje = 0, cLaboralNoRodaje = 0, cVacaciones = 0, cFestivosTrab = 0, cFestivosNoTrab = 0, cDescanso = 0, cEspecial = 0;
+                  for (const [fecha, info] of Object.entries(cal.dias || {})) {
+                    if (fecha < fechaInicio || fecha > fechaFin) continue;
+                    if (!info) continue;
+                    // v70: contar especial aparte (puede coexistir con laboral/rodaje)
+                    if (info.especial) cEspecial++;
+                    const esFest = setFest.has(fecha);
+                    if (esFest) {
+                      if (info.festivo_trabajado) cFestivosTrab++;
+                      else cFestivosNoTrab++;
+                      continue; // festivo tiene prioridad, no lo contamos también como laboral
+                    }
+                    if (info.vacaciones) { cVacaciones++; continue; }
+                    if (info.descanso) { cDescanso++; continue; }
+                    if (info.rodaje) { cRodaje++; continue; }
+                    if (info.laboral) { cLaboralNoRodaje++; continue; }
+                  }
+                  const hayAlgo = cRodaje + cLaboralNoRodaje + cVacaciones + cFestivosTrab + cFestivosNoTrab + cDescanso + cEspecial > 0;
+                  if (!hayAlgo) return null;
+                  const cats = [
+                    { label: "Rodaje",              n: cRodaje,           bg: "#faf1e0", border: "#c8963a", color: "#7a5a2a" },
+                    { label: "Laboral no-rodaje",   n: cLaboralNoRodaje,  bg: "#e8f0e0", border: "#8ab070", color: "#3a5a2a" },
+                    { label: "Jornada especial",    n: cEspecial,         bg: "#ffd6e8", border: "#d63a7a", color: "#8a1e4a" },
+                    { label: "Vacaciones",          n: cVacaciones,       bg: "#e0edf5", border: "#5090c0", color: "#204878" },
+                    { label: "Festivos trabajados", n: cFestivosTrab,     bg: "#ffe8c8", border: "#e89838", color: "#8a5820" },
+                    { label: "Festivos no trab.",   n: cFestivosNoTrab,   bg: "#fde0e0", border: "#c05050", color: "#8a2020" },
+                    { label: "Descanso",            n: cDescanso,         bg: "#ece0f0", border: "#8a5aa0", color: "#502870" },
+                  ];
+                  return (
+                    <>
+                      <Div />
+                      <div style={{ padding:"10px 12px", background:"#f8f5ff", borderRadius:6, border:"1px solid #d8c8e8" }}>
+                        <div style={{ fontSize:9, color:"#6a3a9a", letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:8 }}>Días del calendario en el período</div>
+                        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(110px, 1fr))", gap:6 }}>
+                          {cats.map(c => (
+                            <div key={c.label} style={{ background:c.bg, border:`1px solid ${c.border}`, borderRadius:6, padding:"8px 10px", textAlign:"center" }}>
+                              <div style={{ fontSize:22, fontWeight:800, color:c.color, fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", lineHeight:1, letterSpacing: "-0.02em" }}>{c.n}</div>
+                              <div style={{ fontSize:10, color:c.color, marginTop:5, letterSpacing:"0.08em", textTransform:"uppercase", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", opacity: c.n === 0 ? 0.5 : 1, fontWeight: 700 }}>{c.label}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  );
+                })()}
+                {/* Aviso orientativo */}
+                <div style={{ marginTop:16, paddingTop:12, borderTop:"1px solid #d5d9dc", fontSize:10, color:"#666", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", lineHeight:1.5, fontStyle:"italic", textAlign:"center" }}>
+                  Cálculo orientativo del salario mensual bruto, que puede diferir ligeramente de la nómina real generada en cada periodo.
+                </div>
+              </div>
+            </>
+          ) : (
+            <div style={{ ...P, textAlign:"center", padding:"64px 24px" }}>
+              <div style={{ width:46, height:46, margin:"0 auto 16px", borderRadius:10, display:"flex", alignItems:"center", justifyContent:"center",
+                            background: fechasPendientes ? "#fdf3e3" : "#eaf6f3",
+                            border: `1px solid ${fechasPendientes ? "#e8c98a" : "#c7e8e0"}` }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={fechasPendientes ? "#b26a00" : "#4ec9b8"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  {fechasPendientes ? (
+                    <><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></>
+                  ) : (
+                    <><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></>
+                  )}
+                </svg>
+              </div>
+              <div style={{ fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontSize:12, letterSpacing:"0.15em", textTransform:"uppercase", fontWeight:700, color:"#1a1a1a", marginBottom:8 }}>
+                {fechasPendientes ? "Pendiente de fechas" : "Sin datos suficientes"}
+              </div>
+              <div style={{ fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontSize:12, color:"#666", lineHeight:1.6, maxWidth:430, margin:"0 auto" }}>
+                {fechasPendientes
+                  ? "El perfil se puede guardar así. Cuando conozcas las fechas, ábrelo con Modificar, desmarca «Fechas pendientes» y pulsa Guardar cambios."
+                  : "Introduce el salario y las fechas de inicio y fin para calcular el desglose."}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Botones de exportación al pie */}
+      <div className="no-print" style={{ maxWidth: 2100, margin: "20px auto 0", display: "flex", justifyContent: "center", gap: 10 }}>
+        <button
+          onClick={exportarCSV45}
+          disabled={!p || desglose45.length === 0}
+          style={{
+            padding: "10px 24px", fontSize: 11, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+            letterSpacing: "0.15em", textTransform: "uppercase", borderRadius: 4,
+            cursor: (p && desglose45.length) ? "pointer" : "not-allowed", fontWeight: 700,
+            border: "1px solid #4ec9b8",
+            background: (p && desglose45.length) ? "#4ec9b8" : "transparent",
+            color: (p && desglose45.length) ? "#f2f5f7" : "#666",
+            opacity: (p && desglose45.length) ? 1 : 0.5,
+            transition: "all 0.15s",
+          }}
+          title="Descargar nómina como CSV (Excel)"
+        >⬇ Exportar CSV</button>
+        <button
+          onClick={exportarPDF45}
+          disabled={!p || desglose45.length === 0}
+          style={{
+            padding: "10px 24px", fontSize: 11, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+            letterSpacing: "0.15em", textTransform: "uppercase", borderRadius: 4,
+            cursor: (p && desglose45.length) ? "pointer" : "not-allowed", fontWeight: 700,
+            border: "1px solid #4ec9b8",
+            background: (p && desglose45.length) ? "#4ec9b8" : "transparent",
+            color: (p && desglose45.length) ? "#f2f5f7" : "#666",
+            opacity: (p && desglose45.length) ? 1 : 0.5,
+            transition: "all 0.15s",
+          }}
+          title="Abrir vista de PDF (Guardar HTML / Imprimir / Cerrar)"
+        >🖨 Abrir PDF</button>
+        {/* v93: Exportar Listado (solo admin/coordinador) */}
+        {(esAdmin || esCoordinadorApp45) && (
+          <button
+            onClick={() => setMostrarExportarListado(true)}
+            style={{
+              padding: "10px 24px", fontSize: 11, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+              letterSpacing: "0.15em", textTransform: "uppercase", borderRadius: 4,
+              cursor: "pointer", fontWeight: 700,
+              border: "1px solid #5a8a5a",
+              background: "#5a8a5a",
+              color: "#f2f5f7",
+              transition: "all 0.15s",
+            }}
+            title="Exportar listado de perfiles del proyecto a Excel/CSV"
+          >📊 Exportar listado</button>
+        )}
+      </div>
+
+      {/* v93: Modal exportar listado */}
+      {mostrarExportarListado && (esAdmin || esCoordinadorApp45) && (
+        <PanelExportarListado usuarioActual={usuarioSesion} onCerrar={() => setMostrarExportarListado(false)} />
+      )}
+
+      {/* v98: Modal Cargar perfil (tarjetas) */}
+      {mostrarModalCargar && accionesPerfiles && (
+        <ModalCargarPerfil
+          perfiles={perfilesLista}
+          cargando={accionesPerfiles.cargando}
+          onCerrar={() => setMostrarModalCargar(false)}
+          onCargar={(perfil) => { accionesPerfiles.cargarPerfil(perfil); setMostrarModalCargar(false); }}
+          onBorrarSeleccionados={async (ids) => {
+            if (accionesPerfiles.borrarPerfilesSeleccionados) {
+              await accionesPerfiles.borrarPerfilesSeleccionados(ids);
+            }
+          }}
+          onRenombrar={async (perfil, nuevoNombre) => {
+            if (accionesPerfiles.renombrarPerfil) {
+              return await accionesPerfiles.renombrarPerfil(perfil, nuevoNombre);
+            }
+          }}
+          onDuplicar={async (perfil) => {
+            if (accionesPerfiles.duplicarPerfil) {
+              await accionesPerfiles.duplicarPerfil(perfil);
+            }
+          }}
+          perfilEnEdicion={perfilEnEdicionEstado}
+          onModificar={async () => {
+            if (accionesPerfiles.modificarPerfilActivo) {
+              await accionesPerfiles.modificarPerfilActivo();
+              setMostrarModalCargar(false);
+            }
+          }}
+          onModificarEspecifico={async (perfil) => {
+            // v138: Modificar abre el perfil enlazado; el guardado ocurre luego
+            if (accionesPerfiles.abrirParaModificar) {
+              accionesPerfiles.abrirParaModificar(perfil);
+              setMostrarModalCargar(false);
+            }
+          }}
+          tabActivo={modoTab === "tab40" ? "40h" : "45h"}
+        />
+      )}
+
+      {/* v98: Modal Guardar perfil */}
+      {mostrarModalGuardar && accionesPerfiles && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 100, display: "flex", justifyContent: "center", alignItems: "center", padding: 20 }} onClick={() => setMostrarModalGuardar(false)}>
+          <div style={{ background: "#e8ecef", borderRadius: 12, padding: 24, maxWidth: 500, width: "100%", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", boxShadow: "0 20px 60px rgba(0,0,0,0.5)" }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, paddingBottom: 14, borderBottom: "1px solid #d5d9dc" }}>
+              <h2 style={{ margin: 0, fontSize: 14, letterSpacing: "0.15em", textTransform: "uppercase", color: "#1a1a1a", fontWeight: 700, display: "flex", alignItems: "center", gap: 10 }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4ec9b8" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                Guardar perfil
+              </h2>
+              <button onClick={() => setMostrarModalGuardar(false)} style={{ background: "#0a0a0a", color: "#fff", border: "1px solid rgba(255,255,255,0.15)", padding: "8px 16px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase" }}>✕ Cerrar</button>
+            </div>
+            <label style={{ display: "block", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "#666", marginBottom: 6, fontWeight: 700 }}>Nombre del perfil</label>
+            <input
+              type="text"
+              value={nombreGuardarModal}
+              onChange={(e) => setNombreGuardarModal(e.target.value)}
+              onKeyDown={async (e) => {
+                if (e.key === "Enter" && nombreGuardarModal.trim()) {
+                  await accionesPerfiles.guardarConNombre(nombreGuardarModal.trim());
+                  setMostrarModalGuardar(false);
+                }
+              }}
+              autoFocus
+              style={{ width: "100%", padding: "11px 14px", fontSize: 13, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", border: "1px solid #d5d9dc", borderRadius: 6, color: "#1a1a1a", background: "#fff", outline: "none", boxSizing: "border-box", fontWeight: 500 }}
+            />
+            <div style={{ fontSize: 10, color: "#999", marginTop: 6, fontStyle: "italic" }}>Puedes editar el nombre sugerido. Escribir NO borra el texto (edítalo como quieras).</div>
+            <div style={{ marginTop: 20, display: "flex", justifyContent: "flex-end", gap: 8 }}>
+              <button onClick={() => setMostrarModalGuardar(false)} style={{ background: "transparent", border: "1px solid #b0b8bc", padding: "10px 20px", borderRadius: 6, cursor: "pointer", fontSize: 11, color: "#555", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase" }}>Cancelar</button>
+              <button
+                onClick={async () => {
+                  if (!nombreGuardarModal.trim()) { alert("Escribe un nombre"); return; }
+                  await accionesPerfiles.guardarConNombre(nombreGuardarModal.trim());
+                  setMostrarModalGuardar(false);
+                }}
+                disabled={!nombreGuardarModal.trim()}
+                style={{ background: nombreGuardarModal.trim() ? "#4ec9b8" : "#ccc", color: nombreGuardarModal.trim() ? "#0a0a0a" : "#888", border: "none", padding: "10px 20px", borderRadius: 6, cursor: nombreGuardarModal.trim() ? "pointer" : "not-allowed", fontSize: 11, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", display: "flex", alignItems: "center", gap: 6 }}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                Guardar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Banner de error/confirmación de exportación */}
+      {exportError && (
+        <div className="no-print" style={{
+          maxWidth: 2100, margin: "12px auto 0", padding: "10px 16px",
+          background: exportError.tipo === "ok" ? "#e8f5e8" : "#fdf0f0",
+          border: `1px solid ${exportError.tipo === "ok" ? "#c0e0c0" : "#e8c0c0"}`,
+          borderRadius: 5, color: exportError.tipo === "ok" ? "#2a7a50" : "#b02020",
+          fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontSize: 11, textAlign: "center",
+        }}>
+          {typeof exportError === "string" ? exportError : exportError.mensaje}
+        </div>
+      )}
+
+      <div style={{ maxWidth:2100, margin:"12px auto 0", textAlign:"center", fontSize:8, color:"#aaa", letterSpacing:"0.1em", textTransform:"uppercase" }}>
+        P40 = P45 ÷ (1 + 0,89286/30×7/40×1,5 × h) · Base = P40 × 0,89286 · Vac = Base ÷ 11,478452 · Plus Actividad = máx(0, P45×fracc − cobro)
+      </div>
+      <div style={{ maxWidth: 2100, margin: "8px auto 0", textAlign: "center", fontSize: 7, color: "#bbb", letterSpacing: "0.05em" }}>
+        {DISCLAIMER_PDF}
+      </div>
+
+      {/* ═══ MODAL CSV ═══ */}
+      {modalCSV && (
+        <ModalCSV
+          contenido={modalCSV.contenido}
+          filename={modalCSV.filename}
+          onClose={() => setModalCSV(null)}
+        />
+      )}
+
+      {/* ═══ MODAL PDF (vista print fullscreen) ═══ */}
+      {modalPDF && (
+        <ModalPDF
+          onClose={() => setModalPDF(false)}
+          filename={(() => {
+            const partes = [proyecto, productora, nombre].filter(Boolean).map(s => s.replace(/[^a-zA-Z0-9]/g, "_"));
+            return (partes.length ? partes.join("_") : "calculadora") + "_45h.pdf";
+          })()}
+          contenidoPrint={
+            <DocumentoImprimible
+              logoEmpresa={logoEmpresa}
+              nombre={nombre} puesto={puesto} proyecto={proyecto} productora={productora}
+              fechaInicio={fechaInicio} fechaFin={fechaFin}
+              salario45efectivo={salario45efectivo} horasRef={horasRef}
+              p40ref={p40ref} sumaRef={sumaRef}
+              baseRef={baseRef} vacRef={vacRef} indemRef={indemRef} hxRef={hxRef} vHoraEx={vHoraEx}
+              vHora={vHora} salarioDia={salarioDia}
+              p={p} desglose45={desglose45} complementos45={complementos45}
+              vacAcumulada={vacAcumulada} indemAcumulada={indemAcumulada}
+              horasPorMes={horasPorMes}
+              importeVdMes={importeVdMes} importeFestMes45={importeFestMes45}
+              totBase={totBase} totVac={totVac} totIndem={totIndem}
+              totHx={totHx} totPlus={totPlus} totVd={totVd}
+              totalVdDias={totalVdDias} totalCompl={totalCompl}
+              totFinal={totFinal}
+              totalVac45={totalVac45} totalIndem45={totalIndem45}
+              totalFestDias45={totalFestDias45} totalFestImport45={totalFestImport45} totJEDias={totJEDias} totJEImporte={totJEImporte}
+              totOver45Horas={totOver45Horas} totOver45Importe={totOver45Importe} over45Precio={over45Precio} over45Aplica={over45Aplica}
+              valorFestivo45={valorFestivo45} festPactadoAplica={festPactadoAplica}
+              plusHerramienta={plusHerramienta} plusCoche={plusCoche}
+              plusVivienda={plusVivienda} plusSeguroVida={plusSeguroVida}
+              plusComida={plusComida}
+              es40h={es40h}
+              codigoContable={codigoContable}
+              esFijoDiscontinuo={esFijoDiscontinuo}
+            />
+          }
+        />
+      )}
+
+      {/* Div oculto con el documento para exportación HTML */}
+      {p && desglose45.length > 0 && (
+        <div id="doc-imprimible-oculto" style={{ position: "absolute", left: "-99999px", top: 0, width: "210mm", visibility: "hidden", pointerEvents: "none" }} aria-hidden="true">
+          <DocumentoImprimible
+            logoEmpresa={logoEmpresa}
+            nombre={nombre} puesto={puesto} proyecto={proyecto} productora={productora}
+            fechaInicio={fechaInicio} fechaFin={fechaFin}
+            salario45efectivo={salario45efectivo} horasRef={horasRef}
+            p40ref={p40ref} sumaRef={sumaRef}
+            baseRef={baseRef} vacRef={vacRef} indemRef={indemRef} hxRef={hxRef} vHoraEx={vHoraEx}
+            vHora={vHora} salarioDia={salarioDia}
+            p={p} desglose45={desglose45} complementos45={complementos45}
+            vacAcumulada={vacAcumulada} indemAcumulada={indemAcumulada}
+            horasPorMes={horasPorMes}
+            importeVdMes={importeVdMes} importeFestMes45={importeFestMes45}
+            totBase={totBase} totVac={totVac} totIndem={totIndem}
+            totHx={totHx} totPlus={totPlus} totVd={totVd}
+            totalVdDias={totalVdDias} totalCompl={totalCompl}
+            totFinal={totFinal}
+            totalVac45={totalVac45} totalIndem45={totalIndem45}
+            totalFestDias45={totalFestDias45} totalFestImport45={totalFestImport45} totJEDias={totJEDias} totJEImporte={totJEImporte}
+              totOver45Horas={totOver45Horas} totOver45Importe={totOver45Importe} over45Precio={over45Precio} over45Aplica={over45Aplica}
+              valorFestivo45={valorFestivo45} festPactadoAplica={festPactadoAplica}
+            plusHerramienta={plusHerramienta} plusCoche={plusCoche}
+            plusVivienda={plusVivienda} plusSeguroVida={plusSeguroVida}
+            plusComida={plusComida}
+            es40h={es40h}
+            codigoContable={codigoContable}
+            esFijoDiscontinuo={esFijoDiscontinuo}
+          />
+        </div>
+      )}
+
+    </div>
+  );
+}
+
+
+
+// ═══════════════════════════════════════════════════════════════════════
+// SUPABASE: AUTH + GESTIÓN DE USUARIOS
+// ═══════════════════════════════════════════════════════════════════════
+
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "";
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
+const AUTH_KEY = "calc_user_v2";
+
+// Duración máxima de sesión sin actividad (en milisegundos).
+// El contador se resetea cada vez que el usuario interactúa con la app.
+// Cambia este valor si quieres más/menos tiempo:
+//   30 min = 30 * 60 * 1000
+//   1 hora = 60 * 60 * 1000
+//   1 día  = 24 * 60 * 60 * 1000
+const SESION_DURACION_MS = 30 * 60 * 1000;
+
+// --- Cliente REST ligero a Supabase (sin librería externa) ---
+async function supabaseFetch(path, options = {}) {
+  const url = `${SUPABASE_URL}/rest/v1/${path}`;
+  const headers = {
+    "apikey": SUPABASE_ANON_KEY,
+    "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+    "Content-Type": "application/json",
+    ...(options.headers || {}),
+  };
+  const res = await fetch(url, { ...options, headers });
+  if (!res.ok) {
+    const txt = await res.text().catch(() => "");
+    throw new Error(`Supabase error ${res.status}: ${txt}`);
+  }
+  // DELETE/PATCH a veces devuelven cuerpo vacío
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
+}
+
+// Login: busca por nombre+pin
+async function loginUsuario(nombre, pin) {
+  const params = new URLSearchParams({
+    nombre: `eq.${nombre}`,
+    pin: `eq.${pin}`,
+    activo: `eq.true`,
+    select: "id,nombre,es_admin,rol",
+  });
+  const data = await supabaseFetch(`usuarios?${params}`);
+  return Array.isArray(data) && data.length === 1 ? data[0] : null;
+}
+
+// Lista de nombres (para dropdown del login - solo usuarios activos)
+async function listarNombres() {
+  const data = await supabaseFetch(`usuarios?activo=eq.true&select=nombre&order=nombre.asc`);
+  return data.map(u => u.nombre);
+}
+
+// Lista completa (admin)
+async function listarUsuariosAdmin(adminPin) {
+  const data = await supabaseFetch(`usuarios?select=*&order=nombre.asc`, {
+    headers: { "x-admin-pin": adminPin },
+  });
+  return data;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// PROYECTOS (v43)
+// ═══════════════════════════════════════════════════════════════════════
+
+// Listar proyectos activos (para admin: todos; para usuario normal: solo los asignados)
+async function listarProyectos({ adminPin, usuarioId, esAdmin }) {
+  if (esAdmin && adminPin) {
+    // Admin: ve todos los proyectos
+    const data = await supabaseFetch(`proyectos?select=*&order=nombre.asc`, {
+      headers: { "x-admin-pin": adminPin },
+    });
+    return data || [];
+  }
+  // Usuario normal: solo los proyectos asignados y activos
+  const rel = await supabaseFetch(`usuario_proyectos?usuario_id=eq.${usuarioId}&select=proyecto_id`);
+  if (!Array.isArray(rel) || rel.length === 0) return [];
+  const ids = rel.map(r => r.proyecto_id).join(",");
+  const data = await supabaseFetch(`proyectos?id=in.(${ids})&activo=eq.true&select=*&order=nombre.asc`);
+  return data || [];
+}
+
+async function crearProyecto(adminPin, nombre, productora) {
+  return supabaseFetch(`proyectos`, {
+    method: "POST",
+    headers: { "x-admin-pin": adminPin, "Prefer": "return=representation" },
+    body: JSON.stringify({ nombre, productora, activo: true }),
+  });
+}
+
+async function actualizarProyecto(adminPin, id, cambios) {
+  return supabaseFetch(`proyectos?id=eq.${id}`, {
+    method: "PATCH",
+    headers: { "x-admin-pin": adminPin, "Prefer": "return=representation" },
+    body: JSON.stringify(cambios),
+  });
+}
+
+async function borrarProyecto(adminPin, id) {
+  return supabaseFetch(`proyectos?id=eq.${id}`, {
+    method: "DELETE",
+    headers: { "x-admin-pin": adminPin },
+  });
+}
+
+// Relaciones usuario_proyectos
+async function listarAsignaciones(adminPin) {
+  const data = await supabaseFetch(`usuario_proyectos?select=*`, {
+    headers: { "x-admin-pin": adminPin },
+  });
+  return data || [];
+}
+
+async function asignarUsuarioProyecto(adminPin, usuarioId, proyectoId) {
+  return supabaseFetch(`usuario_proyectos`, {
+    method: "POST",
+    headers: { "x-admin-pin": adminPin, "Prefer": "return=representation" },
+    body: JSON.stringify({ usuario_id: usuarioId, proyecto_id: proyectoId }),
+  });
+}
+
+async function desasignarUsuarioProyecto(adminPin, usuarioId, proyectoId) {
+  return supabaseFetch(`usuario_proyectos?usuario_id=eq.${usuarioId}&proyecto_id=eq.${proyectoId}`, {
+    method: "DELETE",
+    headers: { "x-admin-pin": adminPin },
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// PERFILES en Supabase (v46)
+// ═══════════════════════════════════════════════════════════════════════
+
+// Listar perfiles con filtro por proyecto y tab_id
+// - Si proyectoId es null y verTodos=false → devuelve []
+// - Si verTodos=true (admin) → todos los perfiles
+async function listarPerfilesSupabase({ tabId, proyectoId, verTodos, adminPin }) {
+  let path = `perfiles?select=*&order=created_at.desc`;
+  if (tabId) path += `&tab_id=eq.${tabId}`;
+  if (!verTodos) {
+    if (!proyectoId) return [];
+    path += `&proyecto_id=eq.${proyectoId}`;
+  }
+  // v93: enviar admin pin siempre que se tenga (para que admin vea perfiles de otros users también)
+  const headers = adminPin ? { "x-admin-pin": adminPin } : {};
+  try {
+    const data = await supabaseFetch(path, { headers });
+    return data || [];
+  } catch (e) {
+    console.warn("Error cargando perfiles Supabase:", e.message);
+    return null; // null = error de red (para que caller sepa que debe usar fallback)
+  }
+}
+
+// v148: copia masiva de perfiles a otro proyecto (solo admin).
+// Inserta en lotes en lugar de uno a uno: con 100+ perfiles, una petición por
+// perfil es lenta y frágil. Mismo criterio que reemplazarTodosPuestos.
+// Copia, no mueve: los perfiles de origen no se tocan.
+async function copiarPerfilesAProyecto({ perfiles, proyectoDestinoId, autor, adminPin }) {
+  const LOTE = 50;
+  let copiados = 0;
+  const errores = [];
+  const headers = { "Prefer": "return=minimal", ...(adminPin ? { "x-admin-pin": adminPin } : {}) };
+
+  for (let i = 0; i < perfiles.length; i += LOTE) {
+    const trozo = perfiles.slice(i, i + LOTE).map(p => ({
+      proyecto_id: proyectoDestinoId,
+      // la BD guarda "45h"/"40h"; el estado usa iruna45/tab40 (ver DECISIONS D-14)
+      tab_id: p.tabId === "iruna45" ? "45h" : p.tabId === "tab40" ? "40h" : p.tabId,
+      nombre: p.nombre,
+      autor,
+      datos: p.datos,
+    }));
+    try {
+      await supabaseFetch(`perfiles`, { method: "POST", headers, body: JSON.stringify(trozo) });
+      copiados += trozo.length;
+    } catch (e) {
+      errores.push(`Lote ${Math.floor(i / LOTE) + 1}: ${e.message || e}`);
+    }
+  }
+  return { copiados, fallidos: perfiles.length - copiados, errores };
+}
+
+async function crearPerfilSupabase({ proyectoId, tabId, nombre, autor, datos }) {
+  return supabaseFetch(`perfiles`, {
+    method: "POST",
+    headers: { "Prefer": "return=representation" },
+    body: JSON.stringify({
+      proyecto_id: proyectoId,
+      tab_id: tabId,
+      nombre,
+      autor,
+      datos,
+    }),
+  });
+}
+
+async function borrarPerfilSupabase(perfilId, adminPin) {
+  const headers = adminPin ? { "x-admin-pin": adminPin } : {};
+  return supabaseFetch(`perfiles?id=eq.${perfilId}`, {
+    method: "DELETE",
+    headers,
+  });
+}
+
+// v51: renombrar perfil en Supabase (admin puede renombrar de otros proyectos con pin)
+async function actualizarPerfilSupabase(perfilId, cambios, adminPin) {
+  const headers = adminPin ? { "x-admin-pin": adminPin, "Prefer": "return=representation" } : { "Prefer": "return=representation" };
+  return supabaseFetch(`perfiles?id=eq.${perfilId}`, {
+    method: "PATCH",
+    headers,
+    body: JSON.stringify(cambios),
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// FESTIVOS en Supabase (v54)
+// ═══════════════════════════════════════════════════════════════════════
+
+async function listarFestivosSupabase(comunidad = null) {
+  try {
+    let path = `festivos?select=*&order=fecha.asc`;
+    if (comunidad) path += `&comunidad=eq.${comunidad}`;
+    const data = await supabaseFetch(path);
+    return data || [];
+  } catch (e) {
+    console.warn("Error cargando festivos:", e.message);
+    return null;
+  }
+}
+
+async function crearFestivoSupabase(adminPin, { fecha, nombre, tipo, comunidad }) {
+  return supabaseFetch(`festivos`, {
+    method: "POST",
+    headers: { "x-admin-pin": adminPin, "Prefer": "return=representation" },
+    body: JSON.stringify({ fecha, nombre, tipo, comunidad: comunidad || "bilbao" }),
+  });
+}
+
+async function actualizarFestivoSupabase(adminPin, id, cambios) {
+  return supabaseFetch(`festivos?id=eq.${id}`, {
+    method: "PATCH",
+    headers: { "x-admin-pin": adminPin, "Prefer": "return=representation" },
+    body: JSON.stringify(cambios),
+  });
+}
+
+async function borrarFestivoSupabase(adminPin, id) {
+  return supabaseFetch(`festivos?id=eq.${id}`, {
+    method: "DELETE",
+    headers: { "x-admin-pin": adminPin },
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// CALENDARIOS DE PROYECTO (v55)
+// ═══════════════════════════════════════════════════════════════════════
+
+async function obtenerCalendarioProyecto(proyectoId) {
+  try {
+    const data = await supabaseFetch(`calendarios_proyecto?proyecto_id=eq.${proyectoId}&select=*`);
+    return Array.isArray(data) && data.length > 0 ? data[0] : null;
+  } catch (e) {
+    console.warn("Error cargando calendario proyecto:", e.message);
+    return null;
+  }
+}
+
+async function crearCalendarioProyecto(auth, { proyectoId, fechaInicio, fechaFin, comunidad, dias = {}, notas = "", modoVacaciones = "mes_a_mes", modoIndemnizacion = "mes_a_mes" }) {
+  // v88: auth puede ser string (admin pin, retrocompat) u objeto {adminPin, userPin}
+  const headers = { "Prefer": "return=representation" };
+  if (typeof auth === "string") {
+    headers["x-admin-pin"] = auth;
+  } else if (auth && typeof auth === "object") {
+    if (auth.adminPin) headers["x-admin-pin"] = auth.adminPin;
+    if (auth.userPin) headers["x-user-pin"] = auth.userPin;
+  }
+  return supabaseFetch(`calendarios_proyecto`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      proyecto_id: proyectoId,
+      fecha_inicio: fechaInicio,
+      fecha_fin: fechaFin,
+      comunidad,
+      dias,
+      notas,
+      modo_vacaciones: modoVacaciones,      // v86
+      modo_indemnizacion: modoIndemnizacion, // v86
+    }),
+  });
+}
+
+async function actualizarCalendarioProyecto(auth, id, cambios) {
+  // v88: auth puede ser string (admin pin, retrocompat) u objeto {adminPin, userPin}
+  const c = { ...cambios };
+  if (c.fechaInicio !== undefined) { c.fecha_inicio = c.fechaInicio; delete c.fechaInicio; }
+  if (c.fechaFin !== undefined) { c.fecha_fin = c.fechaFin; delete c.fechaFin; }
+  c.updated_at = new Date().toISOString();
+  const headers = { "Prefer": "return=representation" };
+  if (typeof auth === "string") {
+    headers["x-admin-pin"] = auth;
+  } else if (auth && typeof auth === "object") {
+    if (auth.adminPin) headers["x-admin-pin"] = auth.adminPin;
+    if (auth.userPin) headers["x-user-pin"] = auth.userPin;
+  }
+  return supabaseFetch(`calendarios_proyecto?id=eq.${id}`, {
+    method: "PATCH",
+    headers,
+    body: JSON.stringify(c),
+  });
+}
+
+async function borrarCalendarioProyecto(adminPin, id) {
+  return supabaseFetch(`calendarios_proyecto?id=eq.${id}`, {
+    method: "DELETE",
+    headers: { "x-admin-pin": adminPin },
+  });
+}
+
+
+async function crearUsuario(adminPin, nombre, pin, esAdmin) {
+  return supabaseFetch(`usuarios`, {
+    method: "POST",
+    headers: { "x-admin-pin": adminPin, "Prefer": "return=representation" },
+    body: JSON.stringify({ nombre, pin, es_admin: esAdmin }),
+  });
+}
+
+async function actualizarUsuario(adminPin, id, cambios) {
+  return supabaseFetch(`usuarios?id=eq.${id}`, {
+    method: "PATCH",
+    headers: { "x-admin-pin": adminPin, "Prefer": "return=representation" },
+    body: JSON.stringify(cambios),
+  });
+}
+
+async function borrarUsuario(adminPin, id) {
+  return supabaseFetch(`usuarios?id=eq.${id}`, {
+    method: "DELETE",
+    headers: { "x-admin-pin": adminPin },
+  });
+}
+
+// --- LOGS DE ACTIVIDAD ---
+// Registrar evento (login, export_csv, export_pdf). No bloqueante: si falla, sigue.
+async function registrarLog(usuarioNombre, tipo, detalle = "") {
+  try {
+    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) return;
+    const ua = (typeof navigator !== "undefined" ? navigator.userAgent : "").slice(0, 200);
+    await supabaseFetch(`logs_actividad`, {
+      method: "POST",
+      headers: { "Prefer": "return=minimal" },
+      body: JSON.stringify({
+        usuario_nombre: usuarioNombre,
+        tipo,
+        detalle: detalle || null,
+        user_agent: ua || null,
+      }),
+    });
+  } catch (e) {
+    // Silencioso: no queremos romper la app si los logs fallan
+    console.warn("registrarLog falló:", e.message);
+  }
+}
+
+// --- PUESTOS COAC (catálogo en Supabase) ---
+// Listar todos los puestos (público, no requiere admin)
+async function listarPuestosCoac() {
+  const data = await supabaseFetch(`puestos_coac?select=*&order=orden.asc,nombre.asc`);
+  return data || [];
+}
+
+// Crear puesto manualmente
+async function crearPuestoCoac(adminPin, { codigo, nombre, categoria, orden = 0 }) {
+  return supabaseFetch(`puestos_coac`, {
+    method: "POST",
+    headers: { "x-admin-pin": adminPin, "Prefer": "return=representation" },
+    body: JSON.stringify({ codigo, nombre, categoria, orden }),
+  });
+}
+
+// Actualizar puesto
+async function actualizarPuestoCoac(adminPin, id, cambios) {
+  return supabaseFetch(`puestos_coac?id=eq.${id}`, {
+    method: "PATCH",
+    headers: { "x-admin-pin": adminPin, "Prefer": "return=representation" },
+    body: JSON.stringify(cambios),
+  });
+}
+
+// Borrar puesto
+async function borrarPuestoCoac(adminPin, id) {
+  return supabaseFetch(`puestos_coac?id=eq.${id}`, {
+    method: "DELETE",
+    headers: { "x-admin-pin": adminPin },
+  });
+}
+
+// Reemplazar TODOS los puestos: borra todos y carga los nuevos (usado por importador Excel)
+async function reemplazarTodosPuestos(adminPin, nuevosPuestos) {
+  // 1. Borrar todos
+  // Usamos id=gte.0 que matchea todos
+  await supabaseFetch(`puestos_coac?id=gte.0`, {
+    method: "DELETE",
+    headers: { "x-admin-pin": adminPin },
+  });
+  // 2. Insertar nuevos en lotes (Supabase tiene límite de payload, 200 a la vez es seguro)
+  const BATCH = 200;
+  for (let i = 0; i < nuevosPuestos.length; i += BATCH) {
+    const lote = nuevosPuestos.slice(i, i + BATCH);
+    await supabaseFetch(`puestos_coac`, {
+      method: "POST",
+      headers: { "x-admin-pin": adminPin, "Prefer": "return=minimal" },
+      body: JSON.stringify(lote),
+    });
+  }
+  return { ok: true, total: nuevosPuestos.length };
+}
+
+// --- SheetJS (xlsx) cargado dinámicamente desde CDN solo cuando se necesite ---
+let _xlsxPromise = null;
+function cargarXLSX() {
+  if (typeof window === "undefined") return Promise.reject(new Error("No window"));
+  if (window.XLSX) return Promise.resolve(window.XLSX);
+  if (_xlsxPromise) return _xlsxPromise;
+  _xlsxPromise = new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = "https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js";
+    s.onload = () => {
+      if (window.XLSX) resolve(window.XLSX);
+      else reject(new Error("XLSX no cargado"));
+    };
+    s.onerror = () => reject(new Error("No se pudo cargar SheetJS desde CDN"));
+    document.head.appendChild(s);
+  });
+  return _xlsxPromise;
+}
+
+// Parsear archivo Excel con el formato original del COAC
+// Devuelve { puestos: [{codigo, nombre, categoria, orden}], avisos: [] }
+async function parsearExcelPuestos(archivo) {
+  const XLSX = await cargarXLSX();
+  const buf = await archivo.arrayBuffer();
+  const wb = XLSX.read(buf, { type: "array" });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const filas = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+
+  let categoriaActual = "";
+  const puestos = [];
+  const avisos = [];
+  let orden = 0;
+
+  for (let i = 0; i < filas.length; i++) {
+    const fila = filas[i];
+    if (!fila || fila.length < 2) continue;
+    const codigo = (fila[0] != null ? String(fila[0]).trim() : "");
+    const nombre = (fila[1] != null ? String(fila[1]).trim() : "");
+
+    // Header
+    if (codigo === "CODIGO CONTABLE" && nombre === "EQUIPO TECNICO") continue;
+
+    // Fila totalmente vacía
+    if (!codigo && !nombre) continue;
+
+    // Fila de categoría (código vacío, nombre con texto)
+    if (!codigo && nombre) {
+      categoriaActual = nombre;
+      continue;
+    }
+
+    // Fila de puesto
+    if (codigo && nombre) {
+      if (!categoriaActual) {
+        avisos.push(`Fila ${i + 1}: puesto "${nombre}" sin categoría previa, se asigna "SIN CATEGORÍA"`);
+        categoriaActual = "SIN CATEGORÍA";
+      }
+      puestos.push({ codigo, nombre, categoria: categoriaActual, orden: orden++ });
+    }
+  }
+  return { puestos, avisos };
+}
+
+
+// ─────────────────────────────────────────────────────────────────────
+// EXCEL MASTER: Rellenar pestaña EQUIPO TÉCNICO con un perfil
+// ─────────────────────────────────────────────────────────────────────
+
+// Convierte índice de columna (0-based) a letra Excel (A, B, ..., Z, AA, AB, ..., HZ, ...)
+function colNumToLetter(n) {
+  let s = "";
+  let x = n;
+  while (x >= 0) {
+    s = String.fromCharCode((x % 26) + 65) + s;
+    x = Math.floor(x / 26) - 1;
+  }
+  return s;
+}
+
+// Devuelve clave de celda tipo "A8", "AB10" a partir de col (0-based) y row (1-based)
+function cellKey(col, row) {
+  return colNumToLetter(col) + row;
+}
+
+// Parsea fecha de Excel: puede venir como Date, número (serial) o string
+function parseFechaExcel(v) {
+  if (!v) return null;
+  if (v instanceof Date) return v;
+  if (typeof v === "number") {
+    // Excel serial: días desde 1900-01-01 (con bug del año bisiesto 1900)
+    const d = new Date(Date.UTC(1899, 11, 30));
+    d.setUTCDate(d.getUTCDate() + v);
+    return d;
+  }
+  if (typeof v === "string") {
+    const d = new Date(v);
+    if (!isNaN(d)) return d;
+  }
+  return null;
+}
+
+// Convierte fecha YYYY-MM-DD → Date local
+function fechaStrToDate(s) {
+  if (!s) return null;
+  const partes = String(s).split("-");
+  if (partes.length !== 3) return null;
+  return new Date(parseInt(partes[0]), parseInt(partes[1]) - 1, parseInt(partes[2]));
+}
+
+// Devuelve {año, mes (1-12)} de una Date
+function añoMes(d) {
+  return { year: d.getFullYear(), month: d.getMonth() + 1 };
+}
+
+// Detecta las columnas mensuales del Excel master
+// Lee fila 3, columnas a partir de la 29 (AC, índice 28 en 0-based)
+// Devuelve mapa: { "2026-04": { sueldosCol: 28, extrasCol: 29 }, ... }
+// Cada mes ocupa 10 columnas: inicio + 9 más. La columna donde está la fecha en fila 3
+// es la columna "AC" (2ª del bloque = SUELDOS valor). EXTRAS está 1 columna después.
+function detectarMesesExcel(sheetData) {
+  const fila3 = sheetData[2] || []; // 0-based: fila 3 es índice 2
+  const meses = {};
+  for (let ci = 28; ci < fila3.length; ci++) { // columna AC = índice 28
+    const v = fila3[ci];
+    const fecha = parseFechaExcel(v);
+    if (fecha && fecha.getDate() === 1) {
+      // Es inicio de mes. La col SUELDOS valor es esta misma columna (ci),
+      // y EXTRAS está en ci+1
+      const key = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, "0")}`;
+      // Pero ojo: en realidad el "sueldos valor" calculado está en ci (que tiene fecha primer día)
+      // y "extras" está en ci+1 (que tiene fecha último día). Mirando los encabezados de fila 5,
+      // la columna SUELDOS (valor) coincide con la fecha primer día.
+      if (!meses[key]) {
+        meses[key] = { sueldosCol: ci, extrasCol: ci + 1 };
+      }
+    }
+  }
+  return meses;
+}
+
+// Borra la fórmula y mete un valor en una celda del workbook
+// SheetJS: para sobrescribir, hay que asignar t (tipo) y v (value), y borrar f (formula)
+function setCellValue(ws, cellKey, value) {
+  // Si no existe la celda, la creamos
+  if (!ws[cellKey]) ws[cellKey] = {};
+  const cell = ws[cellKey];
+  // Eliminar fórmula y formato calculado
+  delete cell.f;
+  delete cell.F; // shared formula
+  if (value === null || value === undefined || value === "") {
+    cell.t = "z";
+    cell.v = undefined;
+  } else if (value instanceof Date) {
+    cell.t = "d";
+    cell.v = value;
+    cell.z = "yyyy-mm-dd";
+  } else if (typeof value === "number") {
+    cell.t = "n";
+    cell.v = value;
+  } else {
+    cell.t = "s";
+    cell.v = String(value);
+  }
+  return cell;
+}
+
+// Mapa de nombres de mes en español a número (1-12)
+const MES_NOMBRE_A_NUM = {
+  "enero": 1, "febrero": 2, "marzo": 3, "abril": 4, "mayo": 5, "junio": 6,
+  "julio": 7, "agosto": 8, "septiembre": 9, "octubre": 10, "noviembre": 11, "diciembre": 12,
+};
+function parseMesEspañol(s) {
+  if (!s) return null;
+  const partes = s.toLowerCase().trim().split(/\s+/);
+  if (partes.length < 2) return null;
+  const month = MES_NOMBRE_A_NUM[partes[0]];
+  const year = parseInt(partes[partes.length - 1]);
+  if (!month || isNaN(year)) return null;
+  return { year, month };
+}
+
+// Calcula el desglose mensual desde el perfil cargado
+// Devuelve: { meses: [{ key, año, mes, sueldoBase, extras }], totalVac, totalIndem, totalExtras }
+function calcularDistribucionMensual(perfil) {
+  const d = perfil.datos || {};
+  const desglose = d._calculado?.desglose45 || d.desglose45 || d.desglose || [];
+  const complementos = d._calculado?.complementos45 || d.complementos45 || d.complementos || [];
+  const esT40 = perfil.tabId === "tab40";
+
+  // Fechas de inicio para mapear cada elemento del desglose a su YYYY-MM
+  const fechaIni = fechaStrToDate(d.fechaInicio);
+  const fechaFin = fechaStrToDate(d.fechaFin);
+
+  let totalVac = 0;
+  let totalIndem = 0;
+  let totalExtras = 0;
+  const meses = [];
+
+  for (let i = 0; i < desglose.length; i++) {
+    const mes = desglose[i];
+    const c = complementos[i] || {};
+    const plusAct = esT40 ? 0 : (mes.plusAct || 0);
+
+    // Sueldo base = SOLO Salario Base (sin vac ni indem)
+    const sueldoBase = mes.base40 || 0;
+
+    // Extras = todo lo que NO es base, vac, ni indem
+    const extrasMes = (mes.cobroHx || 0) + plusAct
+      + (c.herramienta || 0) + (c.coche || 0) + (c.vivienda || 0)
+      + (c.seguroVida || 0) + (c.comida || 0);
+
+    totalVac += mes.vac40 || 0;
+    totalIndem += mes.indem40 || 0;
+    totalExtras += extrasMes;
+
+    // Detectar año y mes parseando el string "abril 2026"
+    let year = null, month = null;
+    const parsed = parseMesEspañol(mes.mes);
+    if (parsed) {
+      year = parsed.year;
+      month = parsed.month;
+    } else if (fechaIni) {
+      // Fallback: usar la fecha de inicio + índice
+      const tmp = new Date(fechaIni.getFullYear(), fechaIni.getMonth() + i, 1);
+      year = tmp.getFullYear();
+      month = tmp.getMonth() + 1;
+    }
+
+    if (year && month) {
+      const key = `${year}-${String(month).padStart(2, "0")}`;
+      meses.push({ key, year, month, sueldoBase, extras: extrasMes });
+    }
+  }
+
+  return { meses, totalVac, totalIndem, totalExtras, fechaIni, fechaFin };
+}
+
+// Función principal: rellena la fila destino del Excel master
+async function rellenarExcelMaster(archivoMaster, perfil, filaDestino) {
+  const XLSX = await cargarXLSX();
+  const buf = await archivoMaster.arrayBuffer();
+  // cellNF: leer formato de celdas, cellStyles: leer estilos, cellDates: parsear fechas
+  const wb = XLSX.read(buf, { type: "array", cellNF: true, cellStyles: true, cellDates: true });
+
+  const nombreHoja = "EQUIPO TÉCNICO";
+  const ws = wb.Sheets[nombreHoja];
+  if (!ws) {
+    throw new Error(`El Excel no tiene la pestaña "${nombreHoja}"`);
+  }
+
+  // Leer datos como matriz para detectar columnas mensuales
+  const sheetData = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
+  const mesesExcel = detectarMesesExcel(sheetData);
+
+  if (Object.keys(mesesExcel).length === 0) {
+    throw new Error("No se detectaron columnas mensuales en el Excel (fila 3, cols AC+)");
+  }
+
+  // Calcular distribución del perfil
+  const dist = calcularDistribucionMensual(perfil);
+  if (dist.meses.length === 0) {
+    throw new Error("El perfil no tiene desglose mensual calculado. Recarga el perfil y guárdalo de nuevo.");
+  }
+
+  const d = perfil.datos || {};
+
+  // ─── Rellenar bloque izquierdo ───
+  // D = código contable
+  setCellValue(ws, cellKey(3, filaDestino), d.codigoContable || "");
+  // F = nombre
+  setCellValue(ws, cellKey(5, filaDestino), d.nombre || "");
+  // G = salario pactado (numérico)
+  setCellValue(ws, cellKey(6, filaDestino), Number(d.salario45) || 0);
+  // K = fecha inicio
+  if (dist.fechaIni) setCellValue(ws, cellKey(10, filaDestino), dist.fechaIni);
+  // L = fecha fin
+  if (dist.fechaFin) setCellValue(ws, cellKey(11, filaDestino), dist.fechaFin);
+  // N = "SS"
+  setCellValue(ws, cellKey(13, filaDestino), "SS");
+  // U = total vacaciones (pisa fórmula)
+  setCellValue(ws, cellKey(20, filaDestino), Number(dist.totalVac) || 0);
+  // V = total indemnización (pisa fórmula)
+  setCellValue(ws, cellKey(21, filaDestino), Number(dist.totalIndem) || 0);
+  // W = total extras anual
+  setCellValue(ws, cellKey(22, filaDestino), Number(dist.totalExtras) || 0);
+
+  // ─── Rellenar columnas mensuales ───
+  const mesesEscritos = [];
+  const mesesNoEncontrados = [];
+  for (const m of dist.meses) {
+    const cols = mesesExcel[m.key];
+    if (!cols) {
+      mesesNoEncontrados.push(m.key);
+      continue;
+    }
+    // SUELDOS valor (col 2 del bloque mensual, p.ej. AC)
+    setCellValue(ws, cellKey(cols.sueldosCol, filaDestino), Number(m.sueldoBase) || 0);
+    // EXTRAS (col 3 del bloque mensual, p.ej. AD)
+    setCellValue(ws, cellKey(cols.extrasCol, filaDestino), Number(m.extras) || 0);
+    mesesEscritos.push(m.key);
+  }
+
+  // Generar archivo modificado
+  const nuevoBuf = XLSX.write(wb, { bookType: "xlsx", type: "array", cellStyles: true });
+  return { buffer: nuevoBuf, mesesEscritos, mesesNoEncontrados, mesesExcel };
+}
+
+
+async function listarLogs(adminPin, { usuario, tipo, limit = 200 } = {}) {
+  const params = new URLSearchParams();
+  params.set("select", "*");
+  params.set("order", "created_at.desc");
+  params.set("limit", String(limit));
+  if (usuario) params.set("usuario_nombre", `eq.${usuario}`);
+  if (tipo) params.set("tipo", `eq.${tipo}`);
+  return supabaseFetch(`logs_actividad?${params}`, {
+    headers: { "x-admin-pin": adminPin },
+  });
+}
+
+async function borrarLogsAntiguos(adminPin, dias = 30) {
+  const fechaLimite = new Date(Date.now() - dias * 24 * 60 * 60 * 1000).toISOString();
+  return supabaseFetch(`logs_actividad?created_at=lt.${fechaLimite}`, {
+    method: "DELETE",
+    headers: { "x-admin-pin": adminPin },
+  });
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════
+// PANTALLA DE LOGIN
+// ═══════════════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════════════
+// PANTALLA SELECTOR DE PROYECTO (v45)
+// ═══════════════════════════════════════════════════════════════════════
+function PantallaSelectorProyecto({ usuario, onSeleccionar, onLogout, onGestionar, onEditarCalendario, onExportarListado, refrescoToken }) {
+  const [proyectos, setProyectos] = useState([]);
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState(null);
+
+  const recargar = () => {
+    setCargando(true); setError(null);
+    listarProyectos({
+      adminPin: usuario.es_admin ? usuario.pin : null,
+      usuarioId: usuario.id,
+      esAdmin: usuario.es_admin,
+    })
+      .then(lista => {
+        // Filtrar solo activos (para admins también, la selección es de trabajo)
+        setProyectos((lista || []).filter(p => p.activo));
+        setCargando(false);
+      })
+      .catch(err => { setError(err.message); setCargando(false); });
+  };
+
+  // v149: recarga también cuando cambia refrescoToken. El panel de gestión se
+  // dibuja ENCIMA de esta pantalla sin desmontarla, así que al cerrarlo la lista
+  // se quedaba con los proyectos cargados al entrar y los nuevos no aparecían.
+  useEffect(() => { recargar(); }, [refrescoToken]);
+
+  // v105: cargar Inter
+  useEffect(() => {
+    const fontId = "inter-font-loader";
+    if (!document.getElementById(fontId)) {
+      const link = document.createElement("link");
+      link.id = fontId;
+      link.rel = "stylesheet";
+      link.href = "https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap";
+      document.head.appendChild(link);
+    }
+  }, []);
+
+  return (
+    <div style={{
+      minHeight: "100vh",
+      width: "100%",
+      position: "relative",
+      display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
+      fontFamily: "'Courier Prime', 'Courier New', monospace",
+      overflow: "hidden",
+      boxSizing: "border-box",
+    }}>
+      {/* v105: mismo bg.jpg que el login */}
+      <div style={{
+        position: "fixed",
+        top: 0, left: 0,
+        width: "100vw", height: "100vh",
+        backgroundImage: "url('/bg.jpg')",
+        backgroundSize: "cover",
+        backgroundPosition: "center center",
+        backgroundRepeat: "no-repeat",
+        zIndex: 0,
+      }} />
+      <div style={{
+        position: "fixed",
+        top: 0, left: 0,
+        width: "100vw", height: "100vh",
+        background: "linear-gradient(180deg, rgba(10,15,20,0.35) 0%, rgba(10,15,20,0.55) 100%)",
+        zIndex: 1,
+      }} />
+
+      {/* Card opaca con blur */}
+      <div style={{
+        position: "relative", zIndex: 2,
+        width: "100%", maxWidth: 620,
+        background: "rgba(20,20,20,0.92)",
+        backdropFilter: "blur(20px)",
+        WebkitBackdropFilter: "blur(20px)",
+        border: "1px solid rgba(255,255,255,0.08)",
+        borderRadius: 16,
+        padding: "40px 36px",
+        boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
+      }}>
+        {/* Cabecera */}
+        <div style={{ textAlign: "center", marginBottom: 32 }}>
+          {/* Icono triángulos en cuadro turquesa */}
+          <div style={{
+            width: 72, height: 72,
+            background: "rgba(78,201,184,0.08)",
+            border: "1px solid rgba(78,201,184,0.2)",
+            borderRadius: 16,
+            display: "inline-flex", alignItems: "center", justifyContent: "center",
+            marginBottom: 16,
+          }}>
+            <svg width="44" height="34" viewBox="0 0 44 34">
+              <polygon points="0,0 18,17 0,34" fill="#3a4a52"/>
+              <polygon points="11,0 29,17 11,34" fill="#8dcfc4" opacity="0.85"/>
+              <polygon points="22,0 40,17 22,34" fill="#4ec9b8"/>
+            </svg>
+          </div>
+          <div style={{
+            fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+            fontSize: 24, fontWeight: 500, color: "#f0f0f0",
+            letterSpacing: "-0.01em", marginBottom: 6,
+          }}>
+            Selecciona proyecto
+          </div>
+          <div style={{
+            fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+            fontSize: 12, color: "#888", letterSpacing: "0.05em",
+          }}>
+            {usuario.nombre}{usuario.es_admin ? " · Admin" : (usuario.rol === "coordinador" ? " · Coordinador" : "")}
+          </div>
+          <div style={{ fontSize: 12, color: "#4ec9b8", letterSpacing: "0.2em", fontWeight: 700, marginTop: 10, fontFamily: "'Courier Prime', 'Courier New', monospace" }} title="Versión de la app">
+            {APP_VERSION}
+          </div>
+        </div>
+
+        {cargando && (
+          <div style={{ textAlign: "center", padding: 20, color: "#888", fontSize: 12, letterSpacing: "0.1em", fontFamily: "'Inter', sans-serif" }}>
+            Cargando proyectos...
+          </div>
+        )}
+
+        {error && (
+          <div style={{ padding: 14, background: "rgba(200,80,80,0.15)", border: "1px solid rgba(200,80,80,0.4)", borderRadius: 8, color: "#e88", fontSize: 11, marginBottom: 12, textAlign: "center" }}>
+            ✕ {error}
+          </div>
+        )}
+
+        {/* Sin proyectos */}
+        {!cargando && !error && proyectos.length === 0 && (
+          <div style={{
+            padding: 24, background: "rgba(78,201,184,0.06)", border: "1px solid rgba(78,201,184,0.2)",
+            borderRadius: 10, color: "#4ec9b8", fontSize: 13, textAlign: "center", lineHeight: 1.6, marginBottom: 14,
+            fontFamily: "'Inter', sans-serif",
+          }}>
+            <div style={{ fontSize: 32, marginBottom: 8 }}>⚠</div>
+            <b>No tienes proyectos asignados</b>
+            <div style={{ marginTop: 6, fontSize: 11, color: "#888" }}>
+              Contacta con un administrador para que te asigne un proyecto.
+            </div>
+          </div>
+        )}
+
+        {/* Lista de proyectos */}
+        {!cargando && proyectos.length > 0 && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 24 }}>
+            {proyectos.map(p => (
+              <div key={p.id} style={{ display: "flex", alignItems: "stretch", gap: 8 }}>
+                <button
+                  onClick={() => onSeleccionar(p)}
+                  style={{
+                    flex: 1,
+                    display: "flex", justifyContent: "space-between", alignItems: "center",
+                    padding: "16px 20px",
+                    background: "rgba(30,30,30,0.6)",
+                    border: "1px solid rgba(255,255,255,0.08)",
+                    borderRadius: 10, cursor: "pointer",
+                    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+                    color: "#f0f0f0",
+                    textAlign: "left",
+                    transition: "all 0.15s",
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.background = "rgba(78,201,184,0.08)";
+                    e.currentTarget.style.borderColor = "rgba(78,201,184,0.3)";
+                    e.currentTarget.querySelector(".arrow").style.stroke = "#4ec9b8";
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.background = "rgba(30,30,30,0.6)";
+                    e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)";
+                    e.currentTarget.querySelector(".arrow").style.stroke = "#555";
+                  }}
+                >
+                  <div>
+                    <div style={{ fontSize: 16, fontWeight: 600, color: "#f0f0f0", letterSpacing: "-0.01em", marginBottom: 2 }}>
+                      {p.nombre}
+                    </div>
+                    <div style={{ fontSize: 12, color: "#888", letterSpacing: "0.05em" }}>
+                      {p.productora}
+                    </div>
+                  </div>
+                  <svg className="arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#555" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transition: "stroke 0.15s" }}>
+                    <line x1="5" y1="12" x2="19" y2="12"/>
+                    <polyline points="12 5 19 12 12 19"/>
+                  </svg>
+                </button>
+                {(usuario.es_admin || usuario.rol === "coordinador") && (
+                  <button
+                    onClick={() => onEditarCalendario && onEditarCalendario(p)}
+                    title="Editar calendario del proyecto"
+                    style={{
+                      width: 54, background: "rgba(30,30,30,0.8)",
+                      border: "1px solid rgba(255,255,255,0.1)",
+                      borderRadius: 10, cursor: "pointer",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      padding: 0,
+                      transition: "all 0.15s",
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.background = "rgba(78,201,184,0.15)"; e.currentTarget.style.borderColor = "rgba(78,201,184,0.4)"; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = "rgba(30,30,30,0.8)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)"; }}
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                      <line x1="16" y1="2" x2="16" y2="6"/>
+                      <line x1="8" y1="2" x2="8" y2="6"/>
+                      <line x1="3" y1="10" x2="21" y2="10"/>
+                    </svg>
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Botones inferiores */}
+        <div style={{ display: "flex", gap: 8, paddingTop: 20, borderTop: "1px solid rgba(255,255,255,0.08)", flexWrap: "wrap" }}>
+          {usuario.es_admin && (
+            <button
+              onClick={onGestionar}
+              style={{
+                flex: 1, minWidth: 140,
+                background: "#4ec9b8", color: "#0a0a0a", border: "none",
+                padding: "14px 20px", borderRadius: 10, cursor: "pointer",
+                fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+                fontSize: 13, fontWeight: 600, letterSpacing: "0.02em",
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                transition: "background 0.15s",
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = "#5ed9c8"}
+              onMouseLeave={e => e.currentTarget.style.background = "#4ec9b8"}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+              </svg>
+              Gestionar proyectos
+            </button>
+          )}
+          <button
+            onClick={onLogout}
+            style={{
+              flex: 1, minWidth: 140,
+              background: "transparent", color: "#888",
+              border: "1px solid rgba(255,255,255,0.15)",
+              padding: "14px 20px", borderRadius: 10, cursor: "pointer",
+              fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+              fontSize: 13, fontWeight: 500, letterSpacing: "0.02em",
+              transition: "all 0.15s",
+            }}
+            onMouseEnter={e => { e.currentTarget.style.color = "#ddd"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.3)"; }}
+            onMouseLeave={e => { e.currentTarget.style.color = "#888"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.15)"; }}
+          >
+            Cerrar sesión
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+function PantallaLogin({ onAcierto }) {
+  const [nombres, setNombres] = useState([]);
+  const [cargando, setCargando] = useState(true);
+  const [errorCarga, setErrorCarga] = useState(null);
+  const [nombre, setNombre] = useState("");
+  const [pin, setPin] = useState("");
+  const [error, setError] = useState(false);
+  const [intentos, setIntentos] = useState(0);
+  const [mostrarPin, setMostrarPin] = useState(false);
+  const [verificando, setVerificando] = useState(false);
+
+  useEffect(() => {
+    // v103: cargar fuente Inter desde Google Fonts (solo en la pantalla de login)
+    const fontId = "inter-font-loader";
+    if (!document.getElementById(fontId)) {
+      const link = document.createElement("link");
+      link.id = fontId;
+      link.rel = "stylesheet";
+      link.href = "https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap";
+      document.head.appendChild(link);
+    }
+    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+      setErrorCarga("Supabase no configurado. Revisa las variables de entorno en Vercel.");
+      setCargando(false);
+      return;
+    }
+    listarNombres()
+      .then(lista => { setNombres(lista); setCargando(false); })
+      .catch(err => { setErrorCarga(err.message); setCargando(false); });
+  }, []);
+
+  const intentar = async () => {
+    if (!nombre || !pin) { setError(true); setTimeout(() => setError(false), 600); return; }
+    setVerificando(true);
+    try {
+      const user = await loginUsuario(nombre, pin);
+      if (user) {
+        try {
+          localStorage.setItem(AUTH_KEY, JSON.stringify({
+            id: user.id, nombre: user.nombre, es_admin: user.es_admin, rol: user.rol || (user.es_admin ? "admin" : "user"), pin,
+            ultima_actividad: Date.now(),
+          }));
+        } catch {}
+        // Registrar log de acceso (no bloqueante)
+        registrarLog(user.nombre, "login");
+        onAcierto({ id: user.id, nombre: user.nombre, es_admin: user.es_admin, rol: user.rol || (user.es_admin ? "admin" : "user"), pin });
+      } else {
+        setError(true); setIntentos(n => n + 1); setPin("");
+        setTimeout(() => setError(false), 600);
+      }
+    } catch (err) {
+      setErrorCarga("Error verificando: " + err.message);
+    }
+    setVerificando(false);
+  };
+
+  return (
+    <div style={{
+      minHeight: "100vh",
+      width: "100%",
+      position: "relative",
+      display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
+      fontFamily: "'Courier Prime', 'Courier New', monospace",
+      overflow: "hidden",
+      boxSizing: "border-box",
+    }}>
+      {/* v104: Fondo a pantalla completa (fixed, cover) */}
+      <div style={{
+        position: "fixed",
+        top: 0, left: 0,
+        width: "100vw", height: "100vh",
+        backgroundImage: "url('/bg.jpg')",
+        backgroundSize: "cover",
+        backgroundPosition: "center center",
+        backgroundRepeat: "no-repeat",
+        zIndex: 0,
+      }} />
+      {/* v104: Overlay más sutil (imagen visible) */}
+      <div style={{
+        position: "fixed",
+        top: 0, left: 0,
+        width: "100vw", height: "100vh",
+        background: "linear-gradient(180deg, rgba(10,15,20,0.35) 0%, rgba(10,15,20,0.55) 100%)",
+        zIndex: 1,
+      }} />
+
+      <style>{`
+        @keyframes shake {
+          0%,100% { transform: translateX(0); }
+          25% { transform: translateX(-8px); }
+          75% { transform: translateX(8px); }
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .login-input::placeholder { color: #666; }
+        .login-input:focus { border-color: #4ec9b8 !important; box-shadow: 0 0 0 3px rgba(78,201,184,0.12); }
+        .login-select:focus { border-color: #4ec9b8 !important; box-shadow: 0 0 0 3px rgba(78,201,184,0.12); }
+      `}</style>
+
+      <div style={{
+        position: "relative", zIndex: 2,
+        width: "100%", maxWidth: 480,
+        animation: error ? "shake 0.4s" : "fadeIn 0.6s ease-out",
+      }}>
+        {/* Logo grande centrado */}
+        <div style={{ textAlign: "center", marginBottom: 40 }}>
+          <img src="/logo.png" alt="Bdprodtools" style={{ maxWidth: 380, width: "80%", height: "auto", filter: "drop-shadow(0 4px 20px rgba(0,0,0,0.5))" }} />
+        </div>
+
+        {cargando ? (
+          <div style={{ textAlign: "center", padding: 20, color: "#888", fontSize: 12, letterSpacing: "0.1em" }}>
+            Cargando usuarios...
+          </div>
+        ) : errorCarga ? (
+          <div style={{ padding: 14, background: "rgba(200,80,80,0.15)", border: "1px solid rgba(200,80,80,0.4)", borderRadius: 8, color: "#e88", fontSize: 11, textAlign: "center" }}>
+            ✕ {errorCarga}
+          </div>
+        ) : (
+          <>
+            {/* Usuario (dropdown) */}
+            <div style={{ marginBottom: 12, position: "relative" }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", pointerEvents: "none", zIndex: 2 }}>
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                <circle cx="12" cy="7" r="4"/>
+              </svg>
+              <select
+                value={nombre}
+                onChange={e => setNombre(e.target.value)}
+                className="login-select"
+                style={{
+                  width: "100%", padding: "16px 16px 16px 46px", fontSize: 14,
+                  border: "1px solid rgba(255,255,255,0.12)", borderRadius: 10,
+                  background: "rgba(20,20,20,0.7)",
+                  boxSizing: "border-box", fontFamily: "'Courier Prime', 'Courier New', monospace",
+                  color: nombre ? "#f0f0f0" : "#888", outline: "none",
+                  backdropFilter: "blur(8px)",
+                  WebkitBackdropFilter: "blur(8px)",
+                  cursor: "pointer",
+                  transition: "all 0.15s",
+                }}
+              >
+                <option value="">Usuario</option>
+                {nombres.map(n => <option key={n} value={n} style={{ background: "#141414", color: "#f0f0f0" }}>{n}</option>)}
+              </select>
+            </div>
+
+            {/* PIN */}
+            <div style={{ marginBottom: 20, position: "relative" }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", pointerEvents: "none", zIndex: 2 }}>
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+              <input
+                type={mostrarPin ? "text" : "password"}
+                value={pin}
+                onChange={e => setPin(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && intentar()}
+                placeholder="PIN"
+                inputMode="numeric"
+                autoComplete="off"
+                className="login-input"
+                style={{
+                  width: "100%", padding: "16px 50px 16px 46px", fontSize: 14,
+                  border: `1px solid ${error ? "rgba(200,80,80,0.6)" : "rgba(255,255,255,0.12)"}`,
+                  borderRadius: 10,
+                  background: "rgba(20,20,20,0.7)",
+                  boxSizing: "border-box",
+                  fontFamily: "'Courier Prime', 'Courier New', monospace",
+                  color: "#f0f0f0",
+                  letterSpacing: mostrarPin ? "normal" : (pin ? "0.3em" : "normal"),
+                  outline: "none",
+                  backdropFilter: "blur(8px)",
+                  WebkitBackdropFilter: "blur(8px)",
+                  transition: "all 0.15s",
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => setMostrarPin(v => !v)}
+                style={{
+                  position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)",
+                  background: "transparent", border: "none", cursor: "pointer",
+                  padding: 8, color: "#888",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  zIndex: 2,
+                }}
+              >
+                {mostrarPin ? (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+                    <line x1="1" y1="1" x2="23" y2="23"/>
+                  </svg>
+                ) : (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                    <circle cx="12" cy="12" r="3"/>
+                  </svg>
+                )}
+              </button>
+              {error && (
+                <div style={{ fontSize: 11, color: "#e88", marginTop: 10, letterSpacing: "0.08em", paddingLeft: 4 }}>
+                  ✕ Usuario o PIN incorrectos {intentos > 2 ? `(${intentos} intentos)` : ""}
+                </div>
+              )}
+            </div>
+
+            {/* Botón Log in */}
+            <button
+              onClick={intentar}
+              disabled={verificando}
+              onMouseEnter={(e) => { if (!verificando) e.currentTarget.style.background = "#5ed9c8"; }}
+              onMouseLeave={(e) => { if (!verificando) e.currentTarget.style.background = "#4ec9b8"; }}
+              style={{
+                width: "100%", padding: "16px 20px",
+                background: verificando ? "#3a3a3a" : "#4ec9b8",
+                color: verificando ? "#888" : "#0a0a0a",
+                border: "none", borderRadius: 10,
+                cursor: verificando ? "wait" : "pointer",
+                fontSize: 15, fontWeight: 700, letterSpacing: "0.05em",
+                fontFamily: "'Courier Prime', 'Courier New', monospace",
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+                transition: "background 0.15s",
+                boxShadow: "0 8px 24px rgba(78,201,184,0.2)",
+              }}
+            >
+              {verificando ? "Verificando..." : (
+                <>
+                  <span>Log in</span>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="5" y1="12" x2="19" y2="12"/>
+                    <polyline points="12 5 19 12 12 19"/>
+                  </svg>
+                </>
+              )}
+            </button>
+          </>
+        )}
+
+        {/* v103: Título con Inter 300 + versión */}
+        <div style={{ textAlign: "center", marginTop: 32 }}>
+          <div style={{
+            fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+            fontSize: 22,
+            fontWeight: 300,
+            color: "#f0f0f0",
+            letterSpacing: "-0.01em",
+            marginBottom: 8,
+          }}>
+            Payroll cost calculator
+          </div>
+          <div style={{ fontSize: 13, color: "#4ec9b8", letterSpacing: "0.2em", fontWeight: 700, fontFamily: "'Courier Prime', 'Courier New', monospace" }}>{APP_VERSION}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════
+// PANEL ADMIN: GESTIÓN DE USUARIOS
+// ═══════════════════════════════════════════════════════════════════════
+
+function PanelAdmin({ usuarioActual, onCerrar }) {
+  const [usuarios, setUsuarios] = useState([]);
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState(null);
+  const [editando, setEditando] = useState(null); // {id, nombre, pin, es_admin}
+  const [nuevoForm, setNuevoForm] = useState({ nombre: "", pin: "", es_admin: false });
+  const [mostrarNuevo, setMostrarNuevo] = useState(false);
+
+  const recargar = async () => {
+    setCargando(true); setError(null);
+    try {
+      const lista = await listarUsuariosAdmin(usuarioActual.pin);
+      setUsuarios(lista);
+    } catch (err) { setError(err.message); }
+    setCargando(false);
+  };
+
+  useEffect(() => { recargar(); }, []);
+
+  const onAdd = async () => {
+    if (!nuevoForm.nombre.trim() || !nuevoForm.pin.trim()) { alert("Nombre y PIN obligatorios"); return; }
+    try {
+      await crearUsuario(usuarioActual.pin, nuevoForm.nombre.trim(), nuevoForm.pin.trim(), nuevoForm.es_admin);
+      setNuevoForm({ nombre: "", pin: "", es_admin: false });
+      setMostrarNuevo(false);
+      recargar();
+    } catch (err) { alert("Error: " + err.message); }
+  };
+
+  const onSaveEdit = async () => {
+    try {
+      await actualizarUsuario(usuarioActual.pin, editando.id, {
+        nombre: editando.nombre.trim(), pin: editando.pin.trim(),
+        es_admin: editando.rol === "admin",  // v88: mantener es_admin sincronizado con rol
+        rol: editando.rol || "user",         // v88
+      });
+      setEditando(null);
+      recargar();
+    } catch (err) { alert("Error: " + err.message); }
+  };
+
+  const onDelete = async (u) => {
+    if (u.id === usuarioActual.id) { alert("No puedes borrarte a ti mismo"); return; }
+    if (!confirm(`¿Eliminar a "${u.nombre}" DEFINITIVAMENTE? Esta acción no se puede deshacer.\n\nSi solo quieres impedir el acceso temporal, usa "Desactivar".`)) return;
+    try {
+      await borrarUsuario(usuarioActual.pin, u.id);
+      recargar();
+    } catch (err) { alert("Error: " + err.message); }
+  };
+
+  const onToggleActivo = async (u) => {
+    if (u.id === usuarioActual.id) { alert("No puedes desactivarte a ti mismo"); return; }
+    const accion = u.activo ? "desactivar" : "activar";
+    const msg = u.activo
+      ? `¿Desactivar a "${u.nombre}"? No podrá hacer login pero sus datos se conservarán.`
+      : `¿Reactivar a "${u.nombre}"? Podrá volver a hacer login.`;
+    if (!confirm(msg)) return;
+    try {
+      await actualizarUsuario(usuarioActual.pin, u.id, { activo: !u.activo });
+      recargar();
+    } catch (err) { alert("Error al " + accion + ": " + err.message); }
+  };
+
+  // Separar activos e inactivos. Activos primero (ya ordenados por nombre desde la API).
+  // Inactivos al final, también ordenados por nombre.
+  const usuariosActivos = usuarios.filter(u => u.activo !== false);
+  const usuariosInactivos = usuarios.filter(u => u.activo === false);
+  const usuariosOrdenados = [...usuariosActivos, ...usuariosInactivos];
+
+  const C = { padding: "8px 10px", fontSize: 11, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", borderBottom: "1px solid #eef1f3" };
+  const TH = { ...C, fontSize: 9, letterSpacing: "0.12em", textTransform: "uppercase", color: "#666", fontWeight: 700, textAlign: "left", borderBottom: "1px solid #d5d9dc" };
+  const inp = { padding: "6px 8px", fontSize: 11, border: "1px solid #d5d9dc", borderRadius: 4, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", boxSizing: "border-box" };
+  const btn = (bg, color = "#fff") => ({ padding: "6px 12px", fontSize: 10, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", background: bg, color, border: "none", borderRadius: 4, cursor: "pointer" });
+  const btnSm = (bg, color = "#fff") => ({ padding: "4px 9px", fontSize: 9, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", background: bg, color, border: "none", borderRadius: 3, cursor: "pointer" });
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 1000, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: 20, overflowY: "auto" }}>
+      <div style={{ background: "#dfe4e8", borderRadius: 10, padding: 24, maxWidth: 900, width: "100%", marginTop: 40, boxShadow: "0 20px 60px rgba(0,0,0,0.5)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+          <h2 style={{ margin: 0, fontSize: 14, letterSpacing: "0.15em", textTransform: "uppercase", color: "#1a1a1a", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>⚙ Gestión de Usuarios</h2>
+          <button onClick={onCerrar} style={btn("#1a1a1a")}>✕ Cerrar</button>
+        </div>
+
+        {error && <div style={{ padding: 10, background: "rgba(160,69,69,0.1)", border: "1px solid #a04545", borderRadius: 4, color: "#a04545", fontSize: 11, marginBottom: 12 }}>✕ {error}</div>}
+
+        <div style={{ marginBottom: 12 }}>
+          {!mostrarNuevo ? (
+            <button onClick={() => setMostrarNuevo(true)} style={btn("#4ec9b8")}>+ Añadir usuario</button>
+          ) : (
+            <div style={{ padding: 12, background: "#f2f5f7", borderRadius: 6, border: "1px solid #d5d9dc", display: "grid", gridTemplateColumns: "1fr 100px auto auto auto", gap: 8, alignItems: "center" }}>
+              <input style={inp} placeholder="Nombre" value={nuevoForm.nombre} onChange={e => setNuevoForm({ ...nuevoForm, nombre: e.target.value })} />
+              <input style={inp} placeholder="PIN" value={nuevoForm.pin} onChange={e => setNuevoForm({ ...nuevoForm, pin: e.target.value })} />
+              <label style={{ fontSize: 10, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", display: "flex", alignItems: "center", gap: 4 }}>
+                <input type="checkbox" checked={nuevoForm.es_admin} onChange={e => setNuevoForm({ ...nuevoForm, es_admin: e.target.checked })} /> Admin
+              </label>
+              <button onClick={onAdd} style={btn("#4ec9b8")}>Guardar</button>
+              <button onClick={() => { setMostrarNuevo(false); setNuevoForm({ nombre: "", pin: "", es_admin: false }); }} style={btn("#888")}>Cancelar</button>
+            </div>
+          )}
+        </div>
+
+        {cargando ? (
+          <div style={{ padding: 20, textAlign: "center", color: "#888", fontSize: 11 }}>Cargando...</div>
+        ) : (
+          <div style={{ background: "#f2f5f7", borderRadius: 6, overflow: "hidden", border: "1px solid #d5d9dc" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead><tr>
+                <th style={TH}>Nombre</th>
+                <th style={TH}>PIN</th>
+                <th style={{ ...TH, textAlign: "center" }}>Rol</th>
+                <th style={{ ...TH, textAlign: "center" }}>Estado</th>
+                <th style={{ ...TH, textAlign: "right" }}>Acciones</th>
+              </tr></thead>
+              <tbody>
+                {usuariosOrdenados.map(u => {
+                  const inactivo = u.activo === false;
+                  if (editando && editando.id === u.id) {
+                    return (
+                      <tr key={u.id}>
+                        <td style={C}><input style={{ ...inp, width: "100%" }} value={editando.nombre} onChange={e => setEditando({ ...editando, nombre: e.target.value })} /></td>
+                        <td style={C}><input style={{ ...inp, width: "100%" }} value={editando.pin} onChange={e => setEditando({ ...editando, pin: e.target.value })} /></td>
+                        <td style={{ ...C, textAlign: "center" }}>
+                          <select value={editando.rol || (editando.es_admin ? "admin" : "user")} onChange={e => setEditando({ ...editando, rol: e.target.value, es_admin: e.target.value === "admin" })} style={{ ...inp, fontSize: 10, padding: "4px 6px" }}>
+                            <option value="user">User</option>
+                            <option value="coordinador">Coordinador</option>
+                            <option value="admin">Admin</option>
+                          </select>
+                        </td>
+                        <td style={{ ...C, textAlign: "center", color: "#888", fontSize: 9 }}>—</td>
+                        <td style={{ ...C, textAlign: "right" }}>
+                          <button onClick={onSaveEdit} style={{ ...btn("#4ec9b8"), marginRight: 4 }}>✓</button>
+                          <button onClick={() => setEditando(null)} style={btn("#888")}>✕</button>
+                        </td>
+                      </tr>
+                    );
+                  }
+                  return (
+                    <tr key={u.id} style={inactivo ? { opacity: 0.55, background: "#f2f5f7" } : {}}>
+                      <td style={{ ...C, fontWeight: u.id === usuarioActual.id ? 700 : 400, color: inactivo ? "#888" : "#1a1a1a" }}>
+                        {u.nombre}
+                        {u.id === usuarioActual.id && <span style={{ fontSize: 9, color: "#888", marginLeft: 6 }}>(tú)</span>}
+                      </td>
+                      <td style={{ ...C, color: inactivo ? "#aaa" : "#888" }}>••••</td>
+                      <td style={{ ...C, textAlign: "center", fontSize: 10 }}>
+                        {u.rol === "admin" || u.es_admin ? (
+                          <span style={{ background: "#2196f3", color: "#fff", padding: "3px 10px", borderRadius: 5, fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", fontFamily: "'Inter', sans-serif" }}>ADMIN</span>
+                        ) : u.rol === "coordinador" ? (
+                          <span style={{ background: "rgba(78,201,184,0.15)", color: "#1a1a1a", padding: "3px 10px", borderRadius: 5, fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", fontFamily: "'Inter', sans-serif" }}>COORDINADOR</span>
+                        ) : (
+                          <span style={{ background: "#f2f5f7", color: "#666", padding: "3px 10px", borderRadius: 5, fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", fontFamily: "'Inter', sans-serif", border: "1px solid #d5d9dc" }}>USER</span>
+                        )}
+                      </td>
+                      <td style={{ ...C, textAlign: "center" }}>
+                        {inactivo ? (
+                          <span style={{ background: "#f2f5f7", color: "#888", padding: "3px 10px", borderRadius: 5, fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", fontFamily: "'Inter', sans-serif", border: "1px solid #d5d9dc" }}>⊘ INACTIVO</span>
+                        ) : (
+                          <span style={{ background: "rgba(78,201,184,0.2)", color: "#1a1a1a", padding: "3px 10px", borderRadius: 5, fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", fontFamily: "'Inter', sans-serif" }}>✓ ACTIVO</span>
+                        )}
+                      </td>
+                      <td style={{ ...C, textAlign: "right", whiteSpace: "nowrap" }}>
+                        <button onClick={() => setEditando({ ...u })} style={{ ...btnSm("#4ec9b8"), marginRight: 4 }}>✎ Editar</button>
+                        {u.id !== usuarioActual.id && (
+                          inactivo ? (
+                            <button onClick={() => onToggleActivo(u)} style={{ ...btnSm("transparent", "#2a6e2a"), border: "1px solid #2a6e2a", marginRight: 4 }}>✓ Activar</button>
+                          ) : (
+                            <button onClick={() => onToggleActivo(u)} style={{ ...btnSm("transparent", "#b07030"), border: "1px solid #b07030", marginRight: 4 }}>⊘ Desactivar</button>
+                          )
+                        )}
+                        <button onClick={() => onDelete(u)} style={btnSm("#a04545")} disabled={u.id === usuarioActual.id}>🗑 Borrar</button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <div style={{ marginTop: 14, fontSize: 9, color: "#888", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", letterSpacing: "0.05em", textAlign: "center" }}>
+          {usuariosActivos.length} activo{usuariosActivos.length !== 1 ? "s" : ""} · {usuariosInactivos.length} inactivo{usuariosInactivos.length !== 1 ? "s" : ""} · {usuarios.length} total{usuarios.length !== 1 ? "es" : ""}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════
+// PANEL ADMIN: VISOR DE LOGS
+// ═══════════════════════════════════════════════════════════════════════
+
+function PanelLogs({ usuarioActual, onCerrar }) {
+  const [logs, setLogs] = useState([]);
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState(null);
+  const [filtroTipo, setFiltroTipo] = useState("");
+  const [filtroUsuario, setFiltroUsuario] = useState("");
+  const [limit, setLimit] = useState(100);
+
+  const recargar = async () => {
+    setCargando(true); setError(null);
+    try {
+      const filtros = {};
+      if (filtroTipo) filtros.tipo = filtroTipo;
+      if (filtroUsuario) filtros.usuario = filtroUsuario;
+      filtros.limit = limit;
+      const lista = await listarLogs(usuarioActual.pin, filtros);
+      setLogs(lista || []);
+    } catch (err) { setError(err.message); }
+    setCargando(false);
+  };
+
+  useEffect(() => { recargar(); }, [filtroTipo, filtroUsuario, limit]);
+
+  const formatoFecha = (iso) => {
+    try {
+      const d = new Date(iso);
+      return d.toLocaleString("es-ES", { day:"2-digit", month:"2-digit", year:"numeric", hour:"2-digit", minute:"2-digit" });
+    } catch { return iso; }
+  };
+
+  const tipoLabel = (t) => {
+    if (t === "login") return { txt: "🔓 LOGIN", color: "#4ec9b8" };
+    if (t === "export_csv") return { txt: "📄 CSV", color: "#4ec9b8" };
+    if (t === "export_pdf") return { txt: "📑 PDF", color: "#a04545" };
+    return { txt: t, color: "#666" };
+  };
+
+  const exportarLogsCSV = () => {
+    const sep = ";";
+    const lines = [];
+    lines.push(["Fecha", "Usuario", "Tipo", "Detalle", "Navegador"].join(sep));
+    logs.forEach(l => {
+      lines.push([
+        formatoFecha(l.created_at),
+        l.usuario_nombre || "",
+        l.tipo || "",
+        (l.detalle || "").replace(/[;\n]/g, " "),
+        (l.user_agent || "").replace(/[;\n]/g, " "),
+      ].join(sep));
+    });
+    const csv = "\uFEFF" + lines.join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `logs_${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
+  const limpiarAntiguos = async () => {
+    if (!confirm("¿Borrar logs de más de 30 días? Esta acción NO se puede deshacer.")) return;
+    try {
+      await borrarLogsAntiguos(usuarioActual.pin, 30);
+      recargar();
+      alert("Logs antiguos eliminados");
+    } catch (err) { alert("Error: " + err.message); }
+  };
+
+  const C = { padding: "7px 10px", fontSize: 10.5, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", borderBottom: "1px solid #eef1f3", verticalAlign: "top" };
+  const TH = { ...C, fontSize: 9, letterSpacing: "0.12em", textTransform: "uppercase", color: "#666", fontWeight: 700, textAlign: "left", borderBottom: "1px solid #d5d9dc", whiteSpace: "nowrap" };
+  const inp = { padding: "6px 8px", fontSize: 11, border: "1px solid #d5d9dc", borderRadius: 4, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", background: "#f2f5f7" };
+  const btn = (bg, color = "#fff") => ({ padding: "6px 12px", fontSize: 10, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", background: bg, color, border: "none", borderRadius: 4, cursor: "pointer" });
+
+  // Lista de usuarios únicos para el dropdown
+  const usuariosUnicos = [...new Set(logs.map(l => l.usuario_nombre).filter(Boolean))].sort();
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 1000, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: 20, overflowY: "auto" }}>
+      <div style={{ background: "#dfe4e8", borderRadius: 10, padding: 24, maxWidth: 1000, width: "100%", marginTop: 40, boxShadow: "0 20px 60px rgba(0,0,0,0.5)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <h2 style={{ margin: 0, fontSize: 14, letterSpacing: "0.15em", textTransform: "uppercase", color: "#1a1a1a", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>📊 Logs de Actividad</h2>
+          <button onClick={onCerrar} style={btn("#1a1a1a")}>✕ Cerrar</button>
+        </div>
+
+        {error && <div style={{ padding: 10, background: "rgba(160,69,69,0.1)", border: "1px solid #a04545", borderRadius: 4, color: "#a04545", fontSize: 11, marginBottom: 12 }}>✕ {error}</div>}
+
+        <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap", alignItems: "center" }}>
+          <select style={inp} value={filtroTipo} onChange={e => setFiltroTipo(e.target.value)}>
+            <option value="">— Todos los tipos —</option>
+            <option value="login">🔓 Login</option>
+            <option value="export_csv">📄 Export CSV</option>
+            <option value="export_pdf">📑 Export PDF</option>
+          </select>
+          <select style={inp} value={filtroUsuario} onChange={e => setFiltroUsuario(e.target.value)}>
+            <option value="">— Todos los usuarios —</option>
+            {usuariosUnicos.map(u => <option key={u} value={u}>{u}</option>)}
+          </select>
+          <select style={inp} value={limit} onChange={e => setLimit(Number(e.target.value))}>
+            <option value={50}>Últimos 50</option>
+            <option value={100}>Últimos 100</option>
+            <option value={500}>Últimos 500</option>
+            <option value={2000}>Últimos 2000</option>
+          </select>
+          <button onClick={recargar} style={btn("#888")}>🔄 Refrescar</button>
+          <div style={{ flex: 1 }} />
+          <button onClick={exportarLogsCSV} style={btn("#4ec9b8")} disabled={logs.length === 0}>↓ Exportar CSV</button>
+          <button onClick={limpiarAntiguos} style={btn("#a04545")}>🗑 Limpiar +30d</button>
+        </div>
+
+        {cargando ? (
+          <div style={{ padding: 20, textAlign: "center", color: "#888", fontSize: 11 }}>Cargando logs...</div>
+        ) : logs.length === 0 ? (
+          <div style={{ padding: 30, textAlign: "center", color: "#888", fontSize: 11, background: "#f2f5f7", borderRadius: 6, border: "1px solid #d5d9dc" }}>No hay logs con los filtros seleccionados</div>
+        ) : (
+          <div style={{ background: "#f2f5f7", borderRadius: 6, overflow: "hidden", border: "1px solid #d5d9dc", maxHeight: "60vh", overflowY: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead style={{ position: "sticky", top: 0, background: "#dfe4e8", zIndex: 1 }}>
+                <tr>
+                  <th style={TH}>Fecha</th>
+                  <th style={TH}>Usuario</th>
+                  <th style={TH}>Tipo</th>
+                  <th style={TH}>Detalle</th>
+                </tr>
+              </thead>
+              <tbody>
+                {logs.map(l => {
+                  const t = tipoLabel(l.tipo);
+                  return (
+                    <tr key={l.id}>
+                      <td style={{ ...C, color: "#666", whiteSpace: "nowrap" }}>{formatoFecha(l.created_at)}</td>
+                      <td style={{ ...C, fontWeight: 600 }}>{l.usuario_nombre}</td>
+                      <td style={{ ...C, color: t.color, fontWeight: 700, whiteSpace: "nowrap" }}>{t.txt}</td>
+                      <td style={{ ...C, color: "#444" }}>{l.detalle || "—"}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <div style={{ marginTop: 12, fontSize: 9, color: "#888", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", letterSpacing: "0.05em", textAlign: "center" }}>
+          Mostrando {logs.length} registro{logs.length !== 1 ? "s" : ""}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════
+// PANEL ADMIN: GESTIÓN DE PUESTOS COAC
+// ═══════════════════════════════════════════════════════════════════════
+function PanelPuestos({ usuarioActual, onCerrar }) {
+  const [puestos, setPuestos] = useState([]);
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState(null);
+  const [mensaje, setMensaje] = useState(null);
+  const [busqueda, setBusqueda] = useState("");
+  const [filtroCategoria, setFiltroCategoria] = useState("");
+  const [editandoId, setEditandoId] = useState(null);
+  const [formEdit, setFormEdit] = useState({ codigo: "", nombre: "", categoria: "" });
+  const [mostrarFormNuevo, setMostrarFormNuevo] = useState(false);
+  const [formNuevo, setFormNuevo] = useState({ codigo: "", nombre: "", categoria: "" });
+  const [importando, setImportando] = useState(false);
+  const [previewImport, setPreviewImport] = useState(null); // {puestos, avisos}
+  const fileInputRef = useRef(null);
+
+  const adminPin = usuarioActual?.pin;
+
+  const recargar = async () => {
+    setCargando(true);
+    setError(null);
+    try {
+      const lista = await listarPuestosCoac();
+      setPuestos(lista || []);
+    } catch (e) {
+      setError("Error al cargar puestos: " + e.message);
+    } finally {
+      setCargando(false);
+    }
+  };
+
+  useEffect(() => { recargar(); }, []);
+
+  const showMsg = (texto, tipo = "ok") => {
+    setMensaje({ texto, tipo });
+    setTimeout(() => setMensaje(null), 4000);
+  };
+
+  // Filtrado por búsqueda y categoría
+  const norm = (s) => (s || "").toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const q = norm(busqueda);
+  const puestosFiltrados = puestos.filter(p => {
+    if (filtroCategoria && p.categoria !== filtroCategoria) return false;
+    if (!q) return true;
+    return norm(p.nombre).includes(q) || norm(p.codigo).includes(q) || norm(p.categoria).includes(q);
+  });
+
+  // Categorías únicas
+  const categorias = [...new Set(puestos.map(p => p.categoria))].sort();
+
+  // Editar
+  const empezarEditar = (p) => {
+    setEditandoId(p.id);
+    setFormEdit({ codigo: p.codigo, nombre: p.nombre, categoria: p.categoria });
+  };
+  const cancelarEditar = () => {
+    setEditandoId(null);
+    setFormEdit({ codigo: "", nombre: "", categoria: "" });
+  };
+  const guardarEdicion = async () => {
+    if (!formEdit.codigo.trim() || !formEdit.nombre.trim() || !formEdit.categoria.trim()) {
+      showMsg("Todos los campos son obligatorios", "err");
+      return;
+    }
+    try {
+      await actualizarPuestoCoac(adminPin, editandoId, {
+        codigo: formEdit.codigo.trim(),
+        nombre: formEdit.nombre.trim(),
+        categoria: formEdit.categoria.trim(),
+      });
+      showMsg("Puesto actualizado", "ok");
+      cancelarEditar();
+      await recargar();
+    } catch (e) {
+      showMsg("Error: " + e.message, "err");
+    }
+  };
+
+  // Borrar
+  const borrar = async (p) => {
+    if (!confirm(`¿Borrar "${p.nombre}" (${p.codigo})?`)) return;
+    try {
+      await borrarPuestoCoac(adminPin, p.id);
+      showMsg("Puesto borrado", "ok");
+      await recargar();
+    } catch (e) {
+      showMsg("Error: " + e.message, "err");
+    }
+  };
+
+  // Añadir manual
+  const crearManual = async () => {
+    if (!formNuevo.codigo.trim() || !formNuevo.nombre.trim() || !formNuevo.categoria.trim()) {
+      showMsg("Todos los campos son obligatorios", "err");
+      return;
+    }
+    try {
+      const maxOrden = puestos.reduce((m, p) => Math.max(m, p.orden || 0), 0);
+      await crearPuestoCoac(adminPin, {
+        codigo: formNuevo.codigo.trim(),
+        nombre: formNuevo.nombre.trim(),
+        categoria: formNuevo.categoria.trim(),
+        orden: maxOrden + 1,
+      });
+      showMsg("Puesto añadido", "ok");
+      setFormNuevo({ codigo: "", nombre: "", categoria: "" });
+      setMostrarFormNuevo(false);
+      await recargar();
+    } catch (e) {
+      showMsg("Error: " + e.message, "err");
+    }
+  };
+
+  // Importar Excel — paso 1: parsear y mostrar preview
+  const onArchivoSeleccionado = async (e) => {
+    const archivo = e.target.files?.[0];
+    if (!archivo) return;
+    if (!archivo.name.toLowerCase().endsWith(".xlsx") && !archivo.name.toLowerCase().endsWith(".xls")) {
+      showMsg("Solo archivos .xlsx o .xls", "err");
+      return;
+    }
+    setImportando(true);
+    try {
+      const { puestos: pst, avisos } = await parsearExcelPuestos(archivo);
+      if (pst.length === 0) {
+        showMsg("El archivo no contiene puestos válidos", "err");
+        setImportando(false);
+        return;
+      }
+      setPreviewImport({ puestos: pst, avisos, nombreArchivo: archivo.name });
+    } catch (e) {
+      showMsg("Error parseando Excel: " + e.message, "err");
+    } finally {
+      setImportando(false);
+      // Limpiar el input para poder volver a importar el mismo archivo
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  // Importar Excel — paso 2: confirmar y reemplazar todos
+  const confirmarImportacion = async () => {
+    if (!previewImport) return;
+    setImportando(true);
+    try {
+      await reemplazarTodosPuestos(adminPin, previewImport.puestos);
+      // Registrar log
+      try { registrarLog(usuarioActual.nombre, "import_puestos", `Importados ${previewImport.puestos.length} puestos de ${previewImport.nombreArchivo}`); } catch {}
+      showMsg(`${previewImport.puestos.length} puestos cargados`, "ok");
+      setPreviewImport(null);
+      await recargar();
+    } catch (e) {
+      showMsg("Error importando: " + e.message, "err");
+    } finally {
+      setImportando(false);
+    }
+  };
+
+  // Exportar Excel (backup)
+  const exportarExcel = async () => {
+    try {
+      const XLSX = await cargarXLSX();
+      // Recrear el formato original: filas de categoría intercaladas
+      const filas = [["CODIGO CONTABLE", "EQUIPO TECNICO"]];
+      let catActual = "";
+      const ordenado = [...puestos].sort((a, b) => (a.orden || 0) - (b.orden || 0));
+      for (const p of ordenado) {
+        if (p.categoria !== catActual) {
+          filas.push(["", p.categoria]);
+          catActual = p.categoria;
+        }
+        filas.push([p.codigo, p.nombre]);
+      }
+      const ws = XLSX.utils.aoa_to_sheet(filas);
+      ws["!cols"] = [{ wch: 18 }, { wch: 50 }];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Puestos COAC");
+      const fecha = new Date().toISOString().slice(0, 10);
+      XLSX.writeFile(wb, `Backup_Puestos_COAC_${fecha}.xlsx`);
+    } catch (e) {
+      showMsg("Error exportando: " + e.message, "err");
+    }
+  };
+
+  // Estilos
+  const overlayStyle = {
+    position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+    background: "rgba(0,0,0,0.7)", zIndex: 1000, display: "flex",
+    alignItems: "flex-start", justifyContent: "center", padding: "30px 16px", overflowY: "auto",
+  };
+  const modalStyle = {
+    background: "#dfe4e8", borderRadius: 8, maxWidth: 1100, width: "100%",
+    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", color: "#1a1a1a",
+    boxShadow: "0 10px 40px rgba(0,0,0,0.5)",
+  };
+  const headerStyle = {
+    background: "#1a1a1a", color: "#f0f0f0", padding: "14px 18px",
+    display: "flex", justifyContent: "space-between", alignItems: "center",
+    borderRadius: "8px 8px 0 0",
+  };
+  const btnStyle = {
+    background: "transparent", color: "#4ec9b8", border: "1px solid #4ec9b8",
+    padding: "5px 12px", borderRadius: 4, cursor: "pointer",
+    fontSize: 10, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+    fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase",
+  };
+  const btnDanger = { ...btnStyle, color: "#c85050", borderColor: "#c85050" };
+  const btnOk = { ...btnStyle, color: "#4ec9b8", borderColor: "#4ec9b8" };
+  const inp = {
+    padding: "7px 10px", border: "1px solid #d5d9dc", borderRadius: 4,
+    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontSize: 11, background: "#f2f5f7",
+  };
+
+  return (
+    <div style={overlayStyle} onClick={(e) => { if (e.target === e.currentTarget) onCerrar(); }}>
+      <div style={modalStyle}>
+        <div style={headerStyle}>
+          <div>
+            <div style={{ fontSize: 9, color: "#4ec9b8", letterSpacing: "0.2em", textTransform: "uppercase" }}>Panel admin</div>
+            <div style={{ fontSize: 14, fontWeight: 700, marginTop: 2 }}>📋 Puestos COAC</div>
+          </div>
+          <button onClick={onCerrar} style={{ background: "transparent", color: "#aaa", border: "1px solid #444", padding: "6px 14px", borderRadius: 4, cursor: "pointer", fontSize: 10, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>Cerrar</button>
+        </div>
+
+        <div style={{ padding: 20 }}>
+          {error && <div style={{ background: "#fde6e6", border: "1px solid #d8a0a0", color: "#7a2020", padding: "10px 14px", borderRadius: 4, marginBottom: 14, fontSize: 11 }}>{error}</div>}
+          {mensaje && <div style={{ background: mensaje.tipo === "ok" ? "#e6f4e6" : "#fde6e6", border: `1px solid ${mensaje.tipo === "ok" ? "#4ec9b8" : "#d8a0a0"}`, color: mensaje.tipo === "ok" ? "#2a5a2a" : "#7a2020", padding: "10px 14px", borderRadius: 4, marginBottom: 14, fontSize: 11 }}>{mensaje.texto}</div>}
+
+          {/* Preview de importación */}
+          {previewImport && (
+            <div style={{ background: "#fff3d6", border: "2px solid #4ec9b8", borderRadius: 6, padding: 16, marginBottom: 18 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#1a1a1a", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 10 }}>⚠ Confirmar importación</div>
+              <div style={{ fontSize: 12, marginBottom: 10 }}>
+                Archivo: <strong>{previewImport.nombreArchivo}</strong><br/>
+                Puestos a cargar: <strong>{previewImport.puestos.length}</strong><br/>
+                Esto <strong style={{ color: "#a04545" }}>BORRARÁ los {puestos.length} puestos actuales</strong> y los reemplazará por los nuevos del Excel.
+              </div>
+              {previewImport.avisos.length > 0 && (
+                <div style={{ background: "#f2f5f7", padding: "8px 10px", borderRadius: 4, marginBottom: 10, fontSize: 10, maxHeight: 100, overflowY: "auto" }}>
+                  <strong>Avisos:</strong>
+                  <ul style={{ margin: "4px 0 0 16px", padding: 0 }}>
+                    {previewImport.avisos.map((a, i) => <li key={i}>{a}</li>)}
+                  </ul>
+                </div>
+              )}
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={confirmarImportacion} disabled={importando} style={{ ...btnDanger, padding: "8px 16px" }}>
+                  {importando ? "Importando..." : "✓ Confirmar y reemplazar todo"}
+                </button>
+                <button onClick={() => setPreviewImport(null)} disabled={importando} style={btnStyle}>Cancelar</button>
+              </div>
+            </div>
+          )}
+
+          {/* Barra de acciones */}
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16, alignItems: "center" }}>
+            <input
+              type="text"
+              placeholder="🔍 Buscar nombre, código o categoría..."
+              value={busqueda}
+              onChange={e => setBusqueda(e.target.value)}
+              style={{ ...inp, flex: 1, minWidth: 220 }}
+            />
+            <select value={filtroCategoria} onChange={e => setFiltroCategoria(e.target.value)} style={inp}>
+              <option value="">Todas las categorías</option>
+              {categorias.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".xlsx,.xls"
+              onChange={onArchivoSeleccionado}
+              style={{ display: "none" }}
+            />
+            <button onClick={() => fileInputRef.current?.click()} disabled={importando} style={btnStyle}>📥 Importar Excel</button>
+            <button onClick={exportarExcel} style={btnStyle}>📤 Exportar Excel</button>
+            <button onClick={() => setMostrarFormNuevo(!mostrarFormNuevo)} style={btnOk}>+ Añadir</button>
+          </div>
+
+          {/* Formulario nuevo */}
+          {mostrarFormNuevo && (
+            <div style={{ background: "#f2f5f7", border: "1px solid #4ec9b8", borderRadius: 6, padding: 14, marginBottom: 14 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: "#1a1a1a", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 8 }}>Nuevo puesto</div>
+              <div style={{ display: "grid", gridTemplateColumns: "150px 1fr 1fr auto", gap: 8 }}>
+                <input type="text" placeholder="Código" value={formNuevo.codigo} onChange={e => setFormNuevo({ ...formNuevo, codigo: e.target.value })} style={inp} />
+                <input type="text" placeholder="Nombre" value={formNuevo.nombre} onChange={e => setFormNuevo({ ...formNuevo, nombre: e.target.value })} style={inp} />
+                <input type="text" placeholder="Categoría" value={formNuevo.categoria} onChange={e => setFormNuevo({ ...formNuevo, categoria: e.target.value })} list="cats-nuevo" style={inp} />
+                <datalist id="cats-nuevo">
+                  {categorias.map(c => <option key={c} value={c} />)}
+                </datalist>
+                <button onClick={crearManual} style={btnOk}>✓ Crear</button>
+              </div>
+            </div>
+          )}
+
+          {/* Lista */}
+          {cargando ? (
+            <div style={{ textAlign: "center", padding: 30, color: "#888", fontSize: 11 }}>Cargando puestos...</div>
+          ) : (
+            <div style={{ background: "#f2f5f7", border: "1px solid #d5d9dc", borderRadius: 6, maxHeight: 500, overflowY: "auto" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "130px 1fr 1fr 110px", gap: 8, padding: "8px 12px", background: "#dfe4e8", borderBottom: "1px solid #d5d9dc", fontSize: 9, letterSpacing: "0.1em", textTransform: "uppercase", color: "#666", fontWeight: 700, position: "sticky", top: 0 }}>
+                <div>Código</div><div>Nombre</div><div>Categoría</div><div style={{ textAlign: "right" }}>Acciones</div>
+              </div>
+              {puestosFiltrados.length === 0 ? (
+                <div style={{ padding: 24, textAlign: "center", color: "#888", fontSize: 11, fontStyle: "italic" }}>
+                  {puestos.length === 0 ? "No hay puestos. Importa un Excel o añade manualmente." : "Sin resultados con los filtros aplicados."}
+                </div>
+              ) : (
+                puestosFiltrados.map(p => editandoId === p.id ? (
+                  <div key={p.id} style={{ display: "grid", gridTemplateColumns: "130px 1fr 1fr 110px", gap: 8, padding: "7px 12px", borderBottom: "1px solid #eef1f3", background: "#fff8e6", alignItems: "center" }}>
+                    <input type="text" value={formEdit.codigo} onChange={e => setFormEdit({ ...formEdit, codigo: e.target.value })} style={{ ...inp, padding: "4px 6px" }} />
+                    <input type="text" value={formEdit.nombre} onChange={e => setFormEdit({ ...formEdit, nombre: e.target.value })} style={{ ...inp, padding: "4px 6px" }} />
+                    <input type="text" value={formEdit.categoria} onChange={e => setFormEdit({ ...formEdit, categoria: e.target.value })} list="cats-edit" style={{ ...inp, padding: "4px 6px" }} />
+                    <datalist id="cats-edit">
+                      {categorias.map(c => <option key={c} value={c} />)}
+                    </datalist>
+                    <div style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}>
+                      <button onClick={guardarEdicion} title="Guardar" style={{ ...btnOk, padding: "3px 8px", fontSize: 9 }}>✓</button>
+                      <button onClick={cancelarEditar} title="Cancelar" style={{ ...btnStyle, padding: "3px 8px", fontSize: 9 }}>✗</button>
+                    </div>
+                  </div>
+                ) : (
+                  <div key={p.id} style={{ display: "grid", gridTemplateColumns: "130px 1fr 1fr 110px", gap: 8, padding: "7px 12px", borderBottom: "1px solid #eef1f3", fontSize: 11, alignItems: "center" }}>
+                    <div style={{ color: "#888", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>{p.codigo}</div>
+                    <div style={{ fontWeight: 700 }}>{p.nombre}</div>
+                    <div style={{ color: "#666", fontSize: 10 }}>{p.categoria}</div>
+                    <div style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}>
+                      <button onClick={() => empezarEditar(p)} title="Editar" style={{ ...btnStyle, padding: "3px 8px", fontSize: 9 }}>✏</button>
+                      <button onClick={() => borrar(p)} title="Borrar" style={{ ...btnDanger, padding: "3px 8px", fontSize: 9 }}>🗑</button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+
+          <div style={{ marginTop: 12, fontSize: 10, color: "#888", textAlign: "center" }}>
+            {puestosFiltrados.length} de {puestos.length} puesto{puestos.length !== 1 ? "s" : ""}
+            {categorias.length > 0 && ` · ${categorias.length} categorías`}
+          </div>
+
+          <div style={{ marginTop: 14, padding: "10px 14px", background: "#f2f5f7", borderRadius: 4, border: "1px solid #d5d9dc", fontSize: 10, color: "#666", lineHeight: 1.6 }}>
+            <strong style={{ color: "#444" }}>Formato Excel:</strong> El importador acepta el formato original del Listado COAC: columna A "CODIGO CONTABLE", columna B "EQUIPO TECNICO", con filas de categoría intercaladas (código vacío, nombre = categoría).<br/>
+            <strong style={{ color: "#a04545" }}>⚠ Importar REEMPLAZA todos los puestos existentes.</strong> Exporta primero un backup si quieres conservarlos.
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════
+// PESTAÑA "COSTE EMPRESA" — solo admin
+// ═══════════════════════════════════════════════════════════════════════
+
+function CosteEmpresa() {
+  const usuarioCtx = useContext(UsuarioContext);
+  const proyectoActivoCtx = useContext(ProyectoContext); // v45
+  const [perfiles, setPerfiles] = useState([]);
+  const [cargandoPerfiles, setCargandoPerfiles] = useState(true);
+  const [perfilCargado, setPerfilCargado] = useState(null);
+  const [busqueda, setBusqueda] = useState("");
+  const [filtroTipo, setFiltroTipo] = useState("todos"); // "todos" | "45h" | "40h"
+
+  // IRPF Plus Vivienda (empresa lo asume?)
+  const [irpfActivo, setIrpfActivo] = useState(false);
+  const [pctIRPF, setPctIRPF] = useState("");
+
+  // Gestoría: ¿hay firma de contrato en el primer mes?
+  // Por defecto SÍ (32€ primer mes = 6 alta + 26 nómina)
+  // Si se desactiva: primer mes = 26€ (solo nómina)
+  const [firmaContrato, setFirmaContrato] = useState(true);
+  const [incluirGestoria, setIncluirGestoria] = useState(false); // v78: por defecto OFF, la gestoría aparece pero no suma al total
+
+  // Importe exento por baja médica (no suma a base SS/IMEI/Solidaridad)
+  const [bajaActiva, setBajaActiva] = useState(false);
+  const [importeExento, setImporteExento] = useState(""); // string para input
+  const [mesesExentos, setMesesExentos] = useState({}); // { "2026-04": true, ... }
+
+  // Modal exportar a Excel master
+  const [mostrarExportMaster, setMostrarExportMaster] = useState(false);
+  const [archivoMaster, setArchivoMaster] = useState(null);
+  const [filaDestinoExcel, setFilaDestinoExcel] = useState("8");
+  const [procesandoMaster, setProcesandoMaster] = useState(false);
+  const [errorMaster, setErrorMaster] = useState(null);
+  const inputMasterRef = useRef(null);
+
+  // Adaptador de storage (igual que en GestorPerfiles)
+  const storage = (() => {
+    if (typeof window !== "undefined" && window.storage) return window.storage;
+    return {
+      list: async (prefix) => {
+        const keys = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && k.startsWith(prefix)) keys.push(k);
+        }
+        return { keys };
+      },
+      get: async (key) => {
+        const value = localStorage.getItem(key);
+        if (value === null) throw new Error("Not found");
+        return { value };
+      },
+      set: async (key, value) => {
+        localStorage.setItem(key, value);
+        return { key, value };
+      },
+    };
+  })();
+
+  // Cargar todos los perfiles (v46: Supabase + localStorage)
+  useEffect(() => {
+    (async () => {
+      try {
+        // v46: Cargar de Supabase (admin ve por defecto proyecto activo, con toggle "ver todos")
+        // Como CosteEmpresa es solo admin, cargamos todos los tabs y todos los proyectos por defecto
+        // (más simple: mostrar todos, ya tienen el buscador y filtro por tipo)
+        const perfilesSup = await listarPerfilesSupabase({
+          tabId: null,
+          verTodos: true,
+          adminPin: usuarioCtx?.pin,
+        });
+        let listaFinal = [];
+        if (Array.isArray(perfilesSup)) {
+          listaFinal = perfilesSup.map(p => ({
+            key: `sup_${p.id}`,
+            supabaseId: p.id,
+            proyectoId: p.proyecto_id,
+            nombre: p.nombre,
+            tabId: p.tab_id === "45h" ? "iruna45" : p.tab_id === "40h" ? "tab40" : p.tab_id,
+            timestamp: new Date(p.created_at).getTime(),
+            autor: p.autor,
+            datos: p.datos,
+            fuente: "supabase",
+          }));
+        }
+
+        // localStorage (respaldo/antiguos)
+        const prefijos = ["perfil_unif_", "perfil_40h_", "perfil_45h_"];
+        const todasKeys = [];
+        for (const prefix of prefijos) {
+          try {
+            const res = await storage.list(prefix);
+            if (res && res.keys) todasKeys.push(...res.keys);
+          } catch {}
+        }
+        const lista = await Promise.all(todasKeys.map(async k => {
+          try {
+            const d = await storage.get(k);
+            const data = JSON.parse(d.value);
+            let tabId = data.tabId;
+            // Normalizar: convertir formato GestorPerfiles ("40h"/"45h") al formato CosteEmpresa ("tab40"/"iruna45")
+            if (tabId === "40h") tabId = "tab40";
+            else if (tabId === "45h") tabId = "iruna45";
+            if (!tabId) {
+              if (k.startsWith("perfil_45h_")) tabId = "iruna45";
+              else if (k.startsWith("perfil_40h_")) tabId = "tab40";
+            }
+            return { key: k, fuente: "local", ...data, tabId };
+          } catch { return null; }
+        }));
+        // Fusionar sin duplicados
+        const claves = new Set(listaFinal.map(p => `${p.nombre}::${p.timestamp}`));
+        for (const p of lista.filter(Boolean)) {
+          const k = `${p.nombre}::${p.timestamp}`;
+          if (!claves.has(k)) {
+            listaFinal.push(p);
+            claves.add(k);
+          }
+        }
+        setPerfiles(listaFinal.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)));
+      } catch (e) {
+        console.error("Error cargando perfiles:", e);
+      }
+      setCargandoPerfiles(false);
+    })();
+  }, []);
+
+  const fmtFecha = (ts) => {
+    if (!ts) return "—";
+    try {
+      const d = new Date(ts);
+      return d.toLocaleString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+    } catch { return "—"; }
+  };
+
+  const fmt = (n) => {
+    if (typeof n !== "number" || isNaN(n)) return "0,00";
+    return n.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+
+  // Devuelve etiqueta "45H" o "40H" según tabId
+  const tipoLabel = (tabId) => {
+    if (tabId === "tab40") return { txt: "40H", color: "#1a1a1a" };
+    return { txt: "45H", color: "#4ec9b8" }; // iruna45 o desconocido = 45H
+  };
+
+  // Perfiles filtrados por búsqueda y tipo
+  const perfilesFiltrados = perfiles.filter(p => {
+    if (filtroTipo === "45h" && p.tabId !== "iruna45") return false;
+    if (filtroTipo === "40h" && p.tabId !== "tab40") return false;
+    if (!busqueda) return true;
+    const q = busqueda.toLowerCase();
+    const trabajador = p.datos?.nombre || "";
+    const proyecto = p.datos?.proyecto || "";
+    return (
+      (p.nombre || "").toLowerCase().includes(q) ||
+      trabajador.toLowerCase().includes(q) ||
+      proyecto.toLowerCase().includes(q)
+    );
+  });
+
+  const cargarPerfil = (p) => {
+    setPerfilCargado(p);
+
+    // Cargar configuración de coste empresa guardada con el perfil (si la hay)
+    const ce = p.datos?._costeEmpresa || {};
+    setIrpfActivo(!!ce.irpfActivo);
+    setPctIRPF(ce.pctIRPF != null ? String(ce.pctIRPF) : "");
+    setFirmaContrato(ce.firmaContrato !== undefined ? !!ce.firmaContrato : true); // default ON
+    setBajaActiva(!!ce.bajaActiva);
+    setImporteExento(ce.importeExento != null ? String(ce.importeExento) : "");
+    setMesesExentos(ce.mesesExentos || {});
+
+    // Registrar log
+    if (usuarioCtx) {
+      const detalle = `[Coste Empresa] Cargado: ${p.nombre} (${p.tabId === "tab40" ? "40H" : "45H"})`;
+      try { registrarLog(usuarioCtx.nombre, "cargar_coste_empresa", detalle); } catch {}
+    }
+  };
+
+  // ═══════════════════════════════════════════════════════════════════
+  // EXPORTAR CSV / PDF de Coste Empresa
+  // ═══════════════════════════════════════════════════════════════════
+
+  // Genera filename base (proyecto_productora_trabajador_costeempresa)
+  const generarFilename = () => {
+    if (!perfilCargado) return "CosteEmpresa";
+    const d = perfilCargado.datos || {};
+    // v52: nombre limpio: <Proyecto>_<Productora>_<Nombre>_CosteEmpresa_<40h|45h>
+    const sufijoHoras = perfilCargado.tabId === "tab40" ? "40h" : "45h";
+    const partes = [d.proyecto, d.productora, d.nombre]
+      .filter(Boolean)
+      .map(s => String(s).replace(/[^a-zA-Z0-9]/g, "_"));
+    partes.push("CosteEmpresa", sufijoHoras);
+    return partes.join("_") || "CosteEmpresa";
+  };
+
+  // Calcula todas las filas de coste empresa (reutilizable)
+  const calcularFilas = () => {
+    if (!perfilCargado) return { filas: [], totales: null, totalBruto: 0 };
+    const d = perfilCargado.datos || {};
+    const desglose = d._calculado?.desglose45 || d.desglose45 || d.desglose || [];
+    const complementos = d._calculado?.complementos45 || d.complementos45 || d.complementos || [];
+    const importeFestMes = d._calculado?.importeFestMes45 || []; // v77: importes festivos por mes
+    const esT40 = perfilCargado.tabId === "tab40";
+    const pctIRPFNum = parseFloat(pctIRPF) || 0;
+    const importeExentoNum = parseFloat(importeExento) || 0;
+
+    const filas = desglose.map((mes, i) => {
+      const c = complementos[i] || {};
+      const plusAct = esT40 ? 0 : (mes.plusAct || 0);
+      const festImp = importeFestMes[i] || 0;  // v77
+      const jeImp   = mes.importeJE || 0;      // v77 (viene en desglose desde v73)
+      const vdShow  = mes.vdShow || 0;         // v83: importe días de vacaciones ya disfrutados
+      // v77: total BRUTO (base para SS): incluye vac prorrateada completa (sin restar días disfrutados)
+      const total = (mes.base40 || 0) + (mes.vac40 || 0) + (mes.indem40 || 0) + (mes.cobroHx || 0) + plusAct
+                  + festImp + jeImp
+                  + (c.herramienta || 0) + (c.coche || 0) + (c.vivienda || 0) + (c.seguroVida || 0) + (c.comida || 0);
+      // v83: total PERCIBIDO (líquido para mostrar al usuario): resta las vacaciones ya disfrutadas
+      const totalPercibido = total - vdShow;
+
+      // Determinar si este mes tiene exención aplicada
+      const parsed = parseMesEspañol(mes.mes);
+      const claveMes = parsed ? `${parsed.year}-${String(parsed.month).padStart(2, "0")}` : null;
+      const aplicaExencion = bajaActiva && importeExentoNum > 0 && claveMes && mesesExentos[claveMes];
+      const exentoMes = aplicaExencion ? importeExentoNum : 0;
+
+      const ce = calcularCosteEmpresaMes({
+        total,
+        vacaciones: mes.vac40 || 0,
+        vacDisfrutadas: mes.vdShow || 0,
+        indem: mes.indem40 || 0,
+        horasExtraEur: mes.cobroHx || 0,
+        plusVivienda: c.vivienda || 0,
+        irpfActivo,
+        pctIRPF: pctIRPFNum,
+        esPrimerMes: i === 0,
+        importeExento: exentoMes,
+        firmaContrato,
+        incluirGestoria,
+        vacAcumulada: d.vacAcumulada || false,
+      });
+      return {
+        mes: mes.mes,
+        claveMes,
+        esCompleto: mes.esCompleto,
+        desde: mes.desde,
+        hasta: mes.hasta,
+        // Importes percibe trabajador
+        base: mes.base40 || 0,
+        vac: (mes.vac40 || 0) - vdShow, // v83: vac líquida (menos días disfrutados)
+        vacBruta: mes.vac40 || 0,       // v83: vac bruta prorrateada (para referencia)
+        vdShow,                          // v83: importe días disfrutados
+        indem: mes.indem40 || 0,
+        hx: mes.cobroHx || 0,
+        plusAct,
+        festivos: festImp,          // v77
+        jeImporte: jeImp,           // v77
+        jeDias: mes.totalJEDias || 0, // v77
+        coche: c.coche || 0,
+        vivienda: c.vivienda || 0,
+        seguroVida: c.seguroVida || 0,
+        comida: c.comida || 0,
+        total: totalPercibido,      // v83: total líquido (para mostrar)
+        totalBruto: total,          // v83: total bruto (base SS, por si se necesita)
+        // Coste empresa
+        ...ce,
+      };
+    });
+
+    const totales = filas.reduce((acc, f) => ({
+      base: acc.base + f.base,
+      vac: acc.vac + f.vac,
+      indem: acc.indem + f.indem,
+      hx: acc.hx + f.hx,
+      plusAct: acc.plusAct + f.plusAct,
+      festivos: acc.festivos + (f.festivos || 0),   // v77
+      jeImporte: acc.jeImporte + (f.jeImporte || 0), // v77
+      jeDias: acc.jeDias + (f.jeDias || 0),          // v77
+      coche: acc.coche + f.coche,
+      vivienda: acc.vivienda + f.vivienda,
+      seguroVida: acc.seguroVida + f.seguroVida,
+      comida: acc.comida + f.comida,
+      total: acc.total + f.total,
+      exento: acc.exento + (f.exento || 0),
+      ssPrincipal: acc.ssPrincipal + f.ssPrincipal,
+      ssVacaciones: acc.ssVacaciones + f.ssVacaciones,
+      ssHorasExtra: acc.ssHorasExtra + f.ssHorasExtra,
+      imei: acc.imei + f.imei,
+      solidaridad: acc.solidaridad + f.solidaridad,
+      irpfVivienda: acc.irpfVivienda + f.irpfVivienda,
+      gestoria: acc.gestoria + f.gestoria,
+      totalCosteEmpresa: acc.totalCosteEmpresa + f.totalCosteEmpresa,
+    }), { base: 0, vac: 0, indem: 0, hx: 0, plusAct: 0, festivos: 0, jeImporte: 0, jeDias: 0, coche: 0, vivienda: 0, seguroVida: 0, comida: 0, total: 0, exento: 0, ssPrincipal: 0, ssVacaciones: 0, ssHorasExtra: 0, imei: 0, solidaridad: 0, irpfVivienda: 0, gestoria: 0, totalCosteEmpresa: 0 });
+
+    return { filas, totales, totalBruto: totales.total };
+  };
+
+  const exportarCSV = () => {
+    if (!perfilCargado) { alert("Carga un perfil primero"); return; }
+    const { filas, totales } = calcularFilas();
+    if (filas.length === 0) { alert("Este perfil no tiene datos mensuales"); return; }
+
+    const d = perfilCargado.datos || {};
+    const tipo = perfilCargado.tabId === "tab40" ? "40H" : "45H";
+    const sep = ";";
+    const dec = (n) => (typeof n === "number" && !isNaN(n)) ? n.toFixed(2).replace(".", ",") : "0,00";
+    const lines = [];
+
+    lines.push([`COSTE EMPRESA · ${tipo}`].join(sep));
+    if (usuarioCtx) lines.push(["Generado por", `${usuarioCtx.nombre} · ${new Date().toLocaleString("es-ES")}`].join(sep));
+    lines.push([""].join(sep));
+    lines.push(["Perfil", perfilCargado.nombre || "—"].join(sep));
+    lines.push(["Proyecto", d.proyecto || "—"].join(sep));
+    lines.push(["Productora", d.productora || "—"].join(sep));
+    lines.push(["Trabajador", d.nombre || "—"].join(sep));
+    lines.push(["Puesto", d.puesto || "—"].join(sep));
+    lines.push(["Código Contable", d.codigoContable || "—"].join(sep));
+    lines.push(["Salario pactado", dec(Number(d.salario45) || 0) + " EUR"].join(sep));
+    lines.push(["Periodo", (d.fechaInicio && d.fechaFin) ? `${d.fechaInicio} a ${d.fechaFin}` : "—"].join(sep));
+    lines.push(["Modo vacaciones", d.vacAcumulada ? "Al final" : "Prorrateadas"].join(sep));
+    lines.push(["Modo indemnizacion", d.indemAcumulada ? "Al final" : "Prorrateada"].join(sep));
+    lines.push(["IRPF Plus Vivienda", irpfActivo ? `Empresa asume (${parseFloat(pctIRPF) || 0}%)` : "Trabajador"].join(sep));
+    lines.push([""].join(sep));
+
+    lines.push(["LO QUE PERCIBE EL TRABAJADOR (mensual)"].join(sep));
+    lines.push(["Mes","Salario Base","Vacaciones","Indemnizacion","H.Extra EUR","Plus Actividad","Festivos EUR","Jorn.Esp EUR","Coche","Vivienda","Seguro Vida","Comida","Exento","TOTAL"].join(sep));
+    filas.forEach(f => {
+      lines.push([
+        f.mes + (f.esCompleto ? "" : ` (${f.desde}-${f.hasta})`),
+        dec(f.base), dec(f.vac), dec(f.indem), dec(f.hx), dec(f.plusAct),
+        dec(f.festivos || 0), dec(f.jeImporte || 0),
+        dec(f.coche), dec(f.vivienda), dec(f.seguroVida), dec(f.comida), dec(f.exento || 0), dec(f.total),
+      ].join(sep));
+    });
+    lines.push([
+      "TOTAL", dec(totales.base), dec(totales.vac), dec(totales.indem), dec(totales.hx),
+      dec(totales.plusAct),
+      dec(totales.festivos || 0), dec(totales.jeImporte || 0),
+      dec(totales.coche), dec(totales.vivienda),
+      dec(totales.seguroVida), dec(totales.comida), dec(totales.exento || 0), dec(totales.total)
+    ].join(sep));
+    lines.push([""].join(sep));
+
+    lines.push(["COSTE EMPRESA (mensual)"].join(sep));
+    lines.push(["Mes","SS Principal (33,35%)","SS Vacaciones (33,35%)","SS H.Extra (27%)","IMEI (0,75%)","Solidaridad","IRPF Vivienda","Gestoria","Exento aplicado","TOTAL Coste Empresa"].join(sep));
+    filas.forEach(f => {
+      lines.push([
+        f.mes + (f.esCompleto ? "" : ` (${f.desde}-${f.hasta})`),
+        dec(f.ssPrincipal), dec(f.ssVacaciones), dec(f.ssHorasExtra),
+        dec(f.imei), dec(f.solidaridad), dec(f.irpfVivienda),
+        dec(f.gestoria), dec(f.exento || 0), dec(f.totalCosteEmpresa),
+      ].join(sep));
+    });
+    lines.push([
+      "TOTAL", dec(totales.ssPrincipal), dec(totales.ssVacaciones), dec(totales.ssHorasExtra),
+      dec(totales.imei), dec(totales.solidaridad), dec(totales.irpfVivienda),
+      dec(totales.gestoria), dec(totales.exento || 0), dec(totales.totalCosteEmpresa),
+    ].join(sep));
+    lines.push([""].join(sep));
+
+    lines.push(["RESUMEN"].join(sep));
+    lines.push(["Bruto trabajador", dec(totales.total) + " EUR"].join(sep));
+    lines.push(["Coste empresa", dec(totales.totalCosteEmpresa) + " EUR"].join(sep));
+    if (bajaActiva && (parseFloat(importeExento) || 0) > 0) {
+      lines.push(["Importe exento mensual", dec(parseFloat(importeExento) || 0) + " EUR"].join(sep));
+      lines.push(["Total exento aplicado", dec(totales.exento || 0) + " EUR"].join(sep));
+    }
+    lines.push(["Firma de contrato", firmaContrato ? "SI" : "NO"].join(sep));
+    lines.push(["Coste total", dec(totales.total + totales.totalCosteEmpresa) + " EUR"].join(sep));
+    const pct = totales.total > 0 ? (totales.totalCosteEmpresa / totales.total * 100) : 0;
+    lines.push(["% s/salario", pct.toFixed(2).replace(".", ",") + " %"].join(sep));
+
+    const csv = "\uFEFF" + lines.join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = generarFilename() + ".csv";
+    a.style.display = "none";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+    if (usuarioCtx) {
+      try { registrarLog(usuarioCtx.nombre, "export_csv", `[Coste Empresa] ${generarFilename()}.csv · ${d.nombre || "—"}`); } catch {}
+    }
+  };
+
+  const exportarPDF = () => {
+    if (!perfilCargado) { alert("Carga un perfil primero"); return; }
+    const { filas, totales } = calcularFilas();
+    if (filas.length === 0) { alert("Este perfil no tiene datos mensuales"); return; }
+
+    const d = perfilCargado.datos || {};
+    const tipo = perfilCargado.tabId === "tab40" ? "40H" : "45H";
+    const titulo = [d.proyecto, d.productora, d.nombre].filter(Boolean).join(" - ") || "Coste Empresa";
+    const pctIRPFNum = parseFloat(pctIRPF) || 0;
+    const totalConCE = totales.total + totales.totalCosteEmpresa;
+    const pctSobre = totales.total > 0 ? (totales.totalCosteEmpresa / totales.total * 100) : 0;
+    const generadoEl = new Date().toLocaleString("es-ES");
+
+    const filasPerc = filas.map(f => `
+      <tr>
+        <td class="m">${f.mes}${f.esCompleto ? "" : ` <span class="small">(${f.desde}-${f.hasta})</span>`}</td>
+        <td class="n">${fmt(f.base)}</td>
+        <td class="n ${f.vac === 0 ? 'z' : ''}">${f.vac === 0 ? "—" : fmt(f.vac)}</td>
+        <td class="n ${f.indem === 0 ? 'z' : ''}">${f.indem === 0 ? "—" : fmt(f.indem)}</td>
+        <td class="n ${f.hx === 0 ? 'z' : 'b'}">${f.hx === 0 ? "—" : fmt(f.hx)}</td>
+        <td class="n ${f.plusAct === 0 ? 'z' : 'o'}">${f.plusAct === 0 ? "—" : fmt(f.plusAct)}</td>
+        <td class="n ${(f.festivos || 0) === 0 ? 'z' : 'p'}">${(f.festivos || 0) === 0 ? "—" : fmt(f.festivos)}</td>
+        <td class="n ${(f.jeImporte || 0) === 0 ? 'z' : 'jp'}">${(f.jeImporte || 0) === 0 ? "—" : fmt(f.jeImporte)}</td>
+        <td class="n ${f.coche === 0 ? 'z' : 'g'}">${f.coche === 0 ? "—" : fmt(f.coche)}</td>
+        <td class="n ${f.vivienda === 0 ? 'z' : 'g'}">${f.vivienda === 0 ? "—" : fmt(f.vivienda)}</td>
+        <td class="n ${f.seguroVida === 0 ? 'z' : 'g'}">${f.seguroVida === 0 ? "—" : fmt(f.seguroVida)}</td>
+        <td class="n ${f.comida === 0 ? 'z' : 'g'}">${f.comida === 0 ? "—" : fmt(f.comida)}</td>
+        <td class="n ${(f.exento || 0) === 0 ? 'z' : 'red'}"><b>${(f.exento || 0) === 0 ? "—" : "-" + fmt(f.exento)}</b></td>
+        <td class="n gold"><b>${fmt(f.total)}</b></td>
+      </tr>
+    `).join("");
+
+    const filasCE = filas.map(f => `
+      <tr>
+        <td class="m">${f.mes}</td>
+        <td class="n ${f.ssPrincipal === 0 ? 'z' : ''}">${f.ssPrincipal === 0 ? "—" : fmt(f.ssPrincipal)}</td>
+        <td class="n ${f.ssVacaciones === 0 ? 'z' : ''}">${f.ssVacaciones === 0 ? "—" : fmt(f.ssVacaciones)}</td>
+        <td class="n ${f.ssHorasExtra === 0 ? 'z' : 'b'}">${f.ssHorasExtra === 0 ? "—" : fmt(f.ssHorasExtra)}</td>
+        <td class="n ${f.imei === 0 ? 'z' : ''}">${f.imei === 0 ? "—" : fmt(f.imei)}</td>
+        <td class="n ${f.solidaridad === 0 ? 'z' : 'p'}">${f.solidaridad === 0 ? "—" : fmt(f.solidaridad)}</td>
+        <td class="n ${f.irpfVivienda === 0 ? 'z' : 'o'}">${f.irpfVivienda === 0 ? "—" : fmt(f.irpfVivienda)}</td>
+        <td class="n ${incluirGestoria ? 'g' : 'z'}" style="${incluirGestoria ? '' : 'text-decoration:line-through'}">${fmt(f.gestoria)}</td>
+        <td class="n ${(f.exento || 0) === 0 ? 'z' : 'red'}">${(f.exento || 0) === 0 ? "—" : "-" + fmt(f.exento)}</td>
+        <td class="n red"><b>${fmt(f.totalCosteEmpresa)}</b></td>
+        <td class="n gold" style="background:#f2f5f7;border-left:2px solid #1a1a1a"><b>${fmt(f.total + f.totalCosteEmpresa)}</b></td>
+      </tr>
+    `).join("");
+
+    const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>${generarFilename()}</title>
+<style>
+  @page { size: A4 portrait; margin: 10mm; }
+  body { font-family: 'Courier Prime', 'Courier New', monospace; color: #1a1a1a; font-size: 8.5px; margin: 0; padding: 0; position: relative; }
+  .watermark { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-28deg); font-weight: 900; color: rgba(160, 69, 69, 0.10); letter-spacing: 0.15em; z-index: 9999; pointer-events: none; text-align: center; white-space: nowrap; line-height: 0.95; }
+  .watermark .wm1 { font-size: 90px; display: block; }
+  .watermark .wm2 { font-size: 38px; display: block; letter-spacing: 0.20em; margin-top: 6px; }
+  .content { position: relative; z-index: 1; }
+  .banner { background: #1a1a1a; color: #f0f0f0; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; border-radius: 4px; margin-bottom: 12px; }
+  .logo { background: #1a1a1a; color: #1a1a1a; padding: 5px 8px; font-weight: 700; letter-spacing: 0.1em; border-radius: 3px; font-size: 9px; }
+  .title-right { text-align: right; }
+  .subtitle { font-size: 7px; color: #1a1a1a; letter-spacing: 0.25em; text-transform: uppercase; }
+  .title { font-size: 12px; font-weight: 700; letter-spacing: 0.07em; }
+  .meta { font-size: 7px; color: #aaa; margin-top: 2px; }
+  .section { margin-bottom: 12px; }
+  h2 { font-size: 8px; letter-spacing: 0.18em; color: #1a1a1a; text-transform: uppercase; margin: 0 0 6px; padding-bottom: 5px; border-bottom: 1px solid #d5d9dc; }
+  h2.red { color: #a04545; }
+  .datos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
+  .datos > div { background: #f2f5f7; border: 1px solid #d5d9dc; border-radius: 3px; padding: 5px 7px; }
+  .datos .l { font-size: 6.5px; color: #888; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 2px; }
+  .datos .v { font-size: 9px; font-weight: 700; }
+  table { width: 100%; border-collapse: collapse; font-size: 7px; table-layout: fixed; }
+  th { background: #dfe4e8; color: #666; font-size: 6.5px; letter-spacing: 0.03em; text-transform: uppercase; font-weight: 700; padding: 4px 2px; border-bottom: 1px solid #d5d9dc; text-align: right; word-wrap: break-word; }
+  th.first { text-align: left; }
+  th.gold { color: #1a1a1a; }
+  th.red { color: #a04545; }
+  th.p { color: #6a3a9a; }
+  th.jp { color: #8a1e4a; }
+  th .pct { display: block; font-weight: 400; font-size: 6px; color: #999; margin-top: 1px; }
+  td { padding: 3px 2px; border-bottom: 1px solid #eef1f3; word-wrap: break-word; }
+  td.m { font-weight: 600; text-transform: capitalize; font-size: 7px; }
+  td.n { text-align: right; }
+  td.b { color: #1a1a1a; }
+  td.o { color: #b07030; }
+  td.g { color: #1a1a1a; }
+  td.p { color: #6a3a9a; }
+  td.jp { color: #8a1e4a; }
+  td.gold { color: #1a1a1a; }
+  td.red { color: #a04545; }
+  td.z { color: #ccc; }
+  .small { font-size: 6px; color: #888; }
+  tr.total td { background: #f2f5f7; font-weight: 700; border-top: 1.5px solid #d8a8a8; }
+  tr.total td.first { color: #6a2020; text-transform: uppercase; letter-spacing: 0.08em; font-size: 7px; }
+  .ce table tr.total td { background: #fdf0f0; }
+  .resumen { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-top: 8px; }
+  .resumen > div { background: #dfe4e8; border: 1px solid #d5d9dc; border-radius: 3px; padding: 6px; text-align: center; }
+  .resumen .l { font-size: 6.5px; color: #666; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 3px; }
+  .resumen .v { font-size: 10px; font-weight: 700; }
+  .resumen .vL { font-size: 12px; font-weight: 700; }
+  .reglas { margin-top: 10px; padding: 8px 10px; background: #f2f5f7; border: 1px solid #d5d9dc; border-radius: 3px; font-size: 7.5px; color: #666; line-height: 1.5; }
+  .reglas b { color: #444; }
+  .legal { margin-top: 14px; padding: 10px 12px; background: #f2f5f7; border: 1px solid #e8e4de; border-radius: 3px; }
+  .legal h3 { font-size: 8px; color: #888; letter-spacing: 0.18em; text-transform: uppercase; margin: 0 0 6px; }
+  .legal .brand { font-size: 9px; font-weight: 700; letter-spacing: 0.05em; margin-bottom: 4px; }
+  .legal p { font-size: 7.5px; color: #666; line-height: 1.4; margin: 0 0 4px; }
+  .legal .en { font-size: 7px; color: #888; font-style: italic; }
+  .legal .footer { font-size: 7px; color: #888; font-style: italic; }
+  .footer-pdf { margin-top: 10px; text-align: center; font-size: 7px; color: #aaa; letter-spacing: 0.05em; }
+  @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } .no-print { display: none; } }
+  .no-print { background: #faf6ee; border: 1px solid #d8c8a0; border-radius: 4px; padding: 10px 14px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
+  .no-print button { background: #1a1a1a; color: #fff; border: none; padding: 8px 16px; border-radius: 4px; font-family: 'Courier Prime', 'Courier New', monospace; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; font-size: 10px; cursor: pointer; }
+</style>
+</head>
+<body>
+<div class="watermark"><span class="wm1">CONFIDENCIAL</span><span class="wm2">USO INTERNO</span></div>
+<div class="content">
+
+<div class="banner">
+  <img src="/logo.png" alt="Bdprodtools" style="height:36px;width:auto;display:block;" />
+  <div class="title-right">
+    <div class="subtitle">Coste Empresa · ${tipo}</div>
+    <div class="title">CALCULADORA DE SALARIOS</div>
+    <div class="meta">${[d.nombre, d.puesto].filter(Boolean).join(" · ")}</div>
+  </div>
+</div>
+
+<div class="section">
+  <h2>▸ Datos del Trabajador</h2>
+  <div class="datos">
+    <div><div class="l">Perfil</div><div class="v">${perfilCargado.nombre || "—"}</div></div>
+    <div><div class="l">Proyecto</div><div class="v">${d.proyecto || "—"}</div></div>
+    <div><div class="l">Productora</div><div class="v">${d.productora || "—"}</div></div>
+    <div><div class="l">Trabajador</div><div class="v">${d.nombre || "—"}</div></div>
+    <div><div class="l">Puesto</div><div class="v">${d.puesto || "—"}</div></div>
+    <div><div class="l">Código contable</div><div class="v">${d.codigoContable || "—"}</div></div>
+    <div><div class="l">Salario pactado</div><div class="v">${d.salario45 ? fmt(Number(d.salario45)) + " €" : "—"}</div></div>
+    <div><div class="l">Período</div><div class="v">${(d.fechaInicio && d.fechaFin) ? `${d.fechaInicio} → ${d.fechaFin}` : "—"}</div></div>
+    <div><div class="l">Vacaciones</div><div class="v">${d.vacAcumulada ? "Al final" : "Prorrateadas"}</div></div>
+    <div><div class="l">IRPF Vivienda</div><div class="v">${irpfActivo ? `Empresa (${pctIRPFNum}%)` : "Trabajador"}</div></div>
+  </div>
+</div>
+
+<div class="section">
+  <h2>▸ Lo que Percibe el Trabajador (Mensual · Brutos)</h2>
+  <table>
+    <thead>
+      <tr>
+        <th class="first">Mes</th>
+        <th>Salario Base</th>
+        <th>Vacaciones</th>
+        <th>Indem.</th>
+        <th>H.Extra €</th>
+        <th>Plus Act.</th>
+        <th class="p">Festivos €</th>
+        <th class="jp">Jorn.Esp €</th>
+        <th>Coche</th>
+        <th>Vivienda</th>
+        <th>Seguro V.</th>
+        <th>Comida</th>
+        <th class="red">Exento</th>
+        <th class="gold">TOTAL</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${filasPerc}
+      <tr class="total">
+        <td class="first">TOTAL</td>
+        <td class="n">${fmt(totales.base)}</td>
+        <td class="n">${fmt(totales.vac)}</td>
+        <td class="n">${fmt(totales.indem)}</td>
+        <td class="n b">${fmt(totales.hx)}</td>
+        <td class="n o">${totales.plusAct === 0 ? "—" : fmt(totales.plusAct)}</td>
+        <td class="n p">${(totales.festivos || 0) === 0 ? "—" : fmt(totales.festivos)}</td>
+        <td class="n jp">${(totales.jeImporte || 0) === 0 ? "—" : fmt(totales.jeImporte)}</td>
+        <td class="n g">${fmt(totales.coche)}</td>
+        <td class="n g">${fmt(totales.vivienda)}</td>
+        <td class="n g">${fmt(totales.seguroVida)}</td>
+        <td class="n g">${fmt(totales.comida)}</td>
+        <td class="n red">${(totales.exento || 0) === 0 ? "—" : "-" + fmt(totales.exento)}</td>
+        <td class="n gold">${fmt(totales.total)}</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="section ce">
+  <h2 class="red">▸ Coste Empresa (Mensual)</h2>
+  <table>
+    <thead>
+      <tr>
+        <th class="first">Mes</th>
+        <th>SS Principal<span class="pct">33,35%</span></th>
+        <th>SS Vac<span class="pct">33,35%</span></th>
+        <th>SS H.Ex<span class="pct">27%</span></th>
+        <th>IMEI<span class="pct">0,75%</span></th>
+        <th>Solidaridad</th>
+        <th>IRPF Viv<span class="pct">${irpfActivo && pctIRPFNum > 0 ? pctIRPFNum + "%" : "—"}</span></th>
+        <th>Gestoría</th>
+        <th class="red">Exento</th>
+        <th class="red">TOTAL</th>
+        <th style="background:#1a1a1a;color:#fff;border-left:2px solid #1a1a1a">TOTAL MES</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${filasCE}
+      <tr class="total">
+        <td class="first">TOTAL</td>
+        <td class="n">${fmt(totales.ssPrincipal)}</td>
+        <td class="n">${fmt(totales.ssVacaciones)}</td>
+        <td class="n b">${fmt(totales.ssHorasExtra)}</td>
+        <td class="n">${fmt(totales.imei)}</td>
+        <td class="n p">${totales.solidaridad === 0 ? "—" : fmt(totales.solidaridad)}</td>
+        <td class="n o">${totales.irpfVivienda === 0 ? "—" : fmt(totales.irpfVivienda)}</td>
+        <td class="n ${incluirGestoria ? 'g' : 'z'}" style="${incluirGestoria ? '' : 'text-decoration:line-through'}">${fmt(totales.gestoria)}</td>
+        <td class="n red">${(totales.exento || 0) === 0 ? "—" : "-" + fmt(totales.exento)}</td>
+        <td class="n red">${fmt(totales.totalCosteEmpresa)}</td>
+        <td class="n gold" style="background:#1a1a1a;color:#fff;border-left:2px solid #1a1a1a"><b>${fmt(totales.total + totales.totalCosteEmpresa)}</b></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="reglas">
+    <b>Reglas aplicadas:</b><br/>
+    · <b>SS Principal</b> (33,35%): sobre TOTAL del mes − vacaciones* − indemnización. Topada a 1.701,25 € si base &gt; 5.101,20 €.<br/>
+    · <b>SS Vacaciones</b> (33,35%): solo si vacaciones "al final"* — se suman aparte, sin topar. <b>SS H.Extra</b> (27%): siempre aparte, independiente del tope.<br/>
+    · <b>IMEI</b> (0,75%): sobre TOTAL del mes − indemnización. Topado a 38,26 € si base &gt; 5.101,20 €.<br/>
+    · <b>Solidaridad</b> (tramos 0,97% / 1,15% / 1,33%): sobre exceso de (TOTAL − indemnización − vacaciones* − horas extra) sobre 5.101,20 €.<br/>
+    · <b>Indemnización</b>: NO genera SS ni IMEI.<br/>
+    · <b>Gestoría</b>: primer mes 32 € (alta + nómina), resto 26 €.<br/>
+    <span style="color:#888;font-size:8px">* Vacaciones prorrateadas (mes a mes) → van dentro del pool topado de SS Principal y no se restan. Vacaciones "al final" → se restan del pool y generan su propia SS Vacaciones (sin topar) el último mes.</span>
+  </div>
+
+  <div class="resumen">
+    <div><div class="l">Bruto trabajador</div><div class="v">${fmt(totales.total)} €</div></div>
+    <div><div class="l">Coste empresa</div><div class="v" style="color:#a04545">${fmt(totales.totalCosteEmpresa)} €</div></div>
+    <div><div class="l">Coste total</div><div class="vL" style="color:#1a1a1a">${fmt(totalConCE)} €</div></div>
+    <div><div class="l">% s/salario</div><div class="v" style="color:#6a3a9a">${pctSobre.toFixed(2)} %</div></div>
+  </div>
+</div>
+
+<div class="legal">
+  <h3>▸ Aviso Legal</h3>
+  <div class="brand">BD PROD TOOLS</div>
+  <p>${DISCLAIMER_ES}</p>
+  <p class="en">${DISCLAIMER_EN}</p>
+  <p class="footer">G &amp; G Enterprises LLC</p>
+</div>
+
+<div class="footer-pdf">
+  Generado por ${usuarioCtx?.nombre || "—"} · ${generadoEl} · ${DISCLAIMER_PDF}
+</div>
+
+</div>
+<script>
+  // v89: forzar document.title al cargar y antes de imprimir
+  document.title = ${JSON.stringify(generarFilename())};
+  window.addEventListener("beforeprint", function() { document.title = ${JSON.stringify(generarFilename())}; });
+  window.addEventListener("afterprint", function() { document.title = ${JSON.stringify(generarFilename())}; });
+  window.addEventListener("focus", function() { document.title = ${JSON.stringify(generarFilename())}; });
+  // Auto-lanzar el diálogo de impresión al cargar
+  window.addEventListener("load", function() {
+    setTimeout(function() { window.print(); }, 400);
+  });
+</script>
+</body>
+</html>`;
+
+    // v90: abrir con document.write en vez de blob URL para que el nombre PDF sea correcto
+    const nuevaVentana = window.open("", "_blank");
+    if (!nuevaVentana) {
+      // Bloqueado por popup: fallback a descarga con blob
+      const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = generarFilename() + ".html";
+      a.style.display = "none";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 30000);
+      alert("⚠ El navegador bloqueó la ventana emergente. Se ha descargado el HTML. Permite ventanas emergentes para esta web y el PDF se abrirá directamente.");
+    } else {
+      nuevaVentana.document.open();
+      nuevaVentana.document.write(html);
+      nuevaVentana.document.close();
+    }
+
+    if (usuarioCtx) {
+      try { registrarLog(usuarioCtx.nombre, "export_pdf", `[Coste Empresa] ${generarFilename()}.html · ${d.nombre || "—"}`); } catch {}
+    }
+  };
+
+  // ─── Guardar configuración Coste Empresa en el perfil cargado ───
+  const guardarConfigCosteEmpresa = async () => {
+    if (!perfilCargado) { alert("Carga un perfil primero"); return; }
+    try {
+      // Recuperar el perfil del storage, actualizar _costeEmpresa, y volver a guardar
+      const key = perfilCargado.key;
+      const item = await storage.get(key);
+      if (!item || !item.value) { alert("No se pudo leer el perfil"); return; }
+      const data = JSON.parse(item.value);
+      data.datos = data.datos || {};
+      data.datos._costeEmpresa = {
+        irpfActivo,
+        pctIRPF: parseFloat(pctIRPF) || 0,
+        firmaContrato,
+        incluirGestoria,
+        bajaActiva,
+        importeExento: parseFloat(importeExento) || 0,
+        mesesExentos,
+        guardadoEl: new Date().toISOString(),
+        guardadoPor: usuarioCtx?.nombre || null,
+      };
+      // Guardar de vuelta
+      if (storage.set) {
+        await storage.set(key, JSON.stringify(data));
+      } else {
+        localStorage.setItem(key, JSON.stringify(data));
+      }
+      // Actualizar el perfilCargado en memoria
+      setPerfilCargado({ ...perfilCargado, datos: data.datos });
+      alert("✓ Configuración guardada en el perfil");
+      if (usuarioCtx) {
+        try { registrarLog(usuarioCtx.nombre, "guardar_config_coste_empresa", `[Coste Empresa] ${data.nombre || "—"}`); } catch {}
+      }
+    } catch (e) {
+      alert("Error al guardar: " + e.message);
+    }
+  };
+
+  // ─── Exportar a Excel master (rellena fila en EQUIPO TÉCNICO) ───
+  const abrirModalExportMaster = () => {
+    if (!perfilCargado) { alert("Carga un perfil primero"); return; }
+    setErrorMaster(null);
+    setArchivoMaster(null);
+    setFilaDestinoExcel("8");
+    setMostrarExportMaster(true);
+  };
+
+  const onArchivoMasterSeleccionado = (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    if (!f.name.toLowerCase().endsWith(".xlsx") && !f.name.toLowerCase().endsWith(".xlsm")) {
+      setErrorMaster("Solo se aceptan archivos .xlsx o .xlsm");
+      return;
+    }
+    setArchivoMaster(f);
+    setErrorMaster(null);
+  };
+
+  const procesarExcelMaster = async () => {
+    if (!perfilCargado || !archivoMaster) return;
+    const fila = parseInt(filaDestinoExcel);
+    if (isNaN(fila) || fila < 8 || fila > 500) {
+      setErrorMaster("Fila destino debe ser un número entre 8 y 500");
+      return;
+    }
+    setProcesandoMaster(true);
+    setErrorMaster(null);
+    try {
+      const { buffer, mesesEscritos, mesesNoEncontrados, mesesExcel } =
+        await rellenarExcelMaster(archivoMaster, perfilCargado, fila);
+
+      // Descargar
+      const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const nombreOrig = archivoMaster.name.replace(/\.(xlsx|xlsm)$/i, "");
+      const partes = [perfilCargado.datos?.nombre, "rellenado"].filter(Boolean).map(s => String(s).replace(/[^a-zA-Z0-9]/g, "_"));
+      a.href = url;
+      a.download = `${nombreOrig}_${partes.join("_")}.xlsx`;
+      a.style.display = "none";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+      // Log
+      if (usuarioCtx) {
+        try {
+          registrarLog(usuarioCtx.nombre, "export_excel_master",
+            `[Excel Master] ${perfilCargado.datos?.nombre || "—"} · Fila ${fila} · ${mesesEscritos.length} meses`);
+        } catch {}
+      }
+
+      // Mensaje al usuario
+      let msg = `✓ Excel generado. Fila ${fila} rellenada con ${mesesEscritos.length} meses.`;
+      if (mesesNoEncontrados.length > 0) {
+        msg += `\n\n⚠ ${mesesNoEncontrados.length} meses del perfil NO se encontraron en el Excel: ${mesesNoEncontrados.join(", ")}`;
+        msg += `\n\nMeses disponibles en el Excel: ${Object.keys(mesesExcel).sort().join(", ")}`;
+      }
+      alert(msg);
+      setMostrarExportMaster(false);
+    } catch (e) {
+      setErrorMaster("Error: " + e.message);
+    } finally {
+      setProcesandoMaster(false);
+    }
+  };
+
+  // Estilo común
+  const P = { background: "#ffffff", border: "1px solid #d5d9dc", borderRadius: 8, padding: 24, marginBottom: 20, minWidth: 0 };
+  const ST = { fontSize: 12, letterSpacing: "0.15em", color: "#555", textTransform: "uppercase", marginBottom: 18, paddingBottom: 12, borderBottom: "1px solid #d5d9dc", fontFamily: "'Inter', -apple-system, sans-serif", fontWeight: 700 };
+
+  // === Si no hay perfil cargado: solo selector ===
+  if (!perfilCargado) {
+    return (
+      <div style={{ color: "#1a1a1a", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", padding: "32px 32px" }}>
+        <div style={{ maxWidth: 2100, margin: "0 auto 24px" }}>
+          <div style={{ background: "#1a1a1a", padding: "24px 28px", display: "flex", justifyContent: "space-between", alignItems: "center", color: "#f0f0f0", borderRadius: 10, border: "1px solid rgba(255,255,255,0.05)" }}>
+            <img src="/logo.png" alt="Bdprodtools" style={{ height: 60, width: "auto" }} />
+            <div style={{ textAlign: "right" }}>
+              <div style={{ fontSize: 14, color: "#4ec9b8", letterSpacing: "0.18em", textTransform: "uppercase", fontWeight: 700, marginBottom: 6 }}>Coste Empresa</div>
+              <div style={{ fontSize: 24, fontWeight: 500, letterSpacing: "-0.01em", color: "#f0f0f0" }}>Payroll cost calculator</div>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ maxWidth: 2100, margin: "0 auto" }}>
+          <div style={P}>
+            <div style={ST}>▸ Cargar Perfil Guardado</div>
+
+            <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
+              <input
+                type="text"
+                placeholder="🔍 Buscar perfil, trabajador o proyecto..."
+                value={busqueda}
+                onChange={e => setBusqueda(e.target.value)}
+                style={{ flex: 1, minWidth: 200, padding: "8px 12px", border: "1px solid #d5d9dc", borderRadius: 4, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontSize: 11, background: "#dfe4e8" }}
+              />
+              <select
+                value={filtroTipo}
+                onChange={e => setFiltroTipo(e.target.value)}
+                style={{ padding: "8px 12px", border: "1px solid #d5d9dc", borderRadius: 4, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontSize: 11, background: "#dfe4e8" }}
+              >
+                <option value="todos">Todos los tipos</option>
+                <option value="45h">Solo 45H</option>
+                <option value="40h">Solo 40H</option>
+              </select>
+            </div>
+
+            {cargandoPerfiles ? (
+              <div style={{ padding: 30, textAlign: "center", color: "#888", fontSize: 11 }}>Cargando perfiles...</div>
+            ) : perfilesFiltrados.length === 0 ? (
+              <div style={{ padding: 30, textAlign: "center", color: "#888", fontSize: 11, fontStyle: "italic" }}>
+                {perfiles.length === 0 ? "No hay perfiles guardados. Guarda uno desde 45H o 40H." : "No hay perfiles que coincidan con los filtros."}
+              </div>
+            ) : (
+              <div style={{ border: "1px solid #d5d9dc", borderRadius: 6, overflow: "hidden" }}>
+                {perfilesFiltrados.map((p, idx) => {
+                  const t = tipoLabel(p.tabId);
+                  const trabajador = p.datos?.nombre || "—";
+                  const puesto = p.datos?.puesto || "—";
+                  const autor = p.autor || "—";
+                  return (
+                    <div key={p.key} style={{ padding: "10px 14px", borderBottom: idx < perfilesFiltrados.length - 1 ? "1px solid #eef1f3" : "none", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}
+                      onClick={() => cargarPerfil(p)}>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a" }}>
+                          {p.nombre} <span style={{ background: t.color, color: "#f2f5f7", padding: "1px 6px", borderRadius: 3, fontSize: 8, marginLeft: 4, letterSpacing: "0.05em" }}>{t.txt}</span>
+                        </div>
+                        <div style={{ fontSize: 9.5, color: "#888", marginTop: 2 }}>
+                          {trabajador} · {puesto} · {fmtFecha(p.timestamp)} · por {autor}
+                        </div>
+                      </div>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); cargarPerfil(p); }}
+                        style={{ background: "transparent", color: "#4ec9b8", border: "1px solid #4ec9b8", padding: "5px 12px", borderRadius: 3, fontSize: 9, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}
+                      >
+                        Cargar
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <div style={{ marginTop: 12, fontSize: 9, color: "#888", textAlign: "center" }}>
+              {perfilesFiltrados.length} de {perfiles.length} perfil{perfiles.length !== 1 ? "es" : ""} guardado{perfiles.length !== 1 ? "s" : ""}
+            </div>
+          </div>
+
+          <div style={{ textAlign: "center", padding: 30, color: "#aaa", fontStyle: "italic", fontSize: 11, background: "#f2f5f7", borderRadius: 8, border: "1px dashed #d5d9dc" }}>
+            ⬆ Carga un perfil para empezar a calcular el coste empresa
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // === Perfil cargado: mostrar datos + tabla "Lo que percibe el trabajador" ===
+  const d = perfilCargado.datos || {};
+  const esTab40 = perfilCargado.tabId === "tab40";
+  const tipo = tipoLabel(perfilCargado.tabId);
+
+  // Reconstruir desglose mensual usando los datos del perfil
+  // Como FASE 1 no recalcula, mostramos los datos guardados o, si no están,
+  // un placeholder. Los importes Base/Vac/Indem por mes están en d.desglose
+  // si el perfil los guardó (lo hace el GestorPerfiles).
+  const desgloseGuardado = d._calculado?.desglose45 || d.desglose45 || d.desglose || [];
+  const complementosGuardado = d._calculado?.complementos45 || d.complementos45 || d.complementos || [];
+  const importeFestGuardado = d._calculado?.importeFestMes45 || []; // v77
+
+  return (
+    <div style={{ color: "#1a1a1a", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", padding: "32px 32px" }}>
+      <div style={{ maxWidth: 2100, margin: "0 auto 24px" }}>
+        <div style={{ background: "#1a1a1a", padding: "24px 28px", display: "flex", justifyContent: "space-between", alignItems: "center", color: "#f0f0f0", borderRadius: 10, border: "1px solid rgba(255,255,255,0.05)", gap: 20, flexWrap: "wrap" }}>
+          {/* Logo real Bdprodtools + info perfil */}
+          <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
+            <img src="/logo.png" alt="Bdprodtools" style={{ height: 60, width: "auto" }} />
+            <div>
+              <div style={{ fontSize: 12, color: "#4ec9b8", letterSpacing: "0.18em", textTransform: "uppercase", fontWeight: 700, marginBottom: 4 }}>Perfil cargado</div>
+              <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 3, color: "#f0f0f0" }}>
+                {d.nombre || perfilCargado.nombre} · <span style={{ color: "#ccc", fontWeight: 500 }}>{d.puesto || "—"}</span> <span style={{ background: tipo.color, color: "#0a0a0a", padding: "3px 9px", borderRadius: 5, fontSize: 10, marginLeft: 6, letterSpacing: "0.08em", fontWeight: 700 }}>{tipo.txt}</span>
+              </div>
+              <div style={{ fontSize: 11, color: "#888", fontWeight: 500 }}>
+                {fmtFecha(perfilCargado.timestamp)} · creado por {perfilCargado.autor || "—"}
+              </div>
+            </div>
+          </div>
+          {/* Botones acción a la derecha */}
+          <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", marginLeft: "auto" }}>
+            <button
+              onClick={() => setPerfilCargado(null)}
+              style={{ background: "transparent", color: "#ddd", border: "1px solid rgba(255,255,255,0.2)", padding: "8px 14px", borderRadius: 6, fontSize: 11, fontWeight: 600, letterSpacing: "0.03em", cursor: "pointer", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", display: "flex", alignItems: "center", gap: 5, transition: "all 0.15s" }}
+              onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.05)"; }}
+              onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
+            >
+              ← Cambiar perfil
+            </button>
+            <span style={{ width: 1, background: "rgba(255,255,255,0.1)", height: 20, margin: "0 4px" }}></span>
+            <button
+              onClick={guardarConfigCosteEmpresa}
+              style={{ background: "#4ec9b8", color: "#0a0a0a", border: "none", padding: "8px 14px", borderRadius: 6, fontSize: 11, fontWeight: 700, letterSpacing: "0.03em", cursor: "pointer", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", display: "flex", alignItems: "center", gap: 5, transition: "background 0.15s" }}
+              onMouseEnter={e => e.currentTarget.style.background = "#5ed9c8"}
+              onMouseLeave={e => e.currentTarget.style.background = "#4ec9b8"}
+              title="Guardar la configuración actual (IRPF, firma, baja) en el perfil"
+            >
+              💾 Guardar Config
+            </button>
+            <button
+              onClick={abrirModalExportMaster}
+              style={{ background: "transparent", color: "#4ec9b8", border: "1px solid rgba(78,201,184,0.35)", padding: "8px 14px", borderRadius: 6, fontSize: 11, fontWeight: 600, letterSpacing: "0.03em", cursor: "pointer", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", display: "flex", alignItems: "center", gap: 5, transition: "all 0.15s" }}
+              onMouseEnter={e => { e.currentTarget.style.background = "rgba(78,201,184,0.1)"; e.currentTarget.style.borderColor = "#4ec9b8"; }}
+              onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = "rgba(78,201,184,0.35)"; }}
+              title="Rellenar fila en el Excel Master (EQUIPO TÉCNICO)"
+            >
+              📋 Excel Master
+            </button>
+            <button
+              onClick={exportarCSV}
+              style={{ background: "#2196f3", color: "#fff", border: "none", padding: "8px 14px", borderRadius: 6, fontSize: 11, fontWeight: 600, letterSpacing: "0.03em", cursor: "pointer", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", display: "flex", alignItems: "center", gap: 5, transition: "background 0.15s" }}
+              onMouseEnter={e => e.currentTarget.style.background = "#42a5f5"}
+              onMouseLeave={e => e.currentTarget.style.background = "#2196f3"}
+              title="Descargar CSV"
+            >
+              CSV
+            </button>
+            <button
+              onClick={exportarPDF}
+              style={{ background: "#d32f2f", color: "#fff", border: "none", padding: "8px 14px", borderRadius: 6, fontSize: 11, fontWeight: 600, letterSpacing: "0.03em", cursor: "pointer", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", display: "flex", alignItems: "center", gap: 5, transition: "background 0.15s" }}
+              onMouseEnter={e => e.currentTarget.style.background = "#f44336"}
+              onMouseLeave={e => e.currentTarget.style.background = "#d32f2f"}
+              title="Generar PDF"
+            >
+              PDF
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ maxWidth: 2100, margin: "0 auto" }}>
+        {/* Bloque Datos del trabajador */}
+        <div style={P}>
+          <div style={ST}>▸ Datos del Trabajador</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14 }}>
+            {[
+              { l: "Proyecto", v: d.proyecto },
+              { l: "Productora", v: d.productora },
+              { l: "Trabajador", v: d.nombre },
+              { l: "Puesto", v: d.puesto },
+              { l: "Código contable", v: d.codigoContable },
+              { l: "Salario pactado", v: d.salario45 ? `${fmt(Number(d.salario45))} €` : "—" },
+              { l: "Período", v: (d.fechaInicio && d.fechaFin) ? `${d.fechaInicio} → ${d.fechaFin}` : "—" },
+            ].map(it => (
+              <div key={it.l} style={{ background: "#dfe4e8", borderRadius: 6, padding: "10px 12px", border: "1px solid #d5d9dc" }}>
+                <div style={{ fontSize: 9, color: "#666", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 4 }}>{it.l}</div>
+                <div style={{ fontSize: 12, fontWeight: 700 }}>{it.v || "—"}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Toggle IRPF Plus Vivienda (cuando empresa lo asume) */}
+          <div style={{ background: "#f2f5f7", border: "1px solid #d5d9dc", borderRadius: 8, padding: "12px 16px", marginTop: 12, display: "flex", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", flex: "0 0 auto" }}>
+              <span style={{ position: "relative", display: "inline-block", width: 38, height: 20, background: irpfActivo ? "#4ec9b8" : "#bbb", borderRadius: 10, transition: "background 0.15s" }}>
+                <span style={{ position: "absolute", top: 2, left: irpfActivo ? 20 : 2, width: 16, height: 16, background: "#f2f5f7", borderRadius: "50%", transition: "left 0.15s" }} />
+              </span>
+              <input type="checkbox" checked={irpfActivo} onChange={e => setIrpfActivo(e.target.checked)} style={{ display: "none" }} />
+              <span style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", letterSpacing: "0.05em", fontFamily: "'Inter', sans-serif" }}>
+                La empresa asume el IRPF del Plus Vivienda
+              </span>
+            </label>
+            {irpfActivo && (
+              <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: "auto" }}>
+                <label style={{ fontSize: 9, color: "#666", textTransform: "uppercase", letterSpacing: "0.1em" }}>% IRPF trabajador:</label>
+                <input
+                  type="text"
+                  value={pctIRPF}
+                  onChange={e => {
+                    const v = e.target.value.replace(",", ".");
+                    if (v === "" || /^\d*\.?\d*$/.test(v)) setPctIRPF(v);
+                  }}
+                  placeholder="ej: 18"
+                  style={{ width: 60, padding: "5px 8px", border: "1px solid #d5d9dc", borderRadius: 4, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontSize: 11, fontWeight: 700, textAlign: "right" }}
+                />
+                <span style={{ fontSize: 11, color: "#666", fontWeight: 700 }}>%</span>
+              </div>
+            )}
+          </div>
+
+          {/* Fila dividida: Firma de Contrato + Incluir Gestoría */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 8 }}>
+
+            {/* Toggle Firma de Contrato (afecta gestoría del primer mes) */}
+            <div style={{ background: "#f2f5f7", border: "1px solid #d5d9dc", borderRadius: 8, padding: "12px 16px", display: "flex", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", flex: "0 0 auto" }}>
+                <span style={{ position: "relative", display: "inline-block", width: 38, height: 20, background: firmaContrato ? "#4ec9b8" : "#bbb", borderRadius: 10, transition: "background 0.15s" }}>
+                  <span style={{ position: "absolute", top: 2, left: firmaContrato ? 20 : 2, width: 16, height: 16, background: "#f2f5f7", borderRadius: "50%", transition: "left 0.15s" }} />
+                </span>
+                <input type="checkbox" checked={firmaContrato} onChange={e => setFirmaContrato(e.target.checked)} style={{ display: "none" }} />
+                <span style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", letterSpacing: "0.05em", fontFamily: "'Inter', sans-serif" }}>
+                  Firma de contrato
+                </span>
+              </label>
+              <div style={{ fontSize: 9, color: "#666", marginTop: 4, width: "100%", lineHeight: 1.4 }}>
+                Firma contrato 6 € · Nómina 26 €/mes
+              </div>
+            </div>
+
+            {/* v78: Toggle Incluir Gestoría (por defecto OFF: aparece pero no suma al total) */}
+            <div style={{ background: "#f2f5f7", border: "1px solid #d5d9dc", borderRadius: 8, padding: "12px 16px", display: "flex", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", flex: "0 0 auto" }}>
+                <span style={{ position: "relative", display: "inline-block", width: 38, height: 20, background: incluirGestoria ? "#4ec9b8" : "#bbb", borderRadius: 10, transition: "background 0.15s" }}>
+                  <span style={{ position: "absolute", top: 2, left: incluirGestoria ? 20 : 2, width: 16, height: 16, background: "#f2f5f7", borderRadius: "50%", transition: "left 0.15s" }} />
+                </span>
+                <input type="checkbox" checked={incluirGestoria} onChange={e => setIncluirGestoria(e.target.checked)} style={{ display: "none" }} />
+                <span style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", letterSpacing: "0.05em", fontFamily: "'Inter', sans-serif" }}>
+                  Incluir Gestoría en total
+                </span>
+              </label>
+              <div style={{ fontSize: 9, color: "#666", marginTop: 4, width: "100%", lineHeight: 1.4 }}>
+                {incluirGestoria ? "Se suma al coste total de empresa" : "Aparece pero no suma al total"}
+              </div>
+            </div>
+
+          </div>
+
+          {/* Toggle Baja médica (importe exento de SS/IMEI/Solidaridad) */}
+          <div style={{ background: "#f2f5f7", border: "1px solid #d5d9dc", borderRadius: 8, padding: "12px 16px", marginTop: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", flex: "0 0 auto" }}>
+                <span style={{ position: "relative", display: "inline-block", width: 38, height: 20, background: bajaActiva ? "#4ec9b8" : "#bbb", borderRadius: 10, transition: "background 0.15s" }}>
+                  <span style={{ position: "absolute", top: 2, left: bajaActiva ? 20 : 2, width: 16, height: 16, background: "#f2f5f7", borderRadius: "50%", transition: "left 0.15s" }} />
+                </span>
+                <input type="checkbox" checked={bajaActiva} onChange={e => setBajaActiva(e.target.checked)} style={{ display: "none" }} />
+                <span style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", letterSpacing: "0.05em", fontFamily: "'Inter', sans-serif" }}>
+                  Hay baja médica (importe exento de SS)
+                </span>
+              </label>
+              {bajaActiva && (
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: "auto" }}>
+                  <label style={{ fontSize: 9, color: "#666", textTransform: "uppercase", letterSpacing: "0.1em" }}>Importe mensual exento:</label>
+                  <input
+                    type="text"
+                    value={importeExento}
+                    onChange={e => {
+                      const v = e.target.value.replace(",", ".");
+                      if (v === "" || /^\d*\.?\d*$/.test(v)) setImporteExento(v);
+                    }}
+                    placeholder="ej: 600"
+                    style={{ width: 80, padding: "5px 8px", border: "1px solid #d5d9dc", borderRadius: 4, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontSize: 11, fontWeight: 700, textAlign: "right" }}
+                  />
+                  <span style={{ fontSize: 11, color: "#666", fontWeight: 700 }}>€</span>
+                </div>
+              )}
+            </div>
+
+            {/* Casillas mes a mes — se renderizan después porque dependen del desglose del perfil cargado */}
+            {bajaActiva && (() => {
+              const desgloseTmp = perfilCargado?.datos?._calculado?.desglose45 || perfilCargado?.datos?.desglose45 || perfilCargado?.datos?.desglose || [];
+              if (desgloseTmp.length === 0) return null;
+              return (
+                <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px dashed #d8c0c0" }}>
+                  <div style={{ fontSize: 9, color: "#666", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 8, fontWeight: 700 }}>
+                    Aplicar exención en estos meses:
+                  </div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {desgloseTmp.map((mes, i) => {
+                      const parsed = parseMesEspañol(mes.mes);
+                      const clave = parsed ? `${parsed.year}-${String(parsed.month).padStart(2, "0")}` : `idx-${i}`;
+                      const activo = !!mesesExentos[clave];
+                      return (
+                        <label key={clave} style={{
+                          display: "inline-flex", alignItems: "center", gap: 5,
+                          padding: "5px 10px", borderRadius: 4, cursor: "pointer",
+                          background: activo ? "#a04545" : "#f2f5f7",
+                          color: activo ? "#f2f5f7" : "#555",
+                          border: `1px solid ${activo ? "#a04545" : "#d5d9dc"}`,
+                          fontSize: 10, fontWeight: 700, letterSpacing: "0.05em",
+                          textTransform: "capitalize",
+                          transition: "all 0.15s",
+                        }}>
+                          <input
+                            type="checkbox"
+                            checked={activo}
+                            onChange={e => setMesesExentos(prev => ({ ...prev, [clave]: e.target.checked }))}
+                            style={{ display: "none" }}
+                          />
+                          {activo ? "✓ " : ""}{mes.mes}
+                        </label>
+                      );
+                    })}
+                  </div>
+                  <div style={{ marginTop: 6, fontSize: 9, color: "#7a2020", fontStyle: "italic" }}>
+                    El importe exento se restará de las bases de SS Principal, IMEI y Cuota Solidaridad en los meses marcados.
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+
+        {/* Tabla mensual "Lo que percibe el trabajador" */}
+        <div style={P}>
+          <div style={{ ...ST, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span>▸ Lo que Percibe el Trabajador (Mensual)</span>
+            <span style={{ fontSize: 9, color: "#888", textTransform: "none", letterSpacing: "0.05em" }}>Brutos · {desgloseGuardado.length} mes{desgloseGuardado.length !== 1 ? "es" : ""}</span>
+          </div>
+
+          {desgloseGuardado.length === 0 ? (
+            <div style={{ padding: 30, textAlign: "center", color: "#888", fontSize: 11, fontStyle: "italic" }}>
+              Este perfil no contiene datos mensuales calculados. Por favor, abre el perfil en su pestaña original (45H o 40H), recalcula y guarda de nuevo.
+            </div>
+          ) : (
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 10.5 }}>
+                <thead>
+                  <tr style={{ background: "#dfe4e8" }}>
+                    {["Mes", "Salario Base", "Vacaciones", "Indemnización", "H.Extra €", "Plus Act.", "Festivos €", "Jorn.Esp €", "Coche", "Vivienda", "Seguro Vida", "Comida", "Exento", "TOTAL"].map(h => (
+                      <th key={h} style={{ padding: "8px 6px", fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 700, textAlign: h === "Mes" ? "left" : "right", color: h === "TOTAL" ? "#1a1a1a" : (h === "Exento" ? "#a04545" : (h === "Festivos €" ? "#6a3a9a" : (h === "Jorn.Esp €" ? "#8a1e4a" : "#666"))), borderBottom: "1px solid #d5d9dc", whiteSpace: "nowrap" }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {desgloseGuardado.map((mes, i) => {
+                    const c = complementosGuardado[i] || {};
+                    const plusAct = esTab40 ? 0 : (mes.plusAct || 0);
+                    const festImp = importeFestGuardado[i] || 0; // v77
+                    const jeImp = mes.importeJE || 0; // v77
+                    // v83: vacMostrar = vac40 − vdShow (líquido tras descontar días disfrutados)
+                    const vacMostrar = (mes.vacMostrar !== undefined) ? mes.vacMostrar : ((mes.vac40 || 0) - (mes.vdShow || 0));
+                    const totalMes = (mes.base40 || 0) + vacMostrar + (mes.indem40 || 0) + (mes.cobroHx || 0) + plusAct + festImp + jeImp + (c.herramienta || 0) + (c.coche || 0) + (c.vivienda || 0) + (c.seguroVida || 0) + (c.comida || 0);
+
+                    // Exención del mes
+                    const parsed = parseMesEspañol(mes.mes);
+                    const claveMes = parsed ? `${parsed.year}-${String(parsed.month).padStart(2, "0")}` : null;
+                    const importeExentoNum = parseFloat(importeExento) || 0;
+                    const aplicaExencion = bajaActiva && importeExentoNum > 0 && claveMes && mesesExentos[claveMes];
+                    const exentoMes = aplicaExencion ? importeExentoNum : 0;
+
+                    return (
+                      <tr key={i} style={{ borderBottom: "1px solid #eef1f3" }}>
+                        <td style={{ padding: "7px 6px", fontWeight: 600, textTransform: "capitalize" }}>
+                          {mes.mes}{!mes.esCompleto && <span style={{ fontSize: 8, color: "#888", marginLeft: 4 }}>({mes.desde}-{mes.hasta})</span>}
+                        </td>
+                        <td style={{ padding: "7px 6px", textAlign: "right" }}>{fmt(mes.base40 || 0)}</td>
+                        <td style={{ padding: "7px 6px", textAlign: "right", color: vacMostrar === 0 ? "#bbb" : (vacMostrar < 0 ? "#c04040" : "#1a1a1a") }} title={(mes.vdShow || 0) > 0 ? `Prorrateada ${fmt(mes.vac40 || 0)} − disfrutadas ${fmt(mes.vdShow || 0)}` : ""}>{vacMostrar === 0 ? "—" : fmt(vacMostrar)}</td>
+                        <td style={{ padding: "7px 6px", textAlign: "right", color: (mes.indem40 || 0) === 0 ? "#bbb" : "#1a1a1a" }}>{(mes.indem40 || 0) === 0 ? "—" : fmt(mes.indem40)}</td>
+                        <td style={{ padding: "7px 6px", textAlign: "right", color: (mes.cobroHx || 0) === 0 ? "#bbb" : "#1a1a1a" }}>{(mes.cobroHx || 0) === 0 ? "—" : fmt(mes.cobroHx)}</td>
+                        <td style={{ padding: "7px 6px", textAlign: "right", color: plusAct === 0 ? "#bbb" : "#b07030" }}>{plusAct === 0 ? "—" : fmt(plusAct)}</td>
+                        <td style={{ padding: "7px 6px", textAlign: "right", color: festImp === 0 ? "#bbb" : "#6a3a9a" }}>{festImp === 0 ? "—" : fmt(festImp)}</td>
+                        <td style={{ padding: "7px 6px", textAlign: "right", color: jeImp === 0 ? "#bbb" : "#8a1e4a" }} title={jeImp > 0 ? `${mes.totalJEDias || 0} JE` : ""}>{jeImp === 0 ? "—" : fmt(jeImp)}</td>
+                        <td style={{ padding: "7px 6px", textAlign: "right", color: (c.coche || 0) === 0 ? "#bbb" : "#4ec9b8" }}>{(c.coche || 0) === 0 ? "—" : fmt(c.coche)}</td>
+                        <td style={{ padding: "7px 6px", textAlign: "right", color: (c.vivienda || 0) === 0 ? "#bbb" : "#4ec9b8" }}>{(c.vivienda || 0) === 0 ? "—" : fmt(c.vivienda)}</td>
+                        <td style={{ padding: "7px 6px", textAlign: "right", color: (c.seguroVida || 0) === 0 ? "#bbb" : "#4ec9b8" }}>{(c.seguroVida || 0) === 0 ? "—" : fmt(c.seguroVida)}</td>
+                        <td style={{ padding: "7px 6px", textAlign: "right", color: (c.comida || 0) === 0 ? "#bbb" : "#4ec9b8" }}>{(c.comida || 0) === 0 ? "—" : fmt(c.comida)}</td>
+                        <td style={{ padding: "7px 6px", textAlign: "right", color: exentoMes === 0 ? "#bbb" : "#a04545", fontWeight: exentoMes > 0 ? 700 : 400 }}>{exentoMes === 0 ? "—" : `-${fmt(exentoMes)}`}</td>
+                        <td style={{ padding: "7px 6px", textAlign: "right", fontWeight: 800, color: "#1a1a1a" }}>{fmt(totalMes)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* ════════ TABLA COSTE EMPRESA ════════ */}
+        {desgloseGuardado.length > 0 && (() => {
+          const pctIRPFNum = parseFloat(pctIRPF) || 0;
+          const importeExentoNum = parseFloat(importeExento) || 0;
+          // Calcular coste empresa para cada mes
+          const filas = desgloseGuardado.map((mes, i) => {
+            const c = complementosGuardado[i] || {};
+            const plusAct = esTab40 ? 0 : (mes.plusAct || 0);
+            const festImp = importeFestGuardado[i] || 0; // v78
+            const jeImp = mes.importeJE || 0; // v78
+            const total = (mes.base40 || 0) + (mes.vac40 || 0) + (mes.indem40 || 0) + (mes.cobroHx || 0) + plusAct + festImp + jeImp + (c.herramienta || 0) + (c.coche || 0) + (c.vivienda || 0) + (c.seguroVida || 0) + (c.comida || 0);
+
+            // Exención mes a mes
+            const parsed = parseMesEspañol(mes.mes);
+            const claveMes = parsed ? `${parsed.year}-${String(parsed.month).padStart(2, "0")}` : null;
+            const aplicaExencion = bajaActiva && importeExentoNum > 0 && claveMes && mesesExentos[claveMes];
+            const exentoMes = aplicaExencion ? importeExentoNum : 0;
+
+            const ce = calcularCosteEmpresaMes({
+              total,
+              vacaciones: mes.vac40 || 0,
+              vacDisfrutadas: mes.vdShow || 0,
+              indem: mes.indem40 || 0,
+              horasExtraEur: mes.cobroHx || 0,
+              plusVivienda: c.vivienda || 0,
+              irpfActivo,
+              pctIRPF: pctIRPFNum,
+              esPrimerMes: i === 0,
+              importeExento: exentoMes,
+              firmaContrato,
+              incluirGestoria,
+              vacAcumulada: d.vacAcumulada || false,
+            });
+            return { mes: mes.mes, claveMes, ...ce, total };
+          });
+
+          // Totales
+          const T = filas.reduce((acc, f) => ({
+            ssPrincipal: acc.ssPrincipal + f.ssPrincipal,
+            ssVacaciones: acc.ssVacaciones + f.ssVacaciones,
+            ssHorasExtra: acc.ssHorasExtra + f.ssHorasExtra,
+            imei: acc.imei + f.imei,
+            solidaridad: acc.solidaridad + f.solidaridad,
+            irpfVivienda: acc.irpfVivienda + f.irpfVivienda,
+            gestoria: acc.gestoria + f.gestoria,
+            exento: acc.exento + (f.exento || 0),
+            totalCosteEmpresa: acc.totalCosteEmpresa + f.totalCosteEmpresa,
+          }), { ssPrincipal: 0, ssVacaciones: 0, ssHorasExtra: 0, imei: 0, solidaridad: 0, irpfVivienda: 0, gestoria: 0, exento: 0, totalCosteEmpresa: 0 });
+
+          const cellNum = (v, color) => (
+            <td style={{ padding: "7px 5px", textAlign: "right", color: v === 0 ? "#ccc" : (color || "#1a1a1a"), fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>
+              {v === 0 ? "—" : fmt(v)}
+            </td>
+          );
+
+          return (
+            <div style={{ ...P, borderColor: "#d8c0c0" }}>
+              <div style={{ fontSize: 10, letterSpacing: "0.2em", color: "#a04545", textTransform: "uppercase", marginBottom: 14, paddingBottom: 12, borderBottom: "1px solid #e8d0d0", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+                <span>▸ Coste Empresa (Mensual)</span>
+                <span style={{ fontSize: 9, color: "#888", textTransform: "none", letterSpacing: "0.05em" }}>Importes que paga la empresa</span>
+              </div>
+
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 10 }}>
+                  <thead>
+                    <tr style={{ background: "#f5e9e9" }}>
+                      <th style={{ padding: "8px 5px", textAlign: "left", fontSize: 9, letterSpacing: "0.05em", textTransform: "uppercase", color: "#6a2020", fontWeight: 700, borderBottom: "1px solid #d8b0b0", whiteSpace: "nowrap" }}>Mes</th>
+                      <th style={{ padding: "8px 5px", textAlign: "right", fontSize: 9, letterSpacing: "0.04em", textTransform: "uppercase", color: "#6a2020", fontWeight: 700, borderBottom: "1px solid #d8b0b0", whiteSpace: "nowrap" }}>SS Principal<br/><span style={{ fontWeight: 400, fontSize: 8, color: "#a04545" }}>33,35%</span></th>
+                      <th style={{ padding: "8px 5px", textAlign: "right", fontSize: 9, letterSpacing: "0.04em", textTransform: "uppercase", color: "#6a2020", fontWeight: 700, borderBottom: "1px solid #d8b0b0", whiteSpace: "nowrap" }}>SS Vac<br/><span style={{ fontWeight: 400, fontSize: 8, color: "#a04545" }}>33,35%</span></th>
+                      <th style={{ padding: "8px 5px", textAlign: "right", fontSize: 9, letterSpacing: "0.04em", textTransform: "uppercase", color: "#6a2020", fontWeight: 700, borderBottom: "1px solid #d8b0b0", whiteSpace: "nowrap" }}>SS H.Ex<br/><span style={{ fontWeight: 400, fontSize: 8, color: "#a04545" }}>27%</span></th>
+                      <th style={{ padding: "8px 5px", textAlign: "right", fontSize: 9, letterSpacing: "0.04em", textTransform: "uppercase", color: "#6a2020", fontWeight: 700, borderBottom: "1px solid #d8b0b0", whiteSpace: "nowrap" }}>IMEI<br/><span style={{ fontWeight: 400, fontSize: 8, color: "#a04545" }}>0,75%</span></th>
+                      <th style={{ padding: "8px 5px", textAlign: "right", fontSize: 9, letterSpacing: "0.04em", textTransform: "uppercase", color: "#6a2020", fontWeight: 700, borderBottom: "1px solid #d8b0b0", whiteSpace: "nowrap" }}>Solidaridad</th>
+                      <th style={{ padding: "8px 5px", textAlign: "right", fontSize: 9, letterSpacing: "0.04em", textTransform: "uppercase", color: "#6a2020", fontWeight: 700, borderBottom: "1px solid #d8b0b0", whiteSpace: "nowrap" }}>IRPF Viv<br/><span style={{ fontWeight: 400, fontSize: 8, color: "#a04545" }}>{irpfActivo && pctIRPFNum > 0 ? `${pctIRPFNum}%` : "—"}</span></th>
+                      <th style={{ padding: "8px 5px", textAlign: "right", fontSize: 9, letterSpacing: "0.04em", textTransform: "uppercase", color: "#6a2020", fontWeight: 700, borderBottom: "1px solid #d8b0b0", whiteSpace: "nowrap" }}>Gestoría</th>
+                      <th style={{ padding: "8px 5px", textAlign: "right", fontSize: 9, letterSpacing: "0.04em", textTransform: "uppercase", color: "#a04545", fontWeight: 700, borderBottom: "1px solid #d8b0b0", whiteSpace: "nowrap" }}>TOTAL</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filas.map((f, i) => (
+                      <tr key={i} style={{ borderBottom: "1px solid #eef1f3" }}>
+                        <td style={{ padding: "7px 5px", fontWeight: 600, textTransform: "capitalize" }}>{f.mes}</td>
+                        {cellNum(f.ssPrincipal)}
+                        {cellNum(f.ssVacaciones)}
+                        {cellNum(f.ssHorasExtra, "#1a1a1a")}
+                        {cellNum(f.imei)}
+                        {cellNum(f.solidaridad, "#6a3a9a")}
+                        {cellNum(f.irpfVivienda, "#b07030")}
+                        <td style={{ padding: "7px 5px", textAlign: "right", color: incluirGestoria ? "#4ec9b8" : "#bbb", textDecoration: incluirGestoria ? "none" : "line-through", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>{fmt(f.gestoria)}</td>
+                        <td style={{ padding: "7px 5px", textAlign: "right", fontWeight: 700, color: "#a04545", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>{fmt(f.totalCosteEmpresa)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr style={{ background: "#fdf0f0", borderTop: "2px solid #d8a8a8" }}>
+                      <td style={{ padding: "9px 5px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", fontSize: 9, color: "#6a2020" }}>TOTAL</td>
+                      {cellNum(T.ssPrincipal)}
+                      {cellNum(T.ssVacaciones)}
+                      {cellNum(T.ssHorasExtra, "#1a1a1a")}
+                      {cellNum(T.imei)}
+                      {cellNum(T.solidaridad, "#6a3a9a")}
+                      {cellNum(T.irpfVivienda, "#b07030")}
+                      <td style={{ padding: "9px 5px", textAlign: "right", fontWeight: 700, color: incluirGestoria ? "#4ec9b8" : "#bbb", textDecoration: incluirGestoria ? "none" : "line-through", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>{fmt(T.gestoria)}</td>
+                      <td style={{ padding: "9px 5px", textAlign: "right", fontWeight: 700, color: "#a04545", fontSize: 12, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>{fmt(T.totalCosteEmpresa)}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+
+              {/* Notas explicativas */}
+              <div style={{ marginTop: 12, padding: "10px 14px", background: "#f2f5f7", borderRadius: 4, border: "1px solid #d5d9dc", fontSize: 9.5, color: "#666", lineHeight: 1.6 }}>
+                <strong style={{ color: "#444" }}>Reglas aplicadas:</strong><br/>
+                · <strong>SS Principal</strong> (33,35%): sobre TOTAL del mes − vacaciones* − indemnización. Topada a 1.701,25 € si base &gt; 5.101,20 €.<br/>
+                · <strong>SS Vacaciones</strong> (33,35%): solo si vacaciones "al final"* — se suman aparte, sin topar. <strong>SS H.Extra</strong> (27%): siempre aparte, independiente del tope.<br/>
+                · <strong>IMEI</strong> (0,75%): sobre TOTAL del mes − indemnización. Topado a 38,26 € si base &gt; 5.101,20 €.<br/>
+                · <strong>Solidaridad</strong> (tramos 0,97% / 1,15% / 1,33%): sobre exceso de (TOTAL − indemnización − vacaciones* − horas extra) sobre 5.101,20 €.<br/>
+                · <strong>Indemnización</strong>: NO genera SS ni IMEI.<br/>
+                · <strong>Gestoría</strong>: primer mes 32 € (alta + nómina), resto 26 €.<br/>
+                <span style={{ color: "#999", fontSize: 8.5, fontStyle: "italic" }}>* Vacaciones prorrateadas (mes a mes) → van dentro del pool topado de SS Principal y no se restan. Vacaciones "al final" → se restan del pool y generan su propia SS Vacaciones (sin topar) el último mes.</span>
+              </div>
+
+              {/* Comparativa rápida */}
+              <div style={{ marginTop: 14, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
+                {(() => {
+                  // Total bruto trabajador
+                  const totalBruto = desgloseGuardado.reduce((sum, mes, i) => {
+                    const c = complementosGuardado[i] || {};
+                    const plusAct = esTab40 ? 0 : (mes.plusAct || 0);
+                    return sum + (mes.base40 || 0) + (mes.vac40 || 0) + (mes.indem40 || 0) + (mes.cobroHx || 0) + plusAct + (c.herramienta || 0) + (c.coche || 0) + (c.vivienda || 0) + (c.seguroVida || 0) + (c.comida || 0);
+                  }, 0);
+                  const totalConCE = totalBruto + T.totalCosteEmpresa;
+                  const pctSobreSalario = totalBruto > 0 ? (T.totalCosteEmpresa / totalBruto * 100) : 0;
+                  return [
+                    { l: "Bruto trabajador", v: fmt(totalBruto) + " €", color: "#1a1a1a" },
+                    { l: "Coste empresa", v: fmt(T.totalCosteEmpresa) + " €", color: "#d32f2f", bold: true },
+                    { l: "Coste total", v: fmt(totalConCE) + " €", color: "#1a1a1a", bold: true },
+                    { l: "% s/salario", v: pctSobreSalario.toFixed(2) + " %", color: "#1a1a1a" },
+                  ].map(it => (
+                    <div key={it.l} style={{ background: "#fff", borderRadius: 8, padding: "14px 16px", border: "1px solid #d5d9dc", textAlign: "center" }}>
+                      <div style={{ fontSize: 10, color: "#666", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6, fontWeight: 600, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>{it.l}</div>
+                      <div style={{ fontSize: it.bold ? 20 : 17, fontWeight: it.bold ? 800 : 700, color: it.color, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", letterSpacing: "-0.01em" }}>{it.v}</div>
+                    </div>
+                  ));
+                })()}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Aviso Legal (solo visible cuando hay perfil cargado) */}
+        <div style={{ ...P, background: "#f2f5f7", border: "1px solid #e8e4de" }}>
+          <div style={{ ...ST, color: "#888", marginBottom: 10 }}>▸ Aviso Legal</div>
+          <div style={{ fontSize: 10, fontWeight: 700, color: "#1a1a1a", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", marginBottom: 8, letterSpacing: "0.05em" }}>
+            BD PROD TOOLS
+          </div>
+          <div style={{ fontSize: 9, color: "#666", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", lineHeight: 1.5, marginBottom: 8 }}>
+            {DISCLAIMER_ES}
+          </div>
+          <div style={{ fontSize: 8, color: "#888", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", lineHeight: 1.5, fontStyle: "italic", marginBottom: 8 }}>
+            {DISCLAIMER_EN}
+          </div>
+          <div style={{ fontSize: 8, color: "#888", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", lineHeight: 1.5, fontStyle: "italic" }}>
+            G &amp; G Enterprises LLC
+          </div>
+        </div>
+      </div>
+
+      {/* MODAL: Exportar a Excel Master */}
+      {mostrarExportMaster && (
+        <div
+          onClick={(e) => { if (e.target === e.currentTarget && !procesandoMaster) setMostrarExportMaster(false); }}
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 1000, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "40px 16px", overflowY: "auto" }}
+        >
+          <div style={{ background: "#dfe4e8", borderRadius: 8, maxWidth: 600, width: "100%", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", color: "#1a1a1a", boxShadow: "0 10px 40px rgba(0,0,0,0.5)" }}>
+            <div style={{ background: "#1a1a1a", color: "#f0f0f0", padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", borderRadius: "8px 8px 0 0" }}>
+              <div>
+                <div style={{ fontSize: 9, color: "#4ec9b8", letterSpacing: "0.2em", textTransform: "uppercase" }}>Coste empresa</div>
+                <div style={{ fontSize: 14, fontWeight: 700, marginTop: 2 }}>📋 Rellenar Excel Master</div>
+              </div>
+              <button
+                onClick={() => !procesandoMaster && setMostrarExportMaster(false)}
+                disabled={procesandoMaster}
+                style={{ background: "transparent", color: "#aaa", border: "1px solid #444", padding: "6px 14px", borderRadius: 4, cursor: procesandoMaster ? "not-allowed" : "pointer", fontSize: 10, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", opacity: procesandoMaster ? 0.5 : 1 }}
+              >
+                Cerrar
+              </button>
+            </div>
+
+            <div style={{ padding: 20 }}>
+              <div style={{ fontSize: 11, color: "#444", lineHeight: 1.6, marginBottom: 14 }}>
+                Esta opción rellena una fila en la pestaña <strong>EQUIPO TÉCNICO</strong> del Excel Master con los datos del perfil <strong>"{perfilCargado?.datos?.nombre || "—"}"</strong>.
+              </div>
+
+              {errorMaster && (
+                <div style={{ background: "#fde6e6", border: "1px solid #d8a0a0", color: "#7a2020", padding: "10px 14px", borderRadius: 4, marginBottom: 14, fontSize: 11 }}>
+                  {errorMaster}
+                </div>
+              )}
+
+              {/* Paso 1: Seleccionar archivo */}
+              <div style={{ background: "#f2f5f7", border: "1px solid #d5d9dc", borderRadius: 6, padding: 14, marginBottom: 14 }}>
+                <div style={{ fontSize: 10, color: "#1a1a1a", letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 700, marginBottom: 8 }}>1. Excel Master original</div>
+                <input
+                  ref={inputMasterRef}
+                  type="file"
+                  accept=".xlsx,.xlsm"
+                  onChange={onArchivoMasterSeleccionado}
+                  style={{ display: "none" }}
+                />
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <button
+                    onClick={() => inputMasterRef.current?.click()}
+                    disabled={procesandoMaster}
+                    style={{ background: "transparent", color: "#4ec9b8", border: "1px solid #4ec9b8", padding: "6px 14px", borderRadius: 4, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}
+                  >
+                    📤 Seleccionar archivo
+                  </button>
+                  <div style={{ fontSize: 11, color: archivoMaster ? "#1a1a1a" : "#888", fontWeight: archivoMaster ? 700 : 400, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {archivoMaster ? archivoMaster.name : "Ningún archivo"}
+                  </div>
+                </div>
+              </div>
+
+              {/* Paso 2: Fila destino */}
+              <div style={{ background: "#f2f5f7", border: "1px solid #d5d9dc", borderRadius: 6, padding: 14, marginBottom: 14 }}>
+                <div style={{ fontSize: 10, color: "#1a1a1a", letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 700, marginBottom: 8 }}>2. Fila destino</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <input
+                    type="number"
+                    min="8"
+                    max="500"
+                    value={filaDestinoExcel}
+                    onChange={(e) => setFilaDestinoExcel(e.target.value)}
+                    disabled={procesandoMaster}
+                    style={{ width: 80, padding: "6px 10px", border: "1px solid #d5d9dc", borderRadius: 4, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontSize: 12, fontWeight: 700, textAlign: "center" }}
+                  />
+                  <div style={{ fontSize: 10, color: "#666", lineHeight: 1.5 }}>
+                    En qué fila del Excel se rellenan los datos.<br/>
+                    Por defecto fila 8 (primera fila tras encabezados).
+                  </div>
+                </div>
+              </div>
+
+              {/* Aviso */}
+              <div style={{ background: "#fff8e6", border: "1px solid #d8c8a0", borderRadius: 4, padding: 10, marginBottom: 14, fontSize: 9.5, color: "#1a1a1a", lineHeight: 1.5 }}>
+                <strong>⚠ Importante:</strong> esta operación pisa las fórmulas de las columnas D, F, G, K, L, N, U, V, W de la fila destino, y rellena SUELDOS + EXTRAS de cada mes del contrato. Las fórmulas de SS, MEI, Solidaridad NO se tocan. Antes de pegar al Excel en producción, abre el archivo descargado y revisa los valores.
+              </div>
+
+              {/* Botones */}
+              <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                <button
+                  onClick={() => setMostrarExportMaster(false)}
+                  disabled={procesandoMaster}
+                  style={{ background: "transparent", color: "#666", border: "1px solid #888", padding: "8px 16px", borderRadius: 4, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", opacity: procesandoMaster ? 0.5 : 1 }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={procesarExcelMaster}
+                  disabled={procesandoMaster || !archivoMaster}
+                  style={{ background: archivoMaster && !procesandoMaster ? "#4ec9b8" : "#ddd", color: archivoMaster && !procesandoMaster ? "#1a1a1a" : "#888", border: "none", padding: "8px 20px", borderRadius: 4, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", cursor: archivoMaster && !procesandoMaster ? "pointer" : "not-allowed", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}
+                >
+                  {procesandoMaster ? "Procesando..." : "✓ Generar y descargar"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════
+// v98: MODAL CARGAR PERFIL (tarjetas grandes)
+// ═══════════════════════════════════════════════════════════════════════
+
+function ModalCargarPerfil({ perfiles, cargando, onCerrar, onCargar, onBorrarSeleccionados, onRenombrar, onDuplicar, tabActivo, perfilEnEdicion, onModificar, onModificarEspecifico }) {
+  const [seleccionados, setSeleccionados] = useState(new Set());
+  const [filtroTipo, setFiltroTipo] = useState("todos"); // todos | 45h | 40h
+  const [filtroDepto, setFiltroDepto] = useState("__todos__");
+  const [orden, setOrden] = useState("recientes"); // v134: criterio de ordenación
+  const [borrando, setBorrando] = useState(false);
+  // v148: copiar perfiles seleccionados a otro proyecto (solo admin)
+  const usuarioCtxModal = useContext(UsuarioContext);
+  const esAdminModal = !!usuarioCtxModal?.es_admin;
+  const [mostrarCopiar, setMostrarCopiar] = useState(false);
+  const [proyectosDestino, setProyectosDestino] = useState([]);
+  const [destinoId, setDestinoId] = useState("");
+  const [copiando, setCopiando] = useState(false);
+
+  // v148: la lista de proyectos solo se pide al abrir el diálogo de copia
+  useEffect(() => {
+    if (!mostrarCopiar || !esAdminModal) return;
+    (async () => {
+      try {
+        const lista = await listarProyectos({ adminPin: usuarioCtxModal?.pin, usuarioId: usuarioCtxModal?.id, esAdmin: true });
+        setProyectosDestino(Array.isArray(lista) ? lista : []);
+      } catch { setProyectosDestino([]); }
+    })();
+  }, [mostrarCopiar, esAdminModal]);
+
+  const perfilesFiltrados = perfiles.filter(p => {
+    if (filtroTipo !== "todos" && p.tabId !== filtroTipo) return false;
+    if (filtroDepto === "__todos__") return true;
+    if (filtroDepto === "__sin__") return !p.datos?.departamento;
+    return (p.datos?.departamento || "") === filtroDepto;
+  }).sort((a, b) => {
+    // v134: ordenación
+    const colator = new Intl.Collator("es", { sensitivity: "base", numeric: true });
+    switch (orden) {
+      case "recientes":     return (b.timestamp || 0) - (a.timestamp || 0);
+      case "antiguos":      return (a.timestamp || 0) - (b.timestamp || 0);
+      case "nombre_asc":    return colator.compare(a.nombre || "", b.nombre || "");
+      case "nombre_desc":   return colator.compare(b.nombre || "", a.nombre || "");
+      case "salario_desc":  return (Number(b.datos?.salario45) || 0) - (Number(a.datos?.salario45) || 0);
+      case "salario_asc":   return (Number(a.datos?.salario45) || 0) - (Number(b.datos?.salario45) || 0);
+      case "codigo":        return colator.compare(a.datos?.codigoContable || "zzz", b.datos?.codigoContable || "zzz");
+      case "depto":         return colator.compare(a.datos?.departamento || "zzz", b.datos?.departamento || "zzz");
+      case "alta":          return String(a.datos?.fechaInicio || "9999").localeCompare(String(b.datos?.fechaInicio || "9999"));
+      default:              return 0;
+    }
+  });
+
+  const toggleSel = (id) => {
+    const nueva = new Set(seleccionados);
+    if (nueva.has(id)) nueva.delete(id); else nueva.add(id);
+    setSeleccionados(nueva);
+  };
+
+  const seleccionarTodos = () => setSeleccionados(new Set(perfilesFiltrados.map(p => p.supabaseId || p.key)));
+  const deseleccionarTodos = () => setSeleccionados(new Set());
+
+  const borrarSeleccionados = async () => {
+    if (seleccionados.size === 0) return;
+    if (!confirm(`¿Borrar ${seleccionados.size} perfil${seleccionados.size !== 1 ? "es" : ""} seleccionado${seleccionados.size !== 1 ? "s" : ""}?\n\nEsta acción NO se puede deshacer.`)) return;
+    setBorrando(true);
+    await onBorrarSeleccionados([...seleccionados]);
+    setSeleccionados(new Set());
+    setBorrando(false);
+  };
+
+  // v148: copia los seleccionados al proyecto elegido. No mueve: los originales quedan.
+  const copiarAProyecto = async () => {
+    if (!destinoId || seleccionados.size === 0) return;
+    const aCopiar = perfiles.filter(p => seleccionados.has(p.supabaseId || p.key) && p.fuente === "supabase");
+    if (aCopiar.length === 0) { alert("No hay perfiles de Supabase entre los seleccionados."); return; }
+    const destino = proyectosDestino.find(p => String(p.id) === String(destinoId));
+    if (!confirm(`¿Copiar ${aCopiar.length} perfil${aCopiar.length !== 1 ? "es" : ""} a "${destino?.nombre || "el proyecto elegido"}"?\n\nLos originales se mantienen. Las fechas se copian tal cual.`)) return;
+    setCopiando(true);
+    try {
+      const r = await copiarPerfilesAProyecto({
+        perfiles: aCopiar,
+        proyectoDestinoId: destinoId,
+        autor: usuarioCtxModal?.nombre || "—",
+        adminPin: usuarioCtxModal?.pin,
+      });
+      registrarLog(
+        usuarioCtxModal?.nombre,
+        "copiar_perfiles",
+        `${r.copiados} perfiles copiados a proyecto ${destinoId}${r.fallidos ? ` (${r.fallidos} fallidos)` : ""}`
+      );
+      if (r.fallidos > 0) {
+        alert(`Copiados ${r.copiados} de ${aCopiar.length}.\n\nFallaron ${r.fallidos}. Revisa el proyecto destino antes de repetir la operación:\n\n${r.errores.join("\n")}`);
+      } else {
+        alert(`✓ ${r.copiados} perfil${r.copiados !== 1 ? "es" : ""} copiado${r.copiados !== 1 ? "s" : ""} a "${destino?.nombre || ""}".\n\nSe verán al cambiar a ese proyecto.`);
+      }
+      setMostrarCopiar(false);
+      setDestinoId("");
+      setSeleccionados(new Set());
+    } catch (e) {
+      alert("Error al copiar: " + (e.message || e));
+    }
+    setCopiando(false);
+  };
+
+  // Contar por departamento
+  const conteoDeptos = {};
+  perfiles.forEach(p => {
+    const d = p.datos?.departamento || "__sin__";
+    conteoDeptos[d] = (conteoDeptos[d] || 0) + 1;
+  });
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 100, display: "flex", justifyContent: "center", alignItems: "flex-start", padding: 20, overflow: "auto" }} onClick={onCerrar}>
+      <div style={{ background: "#e8ecef", borderRadius: 8, padding: 24, maxWidth: 1100, width: "100%", maxHeight: "90vh", overflow: "auto", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }} onClick={e => e.stopPropagation()}>
+
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, paddingBottom: 12, borderBottom: "2px solid #4ec9b8" }}>
+          <h2 style={{ margin: 0, fontSize: 15, letterSpacing: "0.15em", textTransform: "uppercase", color: "#1a1a1a", fontWeight: 700 }}>📂 Cargar perfil</h2>
+          <button onClick={onCerrar} style={{ background: "#f2f5f7", border: "1px solid #4ec9b8", padding: "6px 14px", borderRadius: 4, cursor: "pointer", fontSize: 11, color: "#4ec9b8", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontWeight: 700 }}>✕ Cerrar</button>
+        </div>
+
+        {/* Filtros (fila 1) */}
+        <div style={{ display: "flex", gap: 12, marginBottom: 10, alignItems: "center", flexWrap: "wrap", padding: "10px 12px", background: "#f2f5f7", borderRadius: 6, border: "1px solid #d5d9dc" }}>
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <span style={{ fontSize: 10, color: "#666", letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 700 }}>Tipo:</span>
+            {["todos", "45h", "40h"].map(t => (
+              <button key={t} onClick={() => setFiltroTipo(t)}
+                style={{ padding: "6px 14px", fontSize: 10, border: `1px solid ${filtroTipo === t ? "#4ec9b8" : "#ccc"}`, borderRadius: 4, background: filtroTipo === t ? "#4ec9b8" : "#fff", color: filtroTipo === t ? "#0a0a0a" : "#666", cursor: "pointer", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>
+                {t}
+              </button>
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <span style={{ fontSize: 10, color: "#666", letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 700 }}>Depto:</span>
+            <select value={filtroDepto} onChange={(e) => setFiltroDepto(e.target.value)}
+              style={{ padding: "6px 10px", fontSize: 11, border: "1px solid #4ec9b8", borderRadius: 4, background: "#fff", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", color: "#1a1a1a", cursor: "pointer" }}>
+              <option value="__todos__">Todos</option>
+              {conteoDeptos["__sin__"] > 0 && <option value="__sin__">— Sin depto — ({conteoDeptos["__sin__"]})</option>}
+              {DEPARTAMENTOS.map(d => conteoDeptos[d] > 0 ? <option key={d} value={d}>{d} ({conteoDeptos[d]})</option> : null)}
+            </select>
+          </div>
+          {/* v134: Ordenar */}
+          <div style={{ display: "flex", gap: 6, alignItems: "center", marginLeft: "auto" }}>
+            <span style={{ fontSize: 10, color: "#4ec9b8", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 700 }}>⇅ Ordenar:</span>
+            <select value={orden} onChange={(e) => setOrden(e.target.value)}
+              style={{ padding: "6px 10px", fontSize: 11, border: "1px solid #4ec9b8", borderRadius: 4, background: "#fff", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", color: "#1a1a1a", cursor: "pointer", fontWeight: 600 }}>
+              <option value="recientes">Más recientes primero</option>
+              <option value="antiguos">Más antiguos primero</option>
+              <option value="nombre_asc">Nombre A → Z</option>
+              <option value="nombre_desc">Nombre Z → A</option>
+              <option value="salario_desc">Salario mayor → menor</option>
+              <option value="salario_asc">Salario menor → mayor</option>
+              <option value="codigo">Código contable A → Z</option>
+              <option value="depto">Departamento A → Z</option>
+              <option value="alta">Fecha alta próxima</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Acciones (fila 2) */}
+        <div style={{ display: "flex", gap: 8, marginBottom: 14, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
+          {perfilesFiltrados.length > 0 && (
+            <>
+              <span style={{ fontSize: 10, color: "#999", marginRight: "auto", fontFamily: "'Inter', sans-serif" }}>{perfilesFiltrados.length} perfil{perfilesFiltrados.length !== 1 ? "es" : ""}</span>
+              <button onClick={seleccionarTodos} style={{ fontSize: 10, padding: "5px 12px", border: "1px solid #4ec9b8", borderRadius: 4, background: "#f2f5f7", cursor: "pointer", color: "#4ec9b8", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontWeight: 700 }}>Seleccionar todos</button>
+              <button onClick={deseleccionarTodos} style={{ fontSize: 10, padding: "5px 12px", border: "1px solid #ccc", borderRadius: 4, background: "#f2f5f7", cursor: "pointer", color: "#666", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontWeight: 700 }}>Ninguno</button>
+            </>
+          )}
+          {seleccionados.size > 0 && esAdminModal && (
+            <button onClick={() => setMostrarCopiar(true)} disabled={copiando}
+              style={{ padding: "8px 14px", fontSize: 10, border: "1px solid #4ec9b8", borderRadius: 4, background: "#f2f5f7", color: "#2a7a70", cursor: copiando ? "wait" : "pointer", fontWeight: 700, letterSpacing: "0.08em", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>
+              ⧉ Copiar a proyecto
+            </button>
+          )}
+          {seleccionados.size > 0 && (
+            <button onClick={borrarSeleccionados} disabled={borrando}
+              style={{ padding: "8px 14px", fontSize: 10, border: "1px solid #c04040", borderRadius: 4, background: "#c04040", color: "#f2f5f7", cursor: borrando ? "wait" : "pointer", fontWeight: 700, letterSpacing: "0.08em", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>
+              🗑 Borrar {seleccionados.size}
+            </button>
+          )}
+        </div>
+
+        {/* v148: diálogo de destino para la copia masiva */}
+        {mostrarCopiar && esAdminModal && (
+          <div style={{ marginBottom: 14, padding: 16, background: "#f2f5f7", border: "1px solid #4ec9b8", borderRadius: 6 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#1a1a1a", marginBottom: 10, fontFamily: "'Inter', -apple-system, sans-serif" }}>
+              Copiar {seleccionados.size} perfil{seleccionados.size !== 1 ? "es" : ""} a otro proyecto
+            </div>
+            <div style={{ fontSize: 11, color: "#555", marginBottom: 12, lineHeight: 1.5, fontFamily: "'Inter', -apple-system, sans-serif" }}>
+              Los perfiles originales se mantienen. Las fechas de contrato se copian tal cual:
+              si el proyecto destino tiene otro calendario, habrá que revisarlas.
+            </div>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+              <select value={destinoId} onChange={e => setDestinoId(e.target.value)}
+                style={{ flex: 1, minWidth: 220, padding: "9px 12px", fontSize: 12, border: "1px solid #d5d9dc", borderRadius: 4, background: "#ffffff", color: "#1a1a1a", fontFamily: "'Inter', -apple-system, sans-serif" }}>
+                <option value="">— Elige el proyecto destino —</option>
+                {proyectosDestino.map(p => (
+                  <option key={p.id} value={p.id}>{p.nombre}{p.productora ? ` · ${p.productora}` : ""}{p.activo === false ? " (inactivo)" : ""}</option>
+                ))}
+              </select>
+              <button onClick={copiarAProyecto} disabled={!destinoId || copiando}
+                style={{ padding: "9px 16px", fontSize: 11, border: "1px solid #4ec9b8", borderRadius: 4, background: destinoId ? "#4ec9b8" : "#dfe4e8", color: destinoId ? "#0a0a0a" : "#888", cursor: (!destinoId || copiando) ? "default" : "pointer", fontWeight: 700, letterSpacing: "0.08em", fontFamily: "'Inter', -apple-system, sans-serif" }}>
+                {copiando ? "Copiando…" : "Copiar"}
+              </button>
+              <button onClick={() => { setMostrarCopiar(false); setDestinoId(""); }} disabled={copiando}
+                style={{ padding: "9px 16px", fontSize: 11, border: "1px solid #ccc", borderRadius: 4, background: "#ffffff", color: "#666", cursor: copiando ? "wait" : "pointer", fontWeight: 700, letterSpacing: "0.08em", fontFamily: "'Inter', -apple-system, sans-serif" }}>
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
+
+        {cargando ? <div style={{ padding: 40, textAlign: "center", color: "#888" }}>Cargando perfiles…</div> : perfilesFiltrados.length === 0 ? (
+          <div style={{ padding: 40, textAlign: "center", color: "#888", fontStyle: "italic" }}>
+            {perfiles.length === 0 ? "No hay perfiles guardados." : "Ningún perfil coincide con los filtros."}
+          </div>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 10 }}>
+            {perfilesFiltrados.map(p => {
+              const id = p.supabaseId || p.key;
+              const sel = seleccionados.has(id);
+              const es40 = p.tabId === "40h";
+              const depto = p.datos?.departamento || "";
+              const salario = p.datos?.salario45 ? Number(p.datos.salario45) : 0;
+              const fecha = p.timestamp ? new Date(p.timestamp).toLocaleDateString("es-ES") : "";
+              // v131: perfil actualmente en edición
+              const esEnEdicion = perfilEnEdicion && (
+                (perfilEnEdicion.supabaseId && perfilEnEdicion.supabaseId === p.supabaseId) ||
+                (perfilEnEdicion.key && perfilEnEdicion.key === p.key)
+              );
+              // v131: fechas alta/baja (formato ISO YYYY-MM-DD → DD/MM/YYYY)
+              const fmtFecha = (iso) => {
+                if (!iso) return null;
+                const parts = String(iso).split("-");
+                if (parts.length !== 3) return iso;
+                return `${parts[2]}/${parts[1]}/${parts[0]}`;
+              };
+              const fAlta = fmtFecha(p.datos?.fechaInicio);
+              const fBaja = fmtFecha(p.datos?.fechaFin);
+              return (
+                <div key={id}
+                  style={{ background: sel ? "#eaf6f3" : "#f2f5f7", border: sel ? "2px solid #4ec9b8" : "1px solid #d5d9dc", borderRadius: 6, padding: 12, transition: "all 0.15s", position: "relative" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+                    <input type="checkbox" checked={sel} onChange={() => toggleSel(id)} style={{ cursor: "pointer", marginTop: 2 }} />
+                    <span style={{ background: es40 ? "#6a3a9a" : "#4ec9b8", color: "#f2f5f7", fontSize: 8, padding: "2px 6px", borderRadius: 2, letterSpacing: "0.08em", fontWeight: 700 }}>
+                      {es40 ? "40H" : "45H"}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", marginBottom: 4, lineHeight: 1.2, wordBreak: "break-word" }}>{p.nombre}</div>
+                  {p.datos?.puesto && <div style={{ fontSize: 10, color: "#666", marginBottom: 6, lineHeight: 1.3 }}>{p.datos.puesto}</div>}
+                  {depto && <div style={{ fontSize: 9, color: "#4ec9b8", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 8, fontWeight: 700 }}>{depto}</div>}
+
+                  {/* v131: Fechas Alta / Baja */}
+                  {/* v139: perfil guardado sin fechas */}
+                  {p.datos?.fechasPendientes ? (
+                    <div style={{ borderTop: "1px solid #d5d9dc", paddingTop: 6, marginBottom: 6 }}>
+                      <div style={{ fontSize: 10, color: "#b26a00", fontWeight: 700 }}>⏳ Pendiente de fechas</div>
+                    </div>
+                  ) : (fAlta || fBaja) && (
+                    <div style={{ borderTop: "1px solid #d5d9dc", paddingTop: 6, marginBottom: 6 }}>
+                      {fAlta && (
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#666" }}>
+                          <span>Alta:</span><span style={{ color: "#1a1a1a", fontWeight: 600 }}>{fAlta}</span>
+                        </div>
+                      )}
+                      {fBaja && (
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#666", marginTop: 2 }}>
+                          <span>Baja:</span><span style={{ color: "#1a1a1a", fontWeight: 600 }}>{fBaja}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div style={{ borderTop: "1px solid #d5d9dc", paddingTop: 6, marginBottom: 8 }}>
+                    <div style={{ fontSize: 9, color: "#888" }}>Salario pactado {es40 ? "40h" : "45h"}</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a" }}>{salario ? salario.toLocaleString("es-ES") + " €/mes" : "—"}</div>
+                  </div>
+                  {/* v132: 4 botones fijos: Renombrar / Duplicar / Modificar / Cargar */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
+                    <button
+                      onClick={async () => {
+                        const nuevo = prompt(`Renombrar perfil:\n\n(Solo cambia el nombre con el que se guarda el perfil, NO el nombre del trabajador)`, p.nombre);
+                        if (!nuevo || !nuevo.trim() || nuevo.trim() === p.nombre) return;
+                        if (onRenombrar) await onRenombrar(p, nuevo.trim());
+                      }}
+                      style={{ background: "transparent", color: "#666", border: "1px solid #ccc", padding: "6px 4px", borderRadius: 3, fontSize: 9, fontWeight: 700, cursor: "pointer", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}
+                      title="Renombrar el nombre del perfil guardado"
+                    >✎ Renombrar</button>
+                    <button
+                      onClick={async () => {
+                        if (!confirm(`¿Duplicar "${p.nombre}" como "${p.nombre} (copia)"?`)) return;
+                        if (onDuplicar) await onDuplicar(p);
+                      }}
+                      style={{ background: "transparent", color: "#666", border: "1px solid #ccc", padding: "6px 4px", borderRadius: 3, fontSize: 9, fontWeight: 700, cursor: "pointer", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}
+                      title="Duplicar este perfil"
+                    >📋 Duplicar</button>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, marginTop: 4 }}>
+                    <button
+                      onClick={async () => { if (onModificarEspecifico) await onModificarEspecifico(p); }}
+                      style={{ background: "#2196f3", color: "#fff", border: "none", padding: "7px 4px", borderRadius: 3, fontSize: 9, fontWeight: 700, cursor: "pointer", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}
+                      title="Abrir este perfil para editarlo y guardar encima"
+                    >✎ Modificar</button>
+                    <button
+                      onClick={() => onCargar(p)}
+                      style={{ background: "#4ec9b8", color: "#0a0a0a", border: "none", padding: "7px 4px", borderRadius: 3, fontSize: 9, fontWeight: 700, cursor: "pointer", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}
+                      title="Cargar este perfil en el formulario"
+                    >📂 Cargar</button>
+                  </div>
+                  {fecha && <div style={{ fontSize: 8, color: "#999", marginTop: 6, letterSpacing: "0.03em", textAlign: "center" }}>{fecha}{p.autor ? ` · por ${p.autor}` : ""}</div>}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// v92: EXPORTAR LISTADO DE PERFILES A EXCEL
+// ═══════════════════════════════════════════════════════════════════════
+
+async function marcarPerfilExportado(perfilId, nombreUsuario, auth) {
+  const headers = { "Prefer": "return=representation" };
+  if (auth?.adminPin) headers["x-admin-pin"] = auth.adminPin;
+  if (auth?.userPin) headers["x-user-pin"] = auth.userPin;
+  return supabaseFetch(`perfiles?id=eq.${perfilId}`, {
+    method: "PATCH",
+    headers,
+    body: JSON.stringify({
+      exportado_el: new Date().toISOString(),
+      exportado_por: nombreUsuario,
+    }),
+  });
+}
+
+// Generar meses YYYY-MM entre 2 fechas
+function generarMesesEntre(fechaInicioStr, fechaFinStr) {
+  if (!fechaInicioStr || !fechaFinStr) return [];
+  const [ay, am] = fechaInicioStr.split("-").map(Number);
+  const [by, bm] = fechaFinStr.split("-").map(Number);
+  const meses = [];
+  let y = ay, m = am;
+  while (y < by || (y === by && m <= bm)) {
+    meses.push(`${y}-${String(m).padStart(2, "0")}`);
+    m++;
+    if (m > 12) { m = 1; y++; }
+  }
+  return meses;
+}
+
+// Nombre corto del mes para header Excel
+function labelMesCorto(ym) {
+  const [y, m] = ym.split("-").map(Number);
+  const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+  return `${MESES[m - 1]}-${String(y).slice(2)}`;
+}
+
+// Calcula coste SS total de un perfil (usando calcularCosteEmpresaMes sobre su desglose)
+function calcularCosteSSPerfil(datos) {
+  const desglose = datos?._calculado?.desglose45 || datos?.desglose45 || [];
+  const complementos = datos?._calculado?.complementos45 || datos?.complementos45 || [];
+  const importeFestMes = datos?._calculado?.importeFestMes45 || [];
+  const esTab40 = datos?.tabId === "tab40";
+  const vacAcumulada = datos?.vacAcumulada || false;
+  let total = 0;
+  const porMes = {};
+  desglose.forEach((mes, i) => {
+    const c = complementos[i] || {};
+    const festImp = importeFestMes[i] || 0;
+    const jeImp = mes.importeJE || 0;
+    const plusAct = esTab40 ? 0 : (mes.plusAct || 0);
+    const vdShow = mes.vdShow || 0;
+    const totalBruto = (mes.base40 || 0) + (mes.vac40 || 0) + (mes.indem40 || 0) + (mes.cobroHx || 0) + plusAct
+                     + festImp + jeImp
+                     + (c.herramienta || 0) + (c.coche || 0) + (c.vivienda || 0) + (c.seguroVida || 0) + (c.comida || 0);
+    const ce = calcularCosteEmpresaMes({
+      total: totalBruto,
+      vacaciones: mes.vac40 || 0,
+      vacDisfrutadas: vdShow,
+      indem: mes.indem40 || 0,
+      horasExtraEur: mes.cobroHx || 0,
+      plusVivienda: c.vivienda || 0,
+      irpfActivo: false, pctIRPF: 0,
+      esPrimerMes: i === 0,
+      importeExento: 0,
+      firmaContrato: true,
+      incluirGestoria: false,
+      vacAcumulada,
+    });
+    const ss = (ce.ssPrincipal || 0) + (ce.ssVacaciones || 0) + (ce.ssHorasExtra || 0) + (ce.imei || 0) + (ce.solidaridad || 0);
+    // key mes: parse "Mayo De 2027" o similar
+    const parsed = parseMesEspañol ? parseMesEspañol(mes.mes) : null;
+    const key = parsed ? `${parsed.year}-${String(parsed.month).padStart(2, "0")}` : null;
+    // Bruto percibido (líquido)
+    const brutoLiq = totalBruto - vdShow;
+    if (key) porMes[key] = { bruto: brutoLiq, ss, total: brutoLiq + ss };
+    total += ss;
+  });
+  return { totalSS: total, porMes };
+}
+
+function PanelExportarListado({ usuarioActual, onCerrar }) {
+  const esAdmin = !!usuarioActual?.es_admin;
+  const esCoordinador = usuarioActual?.rol === "coordinador";
+  const auth = esAdmin ? { adminPin: usuarioActual.pin } : (esCoordinador ? { userPin: usuarioActual.pin } : {});
+
+  const [proyectos, setProyectos] = useState([]);
+  const [proyectoSel, setProyectoSel] = useState(null);
+  const [perfiles, setPerfiles] = useState([]);
+  const [seleccionados, setSeleccionados] = useState(new Set());
+  const [filtroDepto, setFiltroDepto] = useState("__todos__"); // v97: filtro por departamento
+  const [orden, setOrden] = useState("nombre_asc"); // v136: criterio de ordenación
+  const [modoHojas, setModoHojas] = useState("una"); // v97: "una" o "por_depto"
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState(null);
+  const [mensaje, setMensaje] = useState(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        setCargando(true);
+        const lista = await listarProyectos({ adminPin: esAdmin ? usuarioActual.pin : null, usuarioId: usuarioActual.id, esAdmin });
+        setProyectos(lista || []);
+        setCargando(false);
+      } catch (e) { setError(e.message); setCargando(false); }
+    })();
+  }, []);
+
+  const cargarPerfiles = async (p) => {
+    setProyectoSel(p);
+    setCargando(true);
+    setError(null);
+    try {
+      console.log("[Exportar] Cargando perfiles del proyecto:", p.id, p.nombre, "esAdmin:", esAdmin, "esCoordinador:", esCoordinador);
+      const adminPin = esAdmin ? usuarioActual.pin : null;
+      // v94-fix: los tab_id reales en Supabase son "45h" y "40h" (no "iruna45"/"tab40")
+      const [p45, p40] = await Promise.all([
+        listarPerfilesSupabase({ tabId: "45h", proyectoId: p.id, adminPin }),
+        listarPerfilesSupabase({ tabId: "40h", proyectoId: p.id, adminPin }),
+      ]);
+      console.log("[Exportar] Perfiles 45h:", p45?.length, "40h:", p40?.length);
+      const todos = [...(p45 || []), ...(p40 || [])].sort((a, b) => (a.nombre || "").localeCompare(b.nombre || ""));
+      setPerfiles(todos);
+      // Preseleccionar los NO exportados
+      const preSel = new Set(todos.filter(pp => !pp.exportado_el).map(pp => pp.id));
+      setSeleccionados(preSel);
+      setCargando(false);
+      if (todos.length === 0) {
+        setMensaje({ tipo: "info", texto: "No hay perfiles guardados en este proyecto todavía." });
+      }
+    } catch (e) {
+      console.error("[Exportar] Error:", e);
+      setError("Error cargando perfiles: " + e.message);
+      setCargando(false);
+    }
+  };
+
+  const toggleSel = (id) => {
+    const nueva = new Set(seleccionados);
+    if (nueva.has(id)) nueva.delete(id); else nueva.add(id);
+    setSeleccionados(nueva);
+  };
+
+  // v97: perfiles filtrados por departamento
+  const perfilesFiltrados = perfiles.filter(p => {
+    if (filtroDepto === "__todos__") return true;
+    if (filtroDepto === "__sin__") return !p.datos?.departamento;
+    return (p.datos?.departamento || "") === filtroDepto;
+  }).sort((a, b) => {
+    // v136: ordenación
+    // v144: estos perfiles vienen crudos de Supabase y no traen "timestamp";
+    //       la fecha real está en created_at.
+    const ts = (x) => x.timestamp || (x.created_at ? new Date(x.created_at).getTime() : 0);
+    const colator = new Intl.Collator("es", { sensitivity: "base", numeric: true });
+    switch (orden) {
+      case "recientes":     return ts(b) - ts(a);
+      case "antiguos":      return ts(a) - ts(b);
+      case "nombre_asc":    return colator.compare(a.nombre || "", b.nombre || "");
+      case "nombre_desc":   return colator.compare(b.nombre || "", a.nombre || "");
+      case "salario_desc":  return (Number(b.datos?.salario45) || 0) - (Number(a.datos?.salario45) || 0);
+      case "salario_asc":   return (Number(a.datos?.salario45) || 0) - (Number(b.datos?.salario45) || 0);
+      case "codigo":        return colator.compare(a.datos?.codigoContable || "zzz", b.datos?.codigoContable || "zzz");
+      case "depto":         return colator.compare(a.datos?.departamento || "zzz", b.datos?.departamento || "zzz");
+      case "alta":          return String(a.datos?.fechaInicio || "9999").localeCompare(String(b.datos?.fechaInicio || "9999"));
+      default:              return 0;
+    }
+  });
+
+  const seleccionarTodos = () => setSeleccionados(new Set(perfilesFiltrados.map(p => p.id)));
+  const deseleccionarTodos = () => setSeleccionados(new Set());
+  const invertirSeleccion = () => {
+    const nueva = new Set();
+    perfilesFiltrados.forEach(p => { if (!seleccionados.has(p.id)) nueva.add(p.id); });
+    setSeleccionados(nueva);
+  };
+
+  const exportar = async () => {
+    if (seleccionados.size === 0) { alert("Selecciona al menos un perfil"); return; }
+    const perfilesExp = perfiles.filter(p => seleccionados.has(p.id));
+
+    setMensaje({ tipo: "info", texto: "Generando Excel..." });
+
+    // Cargar SheetJS
+    let XLSX;
+    try { XLSX = await cargarXLSX(); }
+    catch (e) { setMensaje({ tipo: "error", texto: "Error cargando librería Excel: " + e.message }); return; }
+
+    // Determinar rango de meses del proyecto (calendario)
+    let mesesRango = [];
+    try {
+      const cal = await obtenerCalendarioProyecto(proyectoSel.id);
+      if (cal && cal.fecha_inicio && cal.fecha_fin) {
+        mesesRango = generarMesesEntre(cal.fecha_inicio, cal.fecha_fin);
+      } else {
+        const fechas = perfilesExp.map(p => ({ ini: p.datos?.fechaInicio, fin: p.datos?.fechaFin })).filter(f => f.ini && f.fin);
+        if (fechas.length > 0) {
+          const ini = fechas.map(f => f.ini).sort()[0];
+          const fin = fechas.map(f => f.fin).sort().reverse()[0];
+          mesesRango = generarMesesEntre(ini, fin);
+        }
+      }
+    } catch (e) { console.warn("Sin calendario, calculando rango desde perfiles"); }
+
+    // Cabeceras finales (v97): añadido Departamento entre C y D
+    const headersFijos = [
+      "Nombre trabajador", "Puesto", "Código contable", "Departamento",                          // A-D (v97: nuevo)
+      "Proyecto", "Productora",                                                                   // E-F
+      "Fecha inicio", "Fecha fin", "Días totales", "Salario pactado (€/mes)",                   // G-J
+      "Modalidad", "Fijo discontinuo", "Vacaciones", "Indemnización", "Finiquito aparte",       // K-O
+      "Total Salario Base", "Total Vacaciones", "Total Indemnización", "Total H.Extra",         // P-S
+      "Total Plus Actividad", "Total Festivos", "Total Jornadas Especiales", "Total Complementos", // T-W
+      "BRUTO TRABAJADOR", "Total SS Empresa", "COSTE TOTAL",                                    // X-Y-Z
+      "BRUTO MMB", "FRINGES MMB", "TOTAL MMB", "DIFERENCIA (Z - AC)",                           // AA-AB-AC-AD (v96)
+      "Autor perfil", "Fecha creación", "Última modificación",                                  // AE-AF-AG
+    ];
+    const headersMeses = [];
+    mesesRango.forEach(ym => {
+      const lbl = labelMesCorto(ym);
+      headersMeses.push(`${lbl} Bruto`, `${lbl} SS`, `${lbl} Total`);
+    });
+    const headersFinales = ["Salario / Día", "Coste Hora Extra (€/h)", "Coste Festivo (€/día)"]; // v96
+    const headers = [...headersFijos, ...headersMeses, ...headersFinales];
+    const idxInicioMeses = headersFijos.length;
+    const idxFinMeses = idxInicioMeses + mesesRango.length * 3;
+
+    // Helper: convertir número de columna (0-indexed) a letra Excel (0=A, 25=Z, 26=AA, ...)
+    const colLetter = (idx) => {
+      let s = "";
+      let n = idx;
+      while (n >= 0) {
+        s = String.fromCharCode(65 + (n % 26)) + s;
+        n = Math.floor(n / 26) - 1;
+      }
+      return s;
+    };
+
+    // Índices de columnas (0-indexed) — v97: +1 desde D en adelante por columna Departamento
+    const IDX_BRUTO_TRAB = 23;   // X (antes W)
+    const IDX_SS = 24;           // Y (antes X)
+    const IDX_COSTE_TOTAL = 25;  // Z (antes Y)
+    const IDX_BRUTO_MMB = 26;    // AA (antes Z)
+    const IDX_FRINGES_MMB = 27;  // AB (antes AA)
+    const IDX_TOTAL_MMB = 28;    // AC (fórmula = AA + AB)
+    const IDX_DIFERENCIA = 29;   // AD (fórmula = Z - AC)
+
+    // v97: función que construye un worksheet a partir de un array de perfiles
+    const construirHoja = (perfilesHoja) => {
+      const aoa = [headers];
+      perfilesHoja.forEach((p, rowIdx) => {
+        const d = p.datos || {};
+        const c = d._calculado || {};
+        const totBase = c.totBase || 0;
+        const totVac = c.totVac || 0;
+        const totIndem = c.totIndem || 0;
+        const totHx = c.totHx || 0;
+        const totPlus = c.totPlus || 0;
+        const totFest = c.totalFestImport45 || 0;
+        const totJE = c.totJEImporte || 0;
+        const totCompl = c.totalCompl || 0;
+        const bruto = c.totFinal ? (c.totFinal + totFest) : (totBase + totVac + totIndem + totHx + totPlus + totFest + totJE + totCompl);
+        const { totalSS, porMes } = calcularCosteSSPerfil(d);
+        const costeTotal = bruto + totalSS;
+        const salarioDia = c.salarioDia || 0;
+        const vHoraEx = c.vHoraEx || 0;
+        const valorFestivo = salarioDia * 1.75;
+        let diasTot = 0;
+        if (d.fechaInicio && d.fechaFin) {
+          const ini = new Date(d.fechaInicio + "T12:00:00");
+          const fin = new Date(d.fechaFin + "T12:00:00");
+          diasTot = Math.round((fin - ini) / (1000 * 60 * 60 * 24)) + 1;
+        }
+        const excelRow = rowIdx + 2;
+        const fila = [
+          d.nombre || p.nombre || "",
+          d.puesto || "",
+          d.codigoContable || "",
+          d.departamento || "",
+          d.proyecto || proyectoSel.nombre,
+          d.productora || proyectoSel.productora || "",
+          d.fechaInicio || "",
+          d.fechaFin || "",
+          diasTot || 0,
+          Number(d.salario45) || 0,
+          p.tab_id === "40h" ? "40H" : "45H",
+          d.esFijoDiscontinuo ? "Sí" : "No",
+          d.vacAcumulada ? "Al final" : "Prorrateadas",
+          d.indemAcumulada ? "Al final" : "Prorrateadas",
+          d.finiquitoAparte ? "Sí" : "No",
+          totBase, totVac, totIndem, totHx, totPlus, totFest, totJE, totCompl,
+          bruto, totalSS, costeTotal,
+          null, null,
+          { f: `${colLetter(IDX_BRUTO_MMB)}${excelRow}+${colLetter(IDX_FRINGES_MMB)}${excelRow}` },
+          { f: `${colLetter(IDX_COSTE_TOTAL)}${excelRow}-${colLetter(IDX_TOTAL_MMB)}${excelRow}` },
+          p.autor || "",
+          p.created_at ? new Date(p.created_at).toLocaleDateString("es-ES") : "",
+          p.updated_at ? new Date(p.updated_at).toLocaleDateString("es-ES") : "",
+        ];
+        mesesRango.forEach(ym => {
+          const m = porMes[ym];
+          fila.push(m ? m.bruto : 0, m ? m.ss : 0, m ? m.total : 0);
+        });
+        fila.push(salarioDia, vHoraEx, valorFestivo);
+        aoa.push(fila);
+      });
+
+      const ws = XLSX.utils.aoa_to_sheet(aoa);
+      const FMT_EUR = '_-* #,##0.00 [$€-C0A]_-;-* #,##0.00 [$€-C0A]_-;_-* "-"?? [$€-C0A]_-;_-@_-';
+      const colsEUR = new Set();
+      colsEUR.add(9);
+      for (let i = 15; i <= 29; i++) colsEUR.add(i);
+      for (let i = idxInicioMeses; i < idxFinMeses; i++) colsEUR.add(i);
+      for (let i = idxFinMeses; i < idxFinMeses + 3; i++) colsEUR.add(i);
+      const totalRows = aoa.length;
+      colsEUR.forEach(colIdx => {
+        for (let r = 1; r < totalRows; r++) {
+          const cellRef = colLetter(colIdx) + (r + 1);
+          if (ws[cellRef]) {
+            ws[cellRef].z = FMT_EUR;
+            if (ws[cellRef].v === null || ws[cellRef].v === undefined) ws[cellRef].t = "n";
+          } else {
+            ws[cellRef] = { t: "n", z: FMT_EUR, v: null };
+          }
+        }
+      });
+      const wscols = [];
+      headers.forEach((h, i) => {
+        let w = 12;
+        if (i === 0) w = 22;
+        else if (i === 1) w = 18;
+        else if (i === 3) w = 16;
+        else if (i === 4 || i === 5) w = 14;
+        else if (i >= 6 && i <= 8) w = 11;
+        else if (i >= 15 && i <= 29) w = 15;
+        else if (i >= idxInicioMeses && i < idxFinMeses) w = 11;
+        else if (i >= idxFinMeses) w = 14;
+        wscols.push({ wch: w });
+      });
+      ws["!cols"] = wscols;
+      ws["!freeze"] = { xSplit: 6, ySplit: 1 };
+      return ws;
+    };
+
+    // Crear workbook y añadir hoja(s)
+    const wb = XLSX.utils.book_new();
+    if (modoHojas === "por_depto") {
+      // Agrupar por departamento
+      const grupos = {};
+      perfilesExp.forEach(p => {
+        const depto = p.datos?.departamento || "Sin departamento";
+        if (!grupos[depto]) grupos[depto] = [];
+        grupos[depto].push(p);
+      });
+      // Orden: DEPARTAMENTOS conocidos primero, luego "Sin departamento"
+      const ordenDeptos = [...DEPARTAMENTOS.filter(d => grupos[d]), ...Object.keys(grupos).filter(d => !DEPARTAMENTOS.includes(d))];
+      ordenDeptos.forEach(depto => {
+        const ws = construirHoja(grupos[depto]);
+        // Nombre hoja: máx 31 chars, sin caracteres inválidos
+        const nombreHoja = depto.replace(/[\\/*?:[\]]/g, "").slice(0, 31);
+        XLSX.utils.book_append_sheet(wb, ws, nombreHoja);
+      });
+    } else {
+      const ws = construirHoja(perfilesExp);
+      XLSX.utils.book_append_sheet(wb, ws, "Listado");
+    }
+    const nombreArchivo = `Listado_${proyectoSel.nombre.replace(/[^a-zA-Z0-9]/g, "_")}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    XLSX.writeFile(wb, nombreArchivo);
+
+    // Marcar perfiles como exportados
+    setMensaje({ tipo: "ok", texto: `Excel generado. Marcando ${perfilesExp.length} perfiles...` });
+    for (const p of perfilesExp) {
+      try {
+        await marcarPerfilExportado(p.id, usuarioActual.nombre, auth);
+      } catch (e) { console.warn("Error marcando", p.id, e); }
+    }
+    setMensaje({ tipo: "ok", texto: `✓ ${perfilesExp.length} perfiles exportados y marcados` });
+    await cargarPerfiles(proyectoSel);
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 100, display: "flex", justifyContent: "center", alignItems: "flex-start", padding: 20, overflow: "auto" }}>
+      <div style={{ background: "#e8ecef", borderRadius: 8, padding: 24, maxWidth: 900, width: "100%", maxHeight: "90vh", overflow: "auto", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, paddingBottom: 12, borderBottom: "2px solid #4ec9b8" }}>
+          <h2 style={{ margin: 0, fontSize: 14, letterSpacing: "0.15em", textTransform: "uppercase", color: "#1a1a1a", fontWeight: 700 }}>📊 Exportar listado de perfiles</h2>
+          <button onClick={onCerrar} style={{ background: "#fff", border: "1px solid #4ec9b8", padding: "6px 14px", borderRadius: 4, cursor: "pointer", fontSize: 11, color: "#4ec9b8", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontWeight: 700 }}>✕ Cerrar</button>
+        </div>
+
+        {mensaje && (
+          <div style={{ padding: "10px 14px", marginBottom: 14, borderRadius: 4, background: mensaje.tipo === "ok" ? "#e6f4e6" : (mensaje.tipo === "info" ? "#e8eef7" : "#fce8e8"), color: mensaje.tipo === "ok" ? "#2a6e2a" : (mensaje.tipo === "info" ? "#1a1a1a" : "#c00"), fontSize: 11, border: `1px solid ${mensaje.tipo === "ok" ? "#4ec9b8" : (mensaje.tipo === "info" ? "#4ec9b8" : "#e0a0a0")}` }}>{mensaje.texto}</div>
+        )}
+        {error && (
+          <div style={{ padding: "10px 14px", marginBottom: 14, borderRadius: 4, background: "#fce8e8", color: "#c00", fontSize: 11, border: "1px solid #e0a0a0" }}>⚠ {error}</div>
+        )}
+
+        {!proyectoSel ? (
+          <div>
+            <div style={{ fontSize: 11, color: "#666", marginBottom: 12, letterSpacing: "0.05em", padding: "10px 12px", background: "#f2f5f7", borderRadius: 4, border: "1px solid #d5d9dc" }}>
+              <strong style={{ color: "#4ec9b8" }}>Paso 1:</strong> Elige el proyecto del que quieres exportar los perfiles.
+            </div>
+            {cargando ? <div style={{ padding: 20, textAlign: "center", color: "#888" }}>Cargando proyectos…</div> : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {proyectos.length === 0 && <div style={{ fontSize: 11, color: "#888", padding: 20, textAlign: "center" }}>No hay proyectos disponibles.</div>}
+                {proyectos.map(p => (
+                  <button key={p.id} onClick={() => cargarPerfiles(p)}
+                    style={{ background: "#f2f5f7", border: "1px solid #d5d9dc", borderRadius: 5, padding: "12px 16px", cursor: "pointer", textAlign: "left", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", transition: "all 0.15s", display: "flex", justifyContent: "space-between", alignItems: "center" }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = "#4ec9b8"; e.currentTarget.style.background = "#eaf6f3"; }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = "#d5d9dc"; e.currentTarget.style.background = "#f2f5f7"; }}
+                  >
+                    <div>
+                      <div style={{ fontSize: 9, color: "#888", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 2 }}>Proyecto</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a" }}>{p.nombre}</div>
+                      <div style={{ fontSize: 10, color: "#888", marginTop: 4, letterSpacing: "0.05em" }}>Productora: {p.productora || "—"}</div>
+                    </div>
+                    <div style={{ color: "#4ec9b8", fontSize: 20 }}>→</div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div>
+            <div style={{ background: "#f2f5f7", padding: "12px 14px", borderRadius: 5, marginBottom: 14, border: "1px solid #d5d9dc", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+              <div>
+                <div style={{ fontSize: 9, color: "#888", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 2 }}>Proyecto seleccionado</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a" }}>{proyectoSel.nombre}</div>
+                <div style={{ fontSize: 10, color: "#666", marginTop: 2 }}>
+                  <strong>{perfiles.length}</strong> perfil{perfiles.length !== 1 ? "es" : ""} · <strong>{seleccionados.size}</strong> seleccionado{seleccionados.size !== 1 ? "s" : ""}
+                </div>
+              </div>
+              <button onClick={() => { setProyectoSel(null); setPerfiles([]); setSeleccionados(new Set()); setMensaje(null); setError(null); }} style={{ background: "#f2f5f7", border: "1px solid #ccc", padding: "6px 12px", borderRadius: 4, cursor: "pointer", fontSize: 10, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", color: "#666", fontWeight: 700 }}>← Cambiar proyecto</button>
+            </div>
+
+            {cargando ? <div style={{ padding: 20, textAlign: "center", color: "#888" }}>Cargando perfiles…</div> : (
+              <>
+                {perfiles.length > 0 && (
+                  <div style={{ display: "flex", gap: 6, marginBottom: 10, alignItems: "center", flexWrap: "wrap" }}>
+                    <span style={{ fontSize: 10, color: "#666", letterSpacing: "0.05em", marginRight: 4, textTransform: "uppercase", fontWeight: 700 }}>Selección:</span>
+                    <button onClick={seleccionarTodos} style={{ fontSize: 10, padding: "6px 14px", border: "1px solid #4ec9b8", borderRadius: 4, background: "#4ec9b8", cursor: "pointer", color: "#0a0a0a", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>Todos</button>
+                    <button onClick={deseleccionarTodos} style={{ fontSize: 10, padding: "6px 14px", border: "1px solid #ccc", borderRadius: 4, background: "#fff", cursor: "pointer", color: "#666", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>Ninguno</button>
+                    <button onClick={invertirSeleccion} style={{ fontSize: 10, padding: "6px 14px", border: "1px solid #ccc", borderRadius: 4, background: "#fff", cursor: "pointer", color: "#666", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>Invertir</button>
+                    <span style={{ fontSize: 9, color: "#888", marginLeft: 8, fontStyle: "italic" }}>Los ya exportados están en gris.</span>
+                  </div>
+                )}
+
+                {/* v97: Filtro por departamento */}
+                {perfiles.length > 0 && (
+                  <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 10, flexWrap: "wrap" }}>
+                    <label style={{ fontSize: 10, color: "#666", letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 700 }}>Filtrar:</label>
+                    <select value={filtroDepto} onChange={(e) => setFiltroDepto(e.target.value)} style={{ padding: "5px 10px", fontSize: 11, border: "1px solid #4ec9b8", borderRadius: 4, background: "#fff", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", cursor: "pointer", color: "#1a1a1a" }}>
+                      <option value="__todos__">Todos los departamentos</option>
+                      <option value="__sin__">— Sin departamento —</option>
+                      {DEPARTAMENTOS.map(d => {
+                        const count = perfiles.filter(p => (p.datos?.departamento || "") === d).length;
+                        return count > 0 ? <option key={d} value={d}>{d} ({count})</option> : null;
+                      })}
+                    </select>
+                    {/* v136: Ordenar */}
+                    <label style={{ fontSize: 10, color: "#4ec9b8", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 700, marginLeft: 10 }}>⇅ Ordenar:</label>
+                    <select value={orden} onChange={(e) => setOrden(e.target.value)} style={{ padding: "5px 10px", fontSize: 11, border: "1px solid #4ec9b8", borderRadius: 4, background: "#fff", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", cursor: "pointer", color: "#1a1a1a", fontWeight: 600 }}>
+                      <option value="nombre_asc">Nombre A → Z</option>
+                      <option value="nombre_desc">Nombre Z → A</option>
+                      <option value="recientes">Más recientes primero</option>
+                      <option value="antiguos">Más antiguos primero</option>
+                      <option value="salario_desc">Salario mayor → menor</option>
+                      <option value="salario_asc">Salario menor → mayor</option>
+                      <option value="codigo">Código contable A → Z</option>
+                      <option value="depto">Departamento A → Z</option>
+                      <option value="alta">Fecha alta próxima</option>
+                    </select>
+                    <span style={{ fontSize: 9, color: "#888" }}>{perfilesFiltrados.length} de {perfiles.length} mostrados</span>
+                  </div>
+                )}
+
+                <div style={{ background: "#f2f5f7", border: "1px solid #d5d9dc", borderRadius: 5, maxHeight: 400, overflow: "auto" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>
+                    <thead style={{ position: "sticky", top: 0, background: "#dfe4e8", zIndex: 1 }}>
+                      <tr>
+                        <th style={{ padding: "10px 6px", textAlign: "center", width: 32, borderBottom: "1px solid #d5d9dc", fontSize: 9 }}>✓</th>
+                        <th style={{ padding: "10px 6px", textAlign: "left", borderBottom: "1px solid #d5d9dc", fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", color: "#666", fontWeight: 700 }}>Perfil</th>
+                        <th style={{ padding: "10px 6px", textAlign: "center", borderBottom: "1px solid #d5d9dc", fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", color: "#666", width: 60, fontWeight: 700 }}>Tipo</th>
+                        <th style={{ padding: "10px 6px", textAlign: "left", borderBottom: "1px solid #d5d9dc", fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", color: "#666", fontWeight: 700 }}>Puesto</th>
+                        <th style={{ padding: "10px 6px", textAlign: "left", borderBottom: "1px solid #d5d9dc", fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", color: "#666", fontWeight: 700 }}>Departamento</th>
+                        <th style={{ padding: "10px 6px", textAlign: "right", borderBottom: "1px solid #d5d9dc", fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", color: "#666", width: 90, fontWeight: 700 }}>Salario</th>
+                        <th style={{ padding: "10px 6px", textAlign: "left", borderBottom: "1px solid #d5d9dc", fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", color: "#666", fontWeight: 700 }}>Exportado</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {perfilesFiltrados.length === 0 && (
+                        <tr><td colSpan={7} style={{ padding: 30, textAlign: "center", color: "#888", fontStyle: "italic" }}>{perfiles.length === 0 ? "No hay perfiles guardados en este proyecto." : "Ningún perfil coincide con el filtro."}</td></tr>
+                      )}
+                      {perfilesFiltrados.map(p => {
+                        const yaExp = !!p.exportado_el;
+                        const sel = seleccionados.has(p.id);
+                        const depto = p.datos?.departamento || "";
+                        return (
+                          <tr key={p.id} style={{ borderBottom: "1px solid #dfe4e8", background: yaExp ? "#e3e7ea" : (sel ? "#eaf6f3" : "transparent"), color: yaExp ? "#777" : "#1a1a1a", cursor: "pointer" }} onClick={() => toggleSel(p.id)}>
+                            <td style={{ padding: "8px 6px", textAlign: "center" }}>
+                              <input type="checkbox" checked={sel} onChange={() => toggleSel(p.id)} onClick={e => e.stopPropagation()} style={{ cursor: "pointer" }} />
+                            </td>
+                            <td style={{ padding: "8px", fontWeight: 600 }}>{p.nombre}</td>
+                            <td style={{ padding: "8px", textAlign: "center", fontSize: 9, color: yaExp ? "#aaa" : "#4ec9b8", fontWeight: 700 }}>{p.tab_id === "40h" ? "40H" : "45H"}</td>
+                            <td style={{ padding: "8px", fontSize: 10 }}>{p.datos?.puesto || "—"}</td>
+                            <td style={{ padding: "8px", fontSize: 10, color: depto ? "#1a1a1a" : "#c04040", fontStyle: depto ? "normal" : "italic" }}>{depto || "sin depto"}</td>
+                            <td style={{ padding: "8px", textAlign: "right", fontSize: 10 }}>{p.datos?.salario45 ? Number(p.datos.salario45).toFixed(0) + " €" : "—"}</td>
+                            <td style={{ padding: "8px", fontSize: 9, color: yaExp ? "#555" : "#999" }}>
+                              {yaExp ? (
+                                <div>
+                                  <div>{new Date(p.exportado_el).toLocaleDateString("es-ES")}</div>
+                                  <div style={{ fontSize: 8, color: "#888", marginTop: 1 }}>por {p.exportado_por || "?"}</div>
+                                </div>
+                              ) : "—"}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {perfilesFiltrados.length > 0 && (
+                  <div style={{ marginTop: 16, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+                    <div style={{ fontSize: 10, color: "#666", display: "flex", flexDirection: "column", gap: 6 }}>
+                      <div>Se descargará un archivo <strong>.xlsx</strong> (Excel) con {seleccionados.size} perfil{seleccionados.size !== 1 ? "es" : ""}, formato contabilidad y fórmulas.</div>
+                      {/* v97: modo hojas */}
+                      <div style={{ display: "flex", gap: 12, alignItems: "center", marginTop: 2 }}>
+                        <label style={{ display: "flex", alignItems: "center", gap: 5, cursor: "pointer", fontSize: 10 }}>
+                          <input type="radio" name="modoHojas" checked={modoHojas === "una"} onChange={() => setModoHojas("una")} />
+                          Una sola hoja
+                        </label>
+                        <label style={{ display: "flex", alignItems: "center", gap: 5, cursor: "pointer", fontSize: 10 }}>
+                          <input type="radio" name="modoHojas" checked={modoHojas === "por_depto"} onChange={() => setModoHojas("por_depto")} />
+                          Una hoja por departamento
+                        </label>
+                      </div>
+                    </div>
+                    <button onClick={exportar} disabled={seleccionados.size === 0}
+                      style={{ background: seleccionados.size === 0 ? "#ccc" : "#4ec9b8", color: "#0a0a0a", border: "none", padding: "12px 24px", borderRadius: 5, cursor: seleccionados.size === 0 ? "not-allowed" : "pointer", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>
+                      📥 Exportar {seleccionados.size} perfil{seleccionados.size !== 1 ? "es" : ""}
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// PANEL ADMIN: GESTIÓN DE PROYECTOS (v43)
+// ═══════════════════════════════════════════════════════════════════════
+
+function PanelProyectos({ usuarioActual, onCerrar }) {
+  const [proyectos, setProyectos] = useState([]);
+  const [usuarios, setUsuarios] = useState([]);
+  const [asignaciones, setAsignaciones] = useState([]); // [{usuario_id, proyecto_id}]
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState(null);
+  const [nuevoForm, setNuevoForm] = useState({ nombre: "", productora: "" });
+  const [mostrarNuevo, setMostrarNuevo] = useState(false);
+  const [editando, setEditando] = useState(null); // {id, nombre, productora, activo}
+  const [proyectoAsignar, setProyectoAsignar] = useState(null); // proyecto en edición de usuarios
+  const [proyectoConCalendario, setProyectoConCalendario] = useState(null); // v55: proyecto en edición de calendario
+
+  const recargar = async () => {
+    setCargando(true); setError(null);
+    try {
+      const [proys, usrs, asigs] = await Promise.all([
+        listarProyectos({ adminPin: usuarioActual.pin, esAdmin: true }),
+        listarUsuariosAdmin(usuarioActual.pin),
+        listarAsignaciones(usuarioActual.pin),
+      ]);
+      setProyectos(proys);
+      setUsuarios(usrs);
+      setAsignaciones(asigs);
+    } catch (err) { setError(err.message); }
+    setCargando(false);
+  };
+
+  useEffect(() => { recargar(); }, []);
+
+  const onAdd = async () => {
+    if (!nuevoForm.nombre.trim() || !nuevoForm.productora.trim()) {
+      alert("Nombre y Productora son obligatorios"); return;
+    }
+    try {
+      await crearProyecto(usuarioActual.pin, nuevoForm.nombre.trim(), nuevoForm.productora.trim());
+      setNuevoForm({ nombre: "", productora: "" });
+      setMostrarNuevo(false);
+      recargar();
+    } catch (err) { alert("Error al crear: " + err.message); }
+  };
+
+  const onGuardarEdit = async () => {
+    try {
+      await actualizarProyecto(usuarioActual.pin, editando.id, {
+        nombre: editando.nombre.trim(),
+        productora: editando.productora.trim(),
+        activo: editando.activo,
+      });
+      setEditando(null);
+      recargar();
+    } catch (err) { alert("Error al guardar: " + err.message); }
+  };
+
+  const onBorrar = async (p) => {
+    if (!confirm(`¿Borrar el proyecto "${p.nombre}"?\n\nSe perderán todas las asignaciones. Los perfiles asociados quedarán huérfanos.`)) return;
+    try {
+      await borrarProyecto(usuarioActual.pin, p.id);
+      recargar();
+    } catch (err) { alert("Error al borrar: " + err.message); }
+  };
+
+  // v84: duplicar proyecto (con calendario, SIN perfiles ni asignaciones)
+  const onDuplicar = async (p) => {
+    const sugerido = `${p.nombre} (copia)`;
+    const nuevoNombre = prompt(`Nombre del nuevo proyecto:\n\n(Se duplicará el proyecto y su calendario. Los perfiles y asignaciones NO se copian.)`, sugerido);
+    if (!nuevoNombre || !nuevoNombre.trim()) return;
+    const nombreLimpio = nuevoNombre.trim();
+    try {
+      setCargando(true);
+      // 1. Crear el nuevo proyecto
+      const nuevoRes = await crearProyecto(usuarioActual.pin, nombreLimpio, p.productora || "");
+      const nuevoProyecto = Array.isArray(nuevoRes) ? nuevoRes[0] : nuevoRes;
+      if (!nuevoProyecto?.id) throw new Error("No se pudo crear el proyecto duplicado");
+
+      // 2. Copiar el calendario si existe
+      const calendarioOriginal = await obtenerCalendarioProyecto(p.id);
+      if (calendarioOriginal) {
+        await crearCalendarioProyecto(usuarioActual.pin, {
+          proyectoId: nuevoProyecto.id,
+          fechaInicio: calendarioOriginal.fecha_inicio,
+          fechaFin: calendarioOriginal.fecha_fin,
+          comunidad: calendarioOriginal.comunidad,
+          dias: calendarioOriginal.dias || {},
+          notas: calendarioOriginal.notas || "",
+        });
+      }
+      recargar();
+      alert(`✓ Proyecto duplicado como "${nombreLimpio}"${calendarioOriginal ? " (con calendario)" : " (sin calendario)"}.\n\nRecuerda asignar los usuarios y perfiles al nuevo proyecto.`);
+    } catch (err) {
+      setCargando(false);
+      alert("Error al duplicar: " + err.message);
+    }
+  };
+
+  // Asignar/desasignar usuario a proyecto
+  const estaAsignado = (usuarioId, proyectoId) =>
+    asignaciones.some(a => a.usuario_id === usuarioId && a.proyecto_id === proyectoId);
+
+  const toggleAsignacion = async (usuarioId, proyectoId) => {
+    try {
+      if (estaAsignado(usuarioId, proyectoId)) {
+        await desasignarUsuarioProyecto(usuarioActual.pin, usuarioId, proyectoId);
+      } else {
+        await asignarUsuarioProyecto(usuarioActual.pin, usuarioId, proyectoId);
+      }
+      // Recargar solo asignaciones (más rápido)
+      const asigs = await listarAsignaciones(usuarioActual.pin);
+      setAsignaciones(asigs);
+    } catch (err) { alert("Error: " + err.message); }
+  };
+
+  // v106: cargar Inter
+  useEffect(() => {
+    const fontId = "inter-font-loader";
+    if (!document.getElementById(fontId)) {
+      const link = document.createElement("link");
+      link.id = fontId;
+      link.rel = "stylesheet";
+      link.href = "https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap";
+      document.head.appendChild(link);
+    }
+  }, []);
+
+  const overlay = {
+    position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)",
+    backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)",
+    display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000,
+    padding: 20,
+  };
+  const modal = {
+    background: "rgba(20,20,20,0.96)",
+    backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)",
+    border: "1px solid rgba(255,255,255,0.08)",
+    borderRadius: 16, padding: "32px 32px", maxWidth: 1400, width: "80%",
+    maxHeight: "90vh", overflowY: "auto", color: "#f0f0f0",
+    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+    boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
+  };
+  // Botón turquesa primario
+  const btnPrimary = {
+    background: "#4ec9b8", color: "#0a0a0a", border: "none",
+    padding: "10px 20px", borderRadius: 8, cursor: "pointer",
+    fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 600,
+    letterSpacing: "0.02em", display: "inline-flex", alignItems: "center", gap: 6,
+    transition: "background 0.15s",
+  };
+  // Botón outline
+  const btnGhost = {
+    background: "transparent", color: "#ddd",
+    border: "1px solid rgba(255,255,255,0.15)",
+    padding: "7px 12px", borderRadius: 6, cursor: "pointer",
+    fontFamily: "'Inter', sans-serif", fontSize: 11, fontWeight: 500,
+    display: "inline-flex", alignItems: "center", gap: 5,
+    transition: "all 0.15s",
+  };
+  // Botón borrar
+  const btnDelete = {
+    background: "transparent", color: "#e88",
+    border: "1px solid rgba(200,80,80,0.3)",
+    padding: "7px 10px", borderRadius: 6, cursor: "pointer",
+    display: "inline-flex", alignItems: "center", justifyContent: "center",
+    transition: "all 0.15s",
+  };
+  const inp = {
+    padding: "10px 12px", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8,
+    fontFamily: "'Inter', sans-serif", fontSize: 13,
+    background: "rgba(20,20,20,0.8)",
+    color: "#f0f0f0", outline: "none",
+    boxSizing: "border-box",
+  };
+
+  return (
+    <div style={overlay} onClick={onCerrar}>
+      <div style={modal} onClick={e => e.stopPropagation()}>
+        {/* Cabecera */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, paddingBottom: 20, borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <div style={{ width: 44, height: 44, background: "rgba(78,201,184,0.08)", border: "1px solid rgba(78,201,184,0.2)", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <svg width="26" height="20" viewBox="0 0 44 34">
+                <polygon points="0,0 18,17 0,34" fill="#3a4a52"/>
+                <polygon points="11,0 29,17 11,34" fill="#8dcfc4" opacity="0.85"/>
+                <polygon points="22,0 40,17 22,34" fill="#4ec9b8"/>
+              </svg>
+            </div>
+            <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 20, fontWeight: 500, color: "#f0f0f0", letterSpacing: "-0.01em" }}>
+              Gestión de proyectos
+            </div>
+          </div>
+          <button onClick={onCerrar} style={btnGhost}>Cerrar</button>
+        </div>
+
+        {error && (
+          <div style={{ padding: 12, background: "rgba(200,80,80,0.15)", border: "1px solid rgba(200,80,80,0.4)", borderRadius: 8, color: "#e88", fontSize: 12, marginBottom: 14 }}>
+            Error: {error}
+          </div>
+        )}
+
+        {/* Botón nuevo */}
+        {!mostrarNuevo && (
+          <div style={{ textAlign: "center", marginBottom: 20 }}>
+            <button
+              onClick={() => setMostrarNuevo(true)}
+              style={{ ...btnPrimary, padding: "12px 28px", fontSize: 13, boxShadow: "0 4px 16px rgba(78,201,184,0.2)" }}
+              onMouseEnter={e => e.currentTarget.style.background = "#5ed9c8"}
+              onMouseLeave={e => e.currentTarget.style.background = "#4ec9b8"}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Nuevo proyecto
+            </button>
+          </div>
+        )}
+
+        {/* Formulario nuevo */}
+        {mostrarNuevo && (
+          <div style={{ background: "rgba(30,30,30,0.6)", padding: 16, borderRadius: 10, marginBottom: 20, border: "1px solid rgba(78,201,184,0.2)" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto auto", gap: 8, alignItems: "center" }}>
+              <input placeholder="Nombre del proyecto" value={nuevoForm.nombre} onChange={e => setNuevoForm({...nuevoForm, nombre: e.target.value})} style={inp} />
+              <input placeholder="Productora" value={nuevoForm.productora} onChange={e => setNuevoForm({...nuevoForm, productora: e.target.value})} style={inp} />
+              <button onClick={onAdd} style={btnPrimary}>Crear</button>
+              <button onClick={() => { setMostrarNuevo(false); setNuevoForm({ nombre: "", productora: "" }); }} style={btnGhost}>Cancelar</button>
+            </div>
+          </div>
+        )}
+
+        {cargando && <div style={{ padding: 20, textAlign: "center", color: "#888", fontSize: 13 }}>Cargando...</div>}
+
+        {/* Lista de proyectos */}
+        {!cargando && proyectos.length === 0 && (
+          <div style={{ padding: 24, textAlign: "center", color: "#888", fontSize: 13, background: "rgba(30,30,30,0.4)", borderRadius: 10, border: "1px solid rgba(255,255,255,0.06)" }}>
+            No hay proyectos. Crea el primero.
+          </div>
+        )}
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {!cargando && proyectos.map(p => {
+            const numUsers = asignaciones.filter(a => a.proyecto_id === p.id).length;
+            return (
+              <div key={p.id} style={{
+                background: "rgba(30,30,30,0.6)",
+                padding: "14px 18px", borderRadius: 10,
+                border: "1px solid rgba(255,255,255,0.08)",
+                transition: "all 0.15s",
+              }}
+                onMouseEnter={e => { if (editando?.id !== p.id) { e.currentTarget.style.background = "rgba(78,201,184,0.06)"; e.currentTarget.style.borderColor = "rgba(78,201,184,0.2)"; } }}
+                onMouseLeave={e => { if (editando?.id !== p.id) { e.currentTarget.style.background = "rgba(30,30,30,0.6)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)"; } }}
+              >
+                {editando?.id === p.id ? (
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto auto auto", gap: 8, alignItems: "center" }}>
+                    <input value={editando.nombre} onChange={e => setEditando({...editando, nombre: e.target.value})} style={inp} />
+                    <input value={editando.productora} onChange={e => setEditando({...editando, productora: e.target.value})} style={inp} />
+                    <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#ddd" }}>
+                      <input type="checkbox" checked={editando.activo} onChange={e => setEditando({...editando, activo: e.target.checked})} /> Activo
+                    </label>
+                    <button onClick={onGuardarEdit} style={btnPrimary}>Guardar</button>
+                    <button onClick={() => setEditando(null)} style={btnGhost}>Cancelar</button>
+                  </div>
+                ) : (
+                  <div style={{ display: "grid", gridTemplateColumns: "100px 90px 90px 1fr auto", gap: 14, alignItems: "center" }}>
+                    <div style={{ fontSize: 15, fontWeight: 600, color: p.activo ? "#f0f0f0" : "#666", letterSpacing: "-0.01em" }}>
+                      {p.nombre}
+                      {!p.activo && <span style={{ fontSize: 9, color: "#e88", marginLeft: 6, fontWeight: 500 }}>(inactivo)</span>}
+                    </div>
+                    <div style={{ fontSize: 12, color: "#888", letterSpacing: "0.05em" }}>{p.productora}</div>
+                    <div style={{ fontSize: 11, color: numUsers > 0 ? "#4ec9b8" : "#666", fontWeight: numUsers > 0 ? 600 : 400 }}>
+                      {numUsers} usuario{numUsers === 1 ? "" : "s"}
+                    </div>
+                    <div></div>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <button onClick={() => setProyectoAsignar(proyectoAsignar?.id === p.id ? null : p)} style={btnGhost} title="Usuarios">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                        Usuarios
+                      </button>
+                      <button onClick={() => setProyectoConCalendario(p)} style={btnGhost} title="Calendario">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                        Calendario
+                      </button>
+                      <button onClick={() => setEditando({ id: p.id, nombre: p.nombre, productora: p.productora, activo: p.activo })} style={btnGhost} title="Editar">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                        Editar
+                      </button>
+                      <button onClick={() => onDuplicar(p)} style={btnGhost} title="Duplicar proyecto y calendario (sin perfiles)">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                        Duplicar
+                      </button>
+                      <button onClick={() => onBorrar(p)} style={btnDelete} title="Borrar">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Sub-panel asignación usuarios */}
+                {proyectoAsignar?.id === p.id && (
+                  <div style={{ marginTop: 14, padding: 14, background: "rgba(20,20,20,0.6)", borderRadius: 8, border: "1px solid rgba(78,201,184,0.2)" }}>
+                    <div style={{ fontSize: 11, color: "#4ec9b8", marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 600 }}>
+                      Marca los usuarios que pueden acceder a este proyecto:
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 6 }}>
+                      {usuarios.filter(u => !u.es_admin && u.activo).map(u => (
+                        <label key={u.id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, padding: "6px 10px", background: "rgba(30,30,30,0.6)", borderRadius: 6, cursor: "pointer", color: "#ddd", border: "1px solid rgba(255,255,255,0.06)" }}>
+                          <input
+                            type="checkbox"
+                            checked={estaAsignado(u.id, p.id)}
+                            onChange={() => toggleAsignacion(u.id, p.id)}
+                            style={{ accentColor: "#4ec9b8" }}
+                          />
+                          {u.nombre}
+                        </label>
+                      ))}
+                      {usuarios.filter(u => !u.es_admin && u.activo).length === 0 && (
+                        <div style={{ fontSize: 12, color: "#888", fontStyle: "italic" }}>
+                          No hay usuarios normales activos. Los admins ven todos los proyectos automáticamente.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      {/* v55: modal calendario del proyecto */}
+      {proyectoConCalendario && (
+        <PanelCalendarioProyecto
+          proyecto={proyectoConCalendario}
+          usuarioActual={usuarioActual}
+          onCerrar={() => setProyectoConCalendario(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════
+// PANEL: CALENDARIO DE PROYECTO (v55 · fase 1)
+// ═══════════════════════════════════════════════════════════════════════
+
+function PanelCalendarioProyecto({ proyecto, usuarioActual, onCerrar }) {
+  // v88: rol del usuario para decidir cabeceras y ocultar acciones
+  const esAdmin = !!usuarioActual?.es_admin;
+  const esCoordinador = usuarioActual?.rol === "coordinador";
+  const auth = esAdmin ? { adminPin: usuarioActual.pin } : (esCoordinador ? { userPin: usuarioActual.pin } : {});
+  const [calendario, setCalendario] = useState(null); // null=cargando, false=no existe, obj=datos
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState(null);
+  const [form, setForm] = useState({ fechaInicio: "", fechaFin: "", comunidad: "", modoVacaciones: "mes_a_mes", modoIndemnizacion: "mes_a_mes" }); // v86
+  const [festivosComunidad, setFestivosComunidad] = useState([]);
+  const [guardando, setGuardando] = useState(false);
+  const [mensaje, setMensaje] = useState(null);
+  const [dias, setDias] = useState({}); // v57: { "2026-09-15": { laboral, rodaje, vacaciones, festivo_trabajado } }
+  const [mesActual, setMesActual] = useState(null); // "2026-09" formato YYYY-MM
+  const [popup, setPopup] = useState(null); // { fecha, x, y }
+  const [tramoForm, setTramoForm] = useState({ desde: "", hasta: "", tipo: "rodaje" });
+  const [tocado, setTocado] = useState(false); // marca si hay cambios sin guardar
+
+  const COMUNIDADES = [
+    { key: "madrid", label: "Madrid" },
+    { key: "gran_canaria", label: "Gran Canaria" },
+    { key: "tenerife", label: "Tenerife" },
+    { key: "bilbao", label: "Bilbao" },
+  ];
+
+  // ── Colores por estado (v106: fosforitos alto contraste sobre fondo oscuro)
+  const COLORES = {
+    laboral:    { bg: "#00e676", border: "#00e676", txt: "#00280d", label: "" },              // verde neón
+    festivo:    { bg: "#ff1744", border: "#ff1744", txt: "#ffffff", label: "" },              // rojo neón (usa nombre real)
+    festivoTrab:{ bg: "#ff9100", border: "#ff9100", txt: "#2a1500", label: "TRAB" },          // naranja neón
+    rodaje:     { bg: "#ffea00", border: "#ffea00", txt: "#2a2400", label: "ROD" },           // amarillo neón
+    vacaciones: { bg: "#00e5ff", border: "#00e5ff", txt: "#002d33", label: "VAC" },           // cyan neón
+    descanso:   { bg: "#c0c0c0", border: "#d0d0d0", txt: "#1a1a1a", label: "DESC" },          // gris claro
+    especial:   { bg: "#ff4081", border: "#ff4081", txt: "#ffffff", label: "ESP" },           // rosa/magenta
+    finde:      { bg: "#2a2a2a", border: "#444", txt: "#888", label: "" },                     // gris oscuro
+    fuera:      { bg: "rgba(20,20,20,0.4)", border: "rgba(255,255,255,0.05)", txt: "#444", label: "" },
+  };
+
+  // ── Cargar calendario desde Supabase
+  const recargar = async () => {
+    setCargando(true); setError(null);
+    try {
+      const cal = await obtenerCalendarioProyecto(proyecto.id);
+      if (cal) {
+        setCalendario(cal);
+        setForm({
+          fechaInicio: cal.fecha_inicio || "",
+          fechaFin: cal.fecha_fin || "",
+          comunidad: cal.comunidad || "",
+          modoVacaciones: cal.modo_vacaciones || "mes_a_mes",
+          modoIndemnizacion: cal.modo_indemnizacion || "mes_a_mes",
+        });
+        setDias(cal.dias || {});
+        // Situar el mes actual en el primer mes del rango
+        if (cal.fecha_inicio) setMesActual(cal.fecha_inicio.slice(0, 7));
+      } else {
+        setCalendario(false);
+        setForm({ fechaInicio: "", fechaFin: "", comunidad: "", modoVacaciones: "mes_a_mes", modoIndemnizacion: "mes_a_mes" });
+        setDias({});
+      }
+      setTocado(false);
+    } catch (err) { setError(err.message); }
+    setCargando(false);
+  };
+
+  useEffect(() => { recargar(); }, [proyecto.id]);
+
+  // ── Cargar festivos de la comunidad
+  useEffect(() => {
+    (async () => {
+      if (!form.comunidad) { setFestivosComunidad([]); return; }
+      const lista = await listarFestivosSupabase(form.comunidad);
+      let filtrados = lista || [];
+      if (form.fechaInicio && form.fechaFin) {
+        filtrados = filtrados.filter(f => f.fecha >= form.fechaInicio && f.fecha <= form.fechaFin);
+      }
+      setFestivosComunidad(filtrados);
+    })();
+  }, [form.comunidad, form.fechaInicio, form.fechaFin]);
+
+  // ── Auto-rellenar laborables L-V al crear/expandir rango
+  useEffect(() => {
+    if (!form.fechaInicio || !form.fechaFin) return;
+    // Solo rellena días que no existan aún (no sobrescribe)
+    const nuevos = { ...dias };
+    let cambios = false;
+    const start = new Date(form.fechaInicio + "T12:00:00");
+    const end = new Date(form.fechaFin + "T12:00:00");
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      const iso = d.toISOString().slice(0, 10);
+      if (!nuevos[iso]) {
+        const dow = d.getDay(); // 0=Do, 6=Sa
+        if (dow >= 1 && dow <= 5) {
+          nuevos[iso] = { laboral: true };
+          cambios = true;
+        }
+      }
+    }
+    if (cambios) { setDias(nuevos); setTocado(true); }
+  }, [form.fechaInicio, form.fechaFin]);
+
+  // ── Set festivos de la comunidad
+  const setFestivos = new Set(festivosComunidad.map(f => f.fecha));
+
+  // ── Guardar
+  const guardar = async () => {
+    if (!form.fechaInicio || !form.fechaFin) { alert("Fechas obligatorias"); return; }
+    if (form.fechaInicio > form.fechaFin) { alert("La fecha de inicio no puede ser posterior a la fecha fin"); return; }
+    if (!form.comunidad) { alert("Selecciona comunidad"); return; }
+
+    // v59: si estamos actualizando (no creando), avisar de perfiles afectados
+    if (calendario && calendario.id) {
+      try {
+        const perfilesDelProyecto = await listarPerfilesSupabase({
+          tabId: null, // ambos 45H y 40H
+          proyectoId: proyecto.id,
+          verTodos: false,
+          adminPin: usuarioActual.pin,
+        });
+        if (Array.isArray(perfilesDelProyecto) && perfilesDelProyecto.length > 0) {
+          const nombres = perfilesDelProyecto.map(p => {
+            const tipo = p.tab_id === "40h" ? "40H" : (p.tab_id === "45h" ? "45H" : "");
+            return `• ${p.nombre}${tipo ? " (" + tipo + ")" : ""}`;
+          }).join("\n");
+          const ok = confirm(
+            `Este calendario tiene ${perfilesDelProyecto.length} perfil(es) guardado(s) que pueden verse afectados:\n\n${nombres}\n\nLos perfiles ya guardados NO se recalculan automáticamente. Al abrirlos de nuevo, tomarán los nuevos valores del calendario.\n\n¿Guardar los cambios?`
+          );
+          if (!ok) return;
+        }
+      } catch (err) {
+        console.warn("No se pudo verificar perfiles afectados:", err.message);
+      }
+    }
+
+    setGuardando(true); setError(null);
+    try {
+      if (calendario && calendario.id) {
+        await actualizarCalendarioProyecto(auth, calendario.id, {
+          fechaInicio: form.fechaInicio, fechaFin: form.fechaFin,
+          comunidad: form.comunidad, dias,
+          modo_vacaciones: form.modoVacaciones,      // v86
+          modo_indemnizacion: form.modoIndemnizacion, // v86
+        });
+        setMensaje({ tipo: "ok", texto: "✓ Calendario actualizado" });
+      } else {
+        await crearCalendarioProyecto(auth, {
+          proyectoId: proyecto.id, fechaInicio: form.fechaInicio, fechaFin: form.fechaFin,
+          comunidad: form.comunidad, dias,
+          modoVacaciones: form.modoVacaciones,        // v86
+          modoIndemnizacion: form.modoIndemnizacion,  // v86
+        });
+        setMensaje({ tipo: "ok", texto: "✓ Calendario creado" });
+      }
+      setTocado(false);
+      recargar();
+      setTimeout(() => setMensaje(null), 3000);
+    } catch (err) {
+      setError(err.message);
+      setMensaje({ tipo: "error", texto: "Error: " + err.message });
+    }
+    setGuardando(false);
+  };
+
+  const eliminar = async () => {
+    if (!calendario || !calendario.id) return;
+    if (!confirm(`¿Borrar el calendario del proyecto "${proyecto.nombre}"?\nSe perderán las fechas, festivos y días marcados.`)) return;
+    try {
+      await borrarCalendarioProyecto(usuarioActual.pin, calendario.id);
+      setMensaje({ tipo: "ok", texto: "✓ Calendario borrado" });
+      recargar();
+    } catch (err) { setError(err.message); }
+  };
+
+  // ── Añadir tramo (rodaje o vacaciones) — excluye sáb/dom
+  const addTramo = () => {
+    if (!tramoForm.desde || !tramoForm.hasta) { alert("Rellena las dos fechas"); return; }
+    if (tramoForm.desde > tramoForm.hasta) { alert("Desde no puede ser posterior a Hasta"); return; }
+    const nuevos = { ...dias };
+    const start = new Date(tramoForm.desde + "T12:00:00");
+    const end = new Date(tramoForm.hasta + "T12:00:00");
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      const dow = d.getDay(); // 0=Do, 6=Sa
+      if (dow === 0 || dow === 6) continue; // v58: no marcar fines de semana
+      const iso = d.toISOString().slice(0, 10);
+      const info = nuevos[iso] || {};
+      if (tramoForm.tipo === "rodaje") info.rodaje = true;
+      if (tramoForm.tipo === "vacaciones") info.vacaciones = true;
+      nuevos[iso] = info;
+    }
+    setDias(nuevos);
+    setTocado(true);
+    setTramoForm({ desde: "", hasta: "", tipo: tramoForm.tipo });
+  };
+
+  // ── Toggle una propiedad de un día concreto (rodaje/vacaciones/festivo_trabajado)
+  const toggleProp = (fecha, prop) => {
+    const nuevos = { ...dias };
+    const info = { ...(nuevos[fecha] || {}) };
+    if (info[prop]) delete info[prop];
+    else info[prop] = true;
+    if (Object.keys(info).length === 0) delete nuevos[fecha];
+    else nuevos[fecha] = info;
+    setDias(nuevos);
+    setTocado(true);
+    setPopup(null);
+  };
+
+  // ── Toggle laboral (para lun-vie desactivar; sab-dom activar como especial)
+  const toggleLaboral = (fecha) => {
+    const nuevos = { ...dias };
+    const info = { ...(nuevos[fecha] || {}) };
+    info.laboral = !info.laboral;
+    if (!info.laboral) delete info.laboral;
+    if (Object.keys(info).length === 0) delete nuevos[fecha];
+    else nuevos[fecha] = info;
+    setDias(nuevos);
+    setTocado(true);
+    setPopup(null);
+  };
+
+  // ── Construir la vista del mes actual
+  const construirMes = () => {
+    if (!mesActual) return null;
+    const [y, m] = mesActual.split("-").map(Number);
+    const primer = new Date(y, m - 1, 1);
+    const ultimo = new Date(y, m, 0);
+    // Empezar la semana en lunes
+    const primerDow = (primer.getDay() + 6) % 7; // 0=Lun ... 6=Do
+    const celdas = [];
+    // Días del mes anterior (huecos)
+    for (let i = 0; i < primerDow; i++) celdas.push(null);
+    for (let d = 1; d <= ultimo.getDate(); d++) celdas.push(new Date(y, m - 1, d));
+    // Rellenar hasta múltiplo de 7
+    while (celdas.length % 7 !== 0) celdas.push(null);
+    return celdas;
+  };
+
+  const mesesDisponibles = () => {
+    if (!form.fechaInicio || !form.fechaFin) return [];
+    const start = new Date(form.fechaInicio + "T12:00:00");
+    const end = new Date(form.fechaFin + "T12:00:00");
+    const meses = [];
+    const cur = new Date(start.getFullYear(), start.getMonth(), 1);
+    while (cur <= end) {
+      meses.push(`${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, "0")}`);
+      cur.setMonth(cur.getMonth() + 1);
+    }
+    return meses;
+  };
+
+  const mesesDisp = mesesDisponibles();
+  const idxMes = mesesDisp.indexOf(mesActual);
+  const nombreMes = (ym) => {
+    if (!ym) return "";
+    const [y, m] = ym.split("-").map(Number);
+    const nombres = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+    return `${nombres[m - 1]} ${y}`;
+  };
+
+  const getEstadoDia = (fecha) => {
+    // Devuelve el estado principal para colorear + secundarios (badges)
+    const info = dias[fecha] || {};
+    const esFestivo = setFestivos.has(fecha);
+    const dow = new Date(fecha + "T12:00:00").getDay();
+    const esFinde = dow === 0 || dow === 6;
+
+    // v58/v70: los festivos SIEMPRE priorizan sobre el resto (rojo o naranja según trabajado)
+    // Prioridad: festivo trabajado > festivo > vacaciones > descanso > jornada especial > rodaje > laboral > finde
+    let color = COLORES.fuera;
+    if (esFestivo && info.festivo_trabajado) color = COLORES.festivoTrab;
+    else if (esFestivo) color = COLORES.festivo;
+    else if (info.vacaciones) color = COLORES.vacaciones;
+    else if (info.descanso) color = COLORES.descanso;
+    else if (info.especial) color = COLORES.especial;
+    else if (info.rodaje) color = COLORES.rodaje;
+    else if (info.laboral) color = COLORES.laboral;
+    else if (esFinde) color = COLORES.finde;
+
+    return { color, info, esFestivo, esFinde };
+  };
+
+  // ── Estilos comunes v106 (paleta oscura)
+  const overlay = {
+    position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)",
+    backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)",
+    display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100,
+    padding: 12,
+  };
+  const modal = {
+    background: "rgba(20,20,20,0.96)",
+    backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)",
+    border: "1px solid rgba(255,255,255,0.08)",
+    borderRadius: 16, padding: "24px 28px",
+    maxWidth: 1600, width: "80%",
+    maxHeight: "96vh", overflowY: "auto",
+    color: "#f0f0f0",
+    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+    boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
+  };
+  const btnPrimary = {
+    background: "#4ec9b8", color: "#0a0a0a", border: "none",
+    padding: "10px 20px", borderRadius: 8, cursor: "pointer",
+    fontFamily: "'Inter', sans-serif", fontSize: 13, fontWeight: 600,
+    letterSpacing: "0.02em", display: "inline-flex", alignItems: "center", gap: 6,
+    transition: "background 0.15s",
+  };
+  const btnGhost = {
+    background: "transparent", color: "#ddd",
+    border: "1px solid rgba(255,255,255,0.15)",
+    padding: "8px 16px", borderRadius: 8, cursor: "pointer",
+    fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 500,
+    display: "inline-flex", alignItems: "center", gap: 6,
+    transition: "all 0.15s",
+  };
+  const btnDelete = {
+    background: "transparent", color: "#e88",
+    border: "1px solid rgba(200,80,80,0.3)",
+    padding: "10px 18px", borderRadius: 8, cursor: "pointer",
+    fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 500,
+    display: "inline-flex", alignItems: "center", gap: 6,
+    transition: "all 0.15s",
+  };
+  const inp = {
+    padding: "12px 14px", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8,
+    fontFamily: "'Inter', sans-serif", fontSize: 14, fontWeight: 500,
+    background: "rgba(20,20,20,0.8)",
+    color: "#f0f0f0", outline: "none",
+    boxSizing: "border-box", width: "100%",
+  };
+  // Select con chevron custom (fix cortes tipo "Madrid" y "Rodaje")
+  const sel = {
+    ...inp,
+    padding: "12px 40px 12px 14px",
+    WebkitAppearance: "none",
+    MozAppearance: "none",
+    appearance: "none",
+    backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>")`,
+    backgroundRepeat: "no-repeat",
+    backgroundPosition: "right 14px center",
+    cursor: "pointer",
+  };
+  const labelStyle = {
+    display: "block", fontSize: 11, color: "#888",
+    textTransform: "uppercase", letterSpacing: "0.05em",
+    marginBottom: 6, fontWeight: 500, fontFamily: "'Inter', sans-serif",
+  };
+
+  return (
+    <div style={overlay} onClick={() => { if (popup) setPopup(null); else onCerrar(); }}>
+      <div style={modal} onClick={e => e.stopPropagation()}>
+        {/* Cabecera */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, paddingBottom: 18, borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <div style={{ width: 44, height: 44, background: "rgba(78,201,184,0.08)", border: "1px solid rgba(78,201,184,0.2)", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4ec9b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+              </svg>
+            </div>
+            <div>
+              <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 20, fontWeight: 500, color: "#f0f0f0", letterSpacing: "-0.01em" }}>
+                Calendario del proyecto
+              </div>
+              <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, color: "#888", marginTop: 2 }}>
+                {proyecto.nombre} · {proyecto.productora}
+              </div>
+            </div>
+          </div>
+          <button onClick={onCerrar} style={btnGhost}>Cerrar</button>
+        </div>
+
+        {cargando && <div style={{ padding: 20, textAlign: "center", color: "#888", fontFamily: "'Inter', sans-serif" }}>Cargando...</div>}
+        {error && <div style={{ background: "rgba(200,80,80,0.15)", border: "1px solid rgba(200,80,80,0.4)", color: "#e88", padding: 12, borderRadius: 8, marginBottom: 12, fontSize: 12 }}>Error: {error}</div>}
+        {mensaje && (
+          <div style={{
+            padding: 12, borderRadius: 8, marginBottom: 12, fontSize: 12,
+            background: mensaje.tipo === "ok" ? "rgba(78,201,184,0.12)" : "rgba(200,80,80,0.15)",
+            border: `1px solid ${mensaje.tipo === "ok" ? "rgba(78,201,184,0.35)" : "rgba(200,80,80,0.4)"}`,
+            color: mensaje.tipo === "ok" ? "#4ec9b8" : "#e88",
+            fontFamily: "'Inter', sans-serif",
+          }}>{mensaje.texto}</div>
+        )}
+
+        {!cargando && (
+          <>
+            {calendario === false && (
+              <div style={{ padding: 14, background: "rgba(78,201,184,0.06)", border: "1px solid rgba(78,201,184,0.2)", borderRadius: 10, marginBottom: 14, fontSize: 12, color: "#4ec9b8", fontFamily: "'Inter', sans-serif" }}>
+                Este proyecto todavía no tiene calendario. Rellena las fechas y calendario laboral y guarda para empezar.
+              </div>
+            )}
+
+            {/* Formulario básico: fechas + calendario laboral */}
+            <div style={{ background: "rgba(30,30,30,0.5)", border: "1px solid rgba(255,255,255,0.06)", padding: 20, borderRadius: 12, marginBottom: 14 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14 }}>
+                <div>
+                  <label style={labelStyle}>Fecha inicio</label>
+                  <input type="date" value={form.fechaInicio} onChange={e => { setForm({...form, fechaInicio: e.target.value}); setTocado(true); }} style={inp} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Fecha fin</label>
+                  <input type="date" value={form.fechaFin} onChange={e => { setForm({...form, fechaFin: e.target.value}); setTocado(true); }} style={inp} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Calendario laboral</label>
+                  <select value={form.comunidad} onChange={e => { setForm({...form, comunidad: e.target.value}); setTocado(true); }} style={sel}>
+                    <option value="" style={{ background: "#141414" }}>— Elegir —</option>
+                    {COMUNIDADES.map(c => <option key={c.key} value={c.key} style={{ background: "#141414" }}>{c.label}</option>)}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Modo por defecto */}
+            <div style={{ background: "rgba(30,30,30,0.5)", border: "1px solid rgba(255,255,255,0.06)", padding: 20, borderRadius: 12, marginBottom: 14 }}>
+              <div style={{ fontSize: 11, color: "#888", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 500, marginBottom: 14, textAlign: "center", fontFamily: "'Inter', sans-serif" }}>
+                Modo por defecto para perfiles de este proyecto
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+
+                <div style={{ background: "rgba(20,20,20,0.6)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: 14 }}>
+                  <div style={{ fontSize: 11, color: "#4ec9b8", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 600, marginBottom: 10, textAlign: "center", fontFamily: "'Inter', sans-serif" }}>Vacaciones</div>
+                  <label style={{ display: "flex", alignItems: "center", gap: 10, padding: 8, borderRadius: 6, background: form.modoVacaciones === "mes_a_mes" ? "rgba(78,201,184,0.08)" : "transparent", marginBottom: 4, cursor: "pointer", fontFamily: "'Inter', sans-serif" }}>
+                    <input type="radio" name="modo-vac" checked={form.modoVacaciones === "mes_a_mes"} onChange={() => { setForm({...form, modoVacaciones: "mes_a_mes"}); setTocado(true); }} style={{ accentColor: "#4ec9b8" }} />
+                    <span style={{ fontSize: 13, color: "#f0f0f0" }}>Prorrateadas (mes a mes)</span>
+                  </label>
+                  <label style={{ display: "flex", alignItems: "center", gap: 10, padding: 8, borderRadius: 6, background: form.modoVacaciones === "al_final" ? "rgba(78,201,184,0.08)" : "transparent", cursor: "pointer", fontFamily: "'Inter', sans-serif" }}>
+                    <input type="radio" name="modo-vac" checked={form.modoVacaciones === "al_final"} onChange={() => { setForm({...form, modoVacaciones: "al_final"}); setTocado(true); }} style={{ accentColor: "#4ec9b8" }} />
+                    <span style={{ fontSize: 13, color: "#f0f0f0" }}>Al final del contrato</span>
+                  </label>
+                </div>
+
+                <div style={{ background: "rgba(20,20,20,0.6)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: 14 }}>
+                  <div style={{ fontSize: 11, color: "#4ec9b8", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 600, marginBottom: 10, textAlign: "center", fontFamily: "'Inter', sans-serif" }}>Indemnización</div>
+                  <label style={{ display: "flex", alignItems: "center", gap: 10, padding: 8, borderRadius: 6, background: form.modoIndemnizacion === "mes_a_mes" ? "rgba(78,201,184,0.08)" : "transparent", marginBottom: 4, cursor: "pointer", fontFamily: "'Inter', sans-serif" }}>
+                    <input type="radio" name="modo-ind" checked={form.modoIndemnizacion === "mes_a_mes"} onChange={() => { setForm({...form, modoIndemnizacion: "mes_a_mes"}); setTocado(true); }} style={{ accentColor: "#4ec9b8" }} />
+                    <span style={{ fontSize: 13, color: "#f0f0f0" }}>Prorrateada (mes a mes)</span>
+                  </label>
+                  <label style={{ display: "flex", alignItems: "center", gap: 10, padding: 8, borderRadius: 6, background: form.modoIndemnizacion === "al_final" ? "rgba(78,201,184,0.08)" : "transparent", cursor: "pointer", fontFamily: "'Inter', sans-serif" }}>
+                    <input type="radio" name="modo-ind" checked={form.modoIndemnizacion === "al_final"} onChange={() => { setForm({...form, modoIndemnizacion: "al_final"}); setTocado(true); }} style={{ accentColor: "#4ec9b8" }} />
+                    <span style={{ fontSize: 13, color: "#f0f0f0" }}>Al final del contrato</span>
+                  </label>
+                </div>
+
+              </div>
+              <div style={{ marginTop: 12, fontSize: 11, color: "#666", fontStyle: "italic", textAlign: "center", fontFamily: "'Inter', sans-serif" }}>
+                Al crear un nuevo perfil se aplicará esta configuración. Los perfiles existentes te preguntará si quieres actualizarlos al cargarlos.
+              </div>
+            </div>
+
+            {/* Añadir tramo — botón centrado abajo, campos ocupan todo el ancho */}
+            {form.fechaInicio && form.fechaFin && (
+              <div style={{ background: "rgba(30,30,30,0.5)", border: "1px solid rgba(255,255,255,0.06)", padding: 20, borderRadius: 12, marginBottom: 18 }}>
+                <div style={{ fontSize: 11, color: "#888", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 14, fontWeight: 500, textAlign: "center", fontFamily: "'Inter', sans-serif" }}>
+                  Añadir tramo (rodaje / vacaciones)
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 14 }}>
+                  <div>
+                    <label style={labelStyle}>Desde</label>
+                    <input type="date" min={form.fechaInicio} max={form.fechaFin} value={tramoForm.desde} onChange={e => setTramoForm({...tramoForm, desde: e.target.value})} style={inp} />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Hasta</label>
+                    <input type="date" min={form.fechaInicio} max={form.fechaFin} value={tramoForm.hasta} onChange={e => setTramoForm({...tramoForm, hasta: e.target.value})} style={inp} />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Tipo</label>
+                    <select value={tramoForm.tipo} onChange={e => setTramoForm({...tramoForm, tipo: e.target.value})} style={sel}>
+                      <option value="rodaje" style={{ background: "#141414" }}>Rodaje</option>
+                      <option value="vacaciones" style={{ background: "#141414" }}>Vacaciones</option>
+                    </select>
+                  </div>
+                </div>
+                <div style={{ textAlign: "center" }}>
+                  <button onClick={addTramo} style={{ ...btnPrimary, padding: "12px 32px", boxShadow: "0 4px 16px rgba(78,201,184,0.2)" }}
+                    onMouseEnter={e => e.currentTarget.style.background = "#5ed9c8"}
+                    onMouseLeave={e => e.currentTarget.style.background = "#4ec9b8"}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    Añadir tramo
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Mini-calendario mensual (v106: 2 meses en paralelo) */}
+            {mesesDisp.length > 0 && (
+              <div style={{ background: "rgba(30,30,30,0.4)", padding: 20, borderRadius: 12, marginBottom: 18, border: "1px solid rgba(255,255,255,0.06)" }}>
+                {/* Navegación */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+                  <button
+                    onClick={() => setMesActual(mesesDisp[Math.max(0, idxMes - 2)])}
+                    disabled={idxMes <= 0}
+                    style={{ ...btnGhost, opacity: idxMes <= 0 ? 0.3 : 1, cursor: idxMes <= 0 ? "not-allowed" : "pointer" }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                    Anteriores
+                  </button>
+                  <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 13, color: "#4ec9b8", letterSpacing: "0.1em", fontWeight: 600 }}>
+                    {(() => {
+                      const idxNext = Math.min(mesesDisp.length - 1, idxMes + 1);
+                      const isNextDifferent = idxNext > idxMes;
+                      return isNextDifferent ? `${idxMes + 1}-${idxNext + 1} / ${mesesDisp.length}` : `${idxMes + 1} / ${mesesDisp.length}`;
+                    })()}
+                  </div>
+                  <button
+                    onClick={() => setMesActual(mesesDisp[Math.min(mesesDisp.length - 1, idxMes + 2)])}
+                    disabled={idxMes >= mesesDisp.length - 1}
+                    style={{ ...btnGhost, opacity: idxMes >= mesesDisp.length - 1 ? 0.3 : 1, cursor: idxMes >= mesesDisp.length - 1 ? "not-allowed" : "pointer" }}
+                  >
+                    Siguientes
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+                  </button>
+                </div>
+
+                {/* Leyenda */}
+                <div style={{ display: "flex", gap: 14, flexWrap: "wrap", padding: "12px 16px", background: "rgba(20,20,20,0.5)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 8, marginBottom: 14, justifyContent: "center", fontFamily: "'Inter', sans-serif" }}>
+                  {[
+                    { l: "Laboral", c: COLORES.laboral },
+                    { l: "Fin de semana", c: COLORES.finde },
+                    { l: "Festivo", c: COLORES.festivo },
+                    { l: "Festivo trabajado", c: COLORES.festivoTrab },
+                    { l: "Rodaje", c: COLORES.rodaje },
+                    { l: "Vacaciones", c: COLORES.vacaciones },
+                    { l: "Descanso", c: COLORES.descanso },
+                    { l: "Jornada especial", c: COLORES.especial },
+                  ].map(item => (
+                    <div key={item.l} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#ddd" }}>
+                      <span style={{ width: 14, height: 14, borderRadius: 3, background: item.c.bg, border: `1px solid ${item.c.border}` }} />
+                      <span>{item.l}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* 2 MESES EN PARALELO */}
+                <div style={{ display: "grid", gridTemplateColumns: idxMes + 1 < mesesDisp.length ? "1fr 1fr" : "1fr", gap: 20 }}>
+                  {[mesActual, mesesDisp[idxMes + 1]].filter(Boolean).map((mes, mesIdx) => {
+                    const construirMesAux = (ymStr) => {
+                      if (!ymStr) return null;
+                      const [y, m] = ymStr.split("-").map(Number);
+                      const primer = new Date(y, m - 1, 1);
+                      const ultimo = new Date(y, m, 0);
+                      const primerDow = (primer.getDay() + 6) % 7;
+                      const celdas = [];
+                      for (let i = 0; i < primerDow; i++) celdas.push(null);
+                      for (let d = 1; d <= ultimo.getDate(); d++) celdas.push(new Date(y, m - 1, d));
+                      while (celdas.length % 7 !== 0) celdas.push(null);
+                      return celdas;
+                    };
+                    return (
+                      <div key={mes}>
+                        <div style={{ textAlign: "center", fontFamily: "'Inter', sans-serif", fontSize: 16, fontWeight: 500, color: "#f0f0f0", letterSpacing: "-0.01em", marginBottom: 10, textTransform: "uppercase" }}>
+                          {nombreMes(mes)}
+                        </div>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 5, marginBottom: 4 }}>
+                          {["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"].map(d => (
+                            <div key={d} style={{ fontFamily: "'Inter', sans-serif", fontSize: 11, color: "#888", textAlign: "center", padding: "6px 0", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 600 }}>{d}</div>
+                          ))}
+                        </div>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 5 }}>
+                          {construirMesAux(mes)?.map((fecha, i) => {
+                            if (!fecha) return <div key={i} style={{ minHeight: 70 }} />;
+                            const iso = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, "0")}-${String(fecha.getDate()).padStart(2, "0")}`;
+                            const enRango = iso >= form.fechaInicio && iso <= form.fechaFin;
+                            if (!enRango) return <div key={i} style={{ background: COLORES.fuera.bg, border: `1px solid ${COLORES.fuera.border}`, borderRadius: 6, minHeight: 70, padding: 8, fontSize: 13, color: COLORES.fuera.txt, fontFamily: "'Inter', sans-serif", fontWeight: 500 }}>{fecha.getDate()}</div>;
+                            const { color, info, esFestivo } = getEstadoDia(iso);
+                            const nombreFestivo = esFestivo ? festivosComunidad.find(f => f.fecha === iso)?.nombre : null;
+                            // v107: etiqueta completa + color texto + soporte 2 líneas
+                            // { texto, color, lineas: 1|2 }
+                            let etiqueta = null;
+                            if (esFestivo && info.festivo_trabajado) {
+                              etiqueta = { texto: "RODAJE FESTIVO", color: "#f2f5f7", dosLineas: ["RODAJE", "FESTIVO"] };
+                            } else if (esFestivo) {
+                              etiqueta = { texto: (nombreFestivo || "FESTIVO").toUpperCase(), color: "#f2f5f7" };
+                            } else if (info.vacaciones) {
+                              etiqueta = { texto: "VACACIONES", color: "#000" };
+                            } else if (info.descanso) {
+                              etiqueta = { texto: "DESCANSO", color: "#000" };
+                            } else if (info.especial) {
+                              etiqueta = { texto: "JORNADA ESPECIAL", color: "#f2f5f7", dosLineas: ["JORNADA", "ESPECIAL"] };
+                            } else if (info.rodaje) {
+                              etiqueta = { texto: "RODAJE", color: "#000" };
+                            }
+                            const popupAbierto = popup && popup.fecha === iso;
+                            return (
+                              <div
+                                key={i}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  // v109: solo alterna abrir/cerrar el popup de ESTE día (posición gestionada por CSS absolute)
+                                  if (popupAbierto) setPopup(null);
+                                  else setPopup({ fecha: iso, esFestivo });
+                                }}
+                                style={{
+                                  background: color.bg,
+                                  border: `1px solid ${color.border}`,
+                                  borderRadius: 6, minHeight: 70, padding: 8,
+                                  cursor: "pointer", position: "relative",
+                                  transition: "transform 0.1s, box-shadow 0.1s",
+                                  fontFamily: "'Inter', sans-serif",
+                                  overflow: popupAbierto ? "visible" : "hidden",
+                                  zIndex: popupAbierto ? 100 : "auto",
+                                }}
+                                onMouseEnter={e => { if (!popupAbierto) { e.currentTarget.style.transform = "scale(1.04)"; e.currentTarget.style.boxShadow = `0 4px 12px ${color.bg}55`; e.currentTarget.style.zIndex = "5"; } }}
+                                onMouseLeave={e => { if (!popupAbierto) { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.zIndex = "auto"; } }}
+                                title={nombreFestivo || (etiqueta ? etiqueta.texto : "")}
+                              >
+                                <div style={{ fontSize: 15, fontWeight: 700, color: color.txt }}>{fecha.getDate()}</div>
+                                {etiqueta && (
+                                  etiqueta.dosLineas ? (
+                                    <div style={{ marginTop: 3, lineHeight: 1.15 }}>
+                                      {etiqueta.dosLineas.map((linea, li) => (
+                                        <div key={li} style={{ fontSize: 10, fontWeight: 800, color: etiqueta.color, letterSpacing: "0.02em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                          {linea}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <div style={{ fontSize: 10, fontWeight: 800, color: etiqueta.color, marginTop: 3, letterSpacing: "0.02em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                      {etiqueta.texto}
+                                    </div>
+                                  )
+                                )}
+
+                                {/* v109: popup RELATIVO al día (siempre encima) */}
+                                {popupAbierto && (
+                                  <div
+                                    onClick={e => e.stopPropagation()}
+                                    style={{
+                                      position: "absolute",
+                                      bottom: "calc(100% + 6px)",
+                                      left: "50%",
+                                      transform: "translateX(-50%)",
+                                      background: "rgba(20,20,20,0.98)",
+                                      backdropFilter: "blur(20px)",
+                                      WebkitBackdropFilter: "blur(20px)",
+                                      border: "1px solid rgba(78,201,184,0.35)",
+                                      borderRadius: 10,
+                                      padding: 10, zIndex: 1200,
+                                      boxShadow: "0 8px 32px rgba(0,0,0,0.7)",
+                                      width: 200,
+                                      fontFamily: "'Inter', sans-serif",
+                                      cursor: "default",
+                                    }}
+                                  >
+                                    <div style={{ fontSize: 11, color: "#4ec9b8", marginBottom: 8, letterSpacing: "0.04em", fontWeight: 600 }}>
+                                      {iso}
+                                    </div>
+                                    <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                                      {[
+                                        { key: "rodaje", label: "Rodaje" },
+                                        { key: "vacaciones", label: "Vacaciones" },
+                                        { key: "descanso", label: "Descanso" },
+                                        { key: "especial", label: "Jornada especial" },
+                                      ].map(item => (
+                                        <label key={item.key} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 12, padding: "5px 8px", background: dias[iso]?.[item.key] ? "rgba(78,201,184,0.12)" : "rgba(255,255,255,0.03)", border: `1px solid ${dias[iso]?.[item.key] ? "rgba(78,201,184,0.3)" : "rgba(255,255,255,0.05)"}`, borderRadius: 5, color: "#f0f0f0" }}>
+                                          <input type="checkbox" checked={!!(dias[iso]?.[item.key])} onChange={() => toggleProp(iso, item.key)} style={{ accentColor: "#4ec9b8", width: 13, height: 13, margin: 0 }} />
+                                          <span>{item.label}</span>
+                                        </label>
+                                      ))}
+                                      {esFestivo && (
+                                        <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 12, padding: "5px 8px", background: dias[iso]?.festivo_trabajado ? "rgba(255,145,0,0.15)" : "rgba(255,255,255,0.03)", border: `1px solid ${dias[iso]?.festivo_trabajado ? "rgba(255,145,0,0.4)" : "rgba(255,255,255,0.05)"}`, borderRadius: 5, color: "#f0f0f0" }}>
+                                          <input type="checkbox" checked={!!(dias[iso]?.festivo_trabajado)} onChange={() => toggleProp(iso, "festivo_trabajado")} style={{ accentColor: "#ff9100", width: 13, height: 13, margin: 0 }} />
+                                          <span>Festivo trabajado</span>
+                                        </label>
+                                      )}
+                                      <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 12, padding: "5px 8px", background: dias[iso]?.laboral ? "rgba(0,230,118,0.12)" : "rgba(255,255,255,0.03)", border: `1px solid ${dias[iso]?.laboral ? "rgba(0,230,118,0.35)" : "rgba(255,255,255,0.05)"}`, borderRadius: 5, color: "#f0f0f0" }}>
+                                        <input type="checkbox" checked={!!(dias[iso]?.laboral)} onChange={() => toggleLaboral(iso)} style={{ accentColor: "#00e676", width: 13, height: 13, margin: 0 }} />
+                                        <span>Laboral</span>
+                                      </label>
+                                    </div>
+                                    <button onClick={() => setPopup(null)} style={{ ...btnGhost, width: "100%", marginTop: 7, justifyContent: "center", padding: "6px 12px", fontSize: 11 }}>Cerrar</button>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Popup: v109 renderizado como hijo del día con position:absolute bottom:100% */}
+
+
+            {/* Barra inferior */}
+            <div style={{ display: "flex", gap: 8, marginTop: 14, justifyContent: "space-between", alignItems: "center", position: "sticky", bottom: -24, background: "rgba(20,20,20,0.96)", padding: "16px 0 4px", borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+              <div>
+                {esAdmin && calendario && calendario.id && (
+                  <button onClick={eliminar} style={btnDelete}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                    Borrar calendario
+                  </button>
+                )}
+              </div>
+              <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                {tocado && <span style={{ fontSize: 12, color: "#ff9100", fontStyle: "italic", fontFamily: "'Inter', sans-serif" }}>Cambios sin guardar</span>}
+                <button onClick={guardar} disabled={guardando} style={{ ...btnPrimary, padding: "12px 28px", cursor: guardando ? "wait" : "pointer", boxShadow: "0 4px 16px rgba(78,201,184,0.2)" }}
+                  onMouseEnter={e => { if (!guardando) e.currentTarget.style.background = "#5ed9c8"; }}
+                  onMouseLeave={e => { if (!guardando) e.currentTarget.style.background = "#4ec9b8"; }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                  {guardando ? "Guardando..." : (calendario && calendario.id ? "Guardar cambios" : "Crear calendario")}
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+
+
+// ═══════════════════════════════════════════════════════════════════════
+// PANEL ADMIN: FESTIVOS (v54)
+// ═══════════════════════════════════════════════════════════════════════
+
+function PanelFestivos({ usuarioActual, onCerrar, onCambios }) {
+  const [festivos, setFestivos] = useState([]);
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState(null);
+  const [nuevoForm, setNuevoForm] = useState({ fecha: "", nombre: "", tipo: "nacional", comunidad: "bilbao" });
+  const [mostrarNuevo, setMostrarNuevo] = useState(false);
+  const [editando, setEditando] = useState(null);
+  const [filtroAnio, setFiltroAnio] = useState("");
+  const [filtroComunidad, setFiltroComunidad] = useState("bilbao"); // v55: filtro por comunidad
+
+  const COMUNIDADES = [
+    { key: "madrid", label: "Madrid" },
+    { key: "gran_canaria", label: "Gran Canaria" },
+    { key: "tenerife", label: "Tenerife" },
+    { key: "bilbao", label: "Bilbao" },
+  ];
+
+  const recargar = async () => {
+    setCargando(true); setError(null);
+    try {
+      const lista = await listarFestivosSupabase();
+      setFestivos(lista || []);
+      // Actualizar array global (Bilbao) para compatibilidad con código antiguo
+      if (Array.isArray(lista) && lista.length > 0) {
+        const bilbao = lista.filter(f => f.comunidad === "bilbao");
+        if (bilbao.length > 0) {
+          FESTIVOS_BILBAO = lista.map(f => ({ fecha: f.fecha, nombre: f.nombre, tipo: f.tipo || "nacional", comunidad: f.comunidad || "bilbao" }));
+        }
+      }
+    } catch (err) { setError(err.message); }
+    setCargando(false);
+  };
+
+  useEffect(() => { recargar(); }, []);
+
+  const onAdd = async () => {
+    if (!nuevoForm.fecha || !nuevoForm.nombre.trim()) {
+      alert("Fecha y Nombre son obligatorios"); return;
+    }
+    try {
+      if (nuevoForm.tipo === "nacional") {
+        // v56: nacionales se crean en las 4 comunidades
+        const errores = [];
+        for (const c of COMUNIDADES) {
+          try {
+            await crearFestivoSupabase(usuarioActual.pin, {
+              fecha: nuevoForm.fecha,
+              nombre: nuevoForm.nombre.trim(),
+              tipo: "nacional",
+              comunidad: c.key,
+            });
+          } catch (e) {
+            // Si ya existe en esa comunidad (conflict), lo ignoramos
+            if (!(e.message || "").toLowerCase().includes("duplicate")) errores.push(`${c.label}: ${e.message}`);
+          }
+        }
+        if (errores.length > 0) alert("Algunos fallos: " + errores.join(" · "));
+      } else {
+        // Autonómico/territorial/local: solo comunidad seleccionada
+        await crearFestivoSupabase(usuarioActual.pin, {
+          fecha: nuevoForm.fecha,
+          nombre: nuevoForm.nombre.trim(),
+          tipo: nuevoForm.tipo,
+          comunidad: nuevoForm.comunidad,
+        });
+      }
+      setNuevoForm({ fecha: "", nombre: "", tipo: "nacional", comunidad: filtroComunidad });
+      setMostrarNuevo(false);
+      recargar();
+      if (onCambios) onCambios();
+    } catch (err) { alert("Error al crear: " + err.message); }
+  };
+
+  const onGuardarEdit = async () => {
+    try {
+      const eraNacional = editando._original?.tipo === "nacional";
+      const esNacional = editando.tipo === "nacional";
+
+      if (eraNacional || esNacional) {
+        // v56: aviso si era o pasa a ser nacional
+        const ok = confirm(
+          `Este festivo ${eraNacional ? "está" : "pasará a estar"} en las 4 comunidades (Madrid, Gran Canaria, Tenerife, Bilbao).\n\n¿Editarlo en todas?`
+        );
+        if (!ok) return;
+
+        if (eraNacional) {
+          // Buscar todos los festivos que eran hermanos del original (misma fecha original, tipo nacional)
+          const hermanos = festivos.filter(f =>
+            f.fecha === editando._original.fecha && f.tipo === "nacional"
+          );
+          const errores = [];
+          for (const h of hermanos) {
+            try {
+              await actualizarFestivoSupabase(usuarioActual.pin, h.id, {
+                fecha: editando.fecha,
+                nombre: editando.nombre.trim(),
+                tipo: editando.tipo,
+                // NO cambiamos comunidad, cada hermano mantiene la suya
+                comunidad: h.comunidad,
+              });
+            } catch (e) { errores.push(`${h.comunidad}: ${e.message}`); }
+          }
+          if (errores.length > 0) alert("Algunos fallos: " + errores.join(" · "));
+
+          // Si el nuevo tipo NO es nacional, borrar los hermanos que no sean de la comunidad editada
+          if (!esNacional) {
+            for (const h of hermanos) {
+              if (h.id !== editando.id) {
+                try { await borrarFestivoSupabase(usuarioActual.pin, h.id); } catch {}
+              }
+            }
+          }
+        } else {
+          // era no-nacional pero pasa a nacional: actualizar el actual y crear en las otras 3 comunidades
+          await actualizarFestivoSupabase(usuarioActual.pin, editando.id, {
+            fecha: editando.fecha,
+            nombre: editando.nombre.trim(),
+            tipo: "nacional",
+            comunidad: editando.comunidad,
+          });
+          for (const c of COMUNIDADES) {
+            if (c.key === editando.comunidad) continue;
+            try {
+              await crearFestivoSupabase(usuarioActual.pin, {
+                fecha: editando.fecha,
+                nombre: editando.nombre.trim(),
+                tipo: "nacional",
+                comunidad: c.key,
+              });
+            } catch {} // ignora duplicados
+          }
+        }
+      } else {
+        // Ni era ni es nacional: comportamiento normal
+        await actualizarFestivoSupabase(usuarioActual.pin, editando.id, {
+          fecha: editando.fecha,
+          nombre: editando.nombre.trim(),
+          tipo: editando.tipo,
+          comunidad: editando.comunidad,
+        });
+      }
+      setEditando(null);
+      recargar();
+      if (onCambios) onCambios();
+    } catch (err) { alert("Error al guardar: " + err.message); }
+  };
+
+  const onBorrar = async (f) => {
+    // v56: si es nacional, avisar y borrar en las 4
+    if (f.tipo === "nacional") {
+      const hermanos = festivos.filter(x => x.fecha === f.fecha && x.tipo === "nacional");
+      const ok = confirm(
+        `Este festivo "${f.nombre}" (${f.fecha}) está en ${hermanos.length} comunidades como Nacional.\n\n¿Borrarlo en todas?`
+      );
+      if (!ok) return;
+      const errores = [];
+      for (const h of hermanos) {
+        try { await borrarFestivoSupabase(usuarioActual.pin, h.id); } catch (e) { errores.push(e.message); }
+      }
+      if (errores.length > 0) alert("Algunos fallos: " + errores.join(" · "));
+      recargar();
+      if (onCambios) onCambios();
+      return;
+    }
+    // Autonómico/territorial/local: borrado normal
+    if (!confirm(`¿Borrar el festivo "${f.nombre}" (${f.fecha})?`)) return;
+    try {
+      await borrarFestivoSupabase(usuarioActual.pin, f.id);
+      recargar();
+      if (onCambios) onCambios();
+    } catch (err) { alert("Error al borrar: " + err.message); }
+  };
+
+  // Filtrar por año Y comunidad
+  const anios = [...new Set(festivos.map(f => f.fecha.slice(0, 4)))].sort();
+  const festivosFiltrados = festivos.filter(f => {
+    if (filtroComunidad && f.comunidad !== filtroComunidad) return false;
+    if (filtroAnio && !f.fecha.startsWith(filtroAnio)) return false;
+    return true;
+  });
+
+  const overlay = {
+    position: "fixed", inset: 0, background: "rgba(20,20,20,0.75)",
+    display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000,
+  };
+  const modal = {
+    background: "#e8ecef", padding: 20, borderRadius: 6, maxWidth: 900, width: "92%",
+    maxHeight: "88vh", overflowY: "auto", color: "#1a1a1a",
+    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", border: "1px solid #4ec9b8",
+  };
+  const btnGold = {
+    background: "#4ec9b8", color: "#f2f5f7", border: "none",
+    padding: "6px 12px", borderRadius: 4, cursor: "pointer",
+    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontSize: 11, fontWeight: 700,
+    letterSpacing: "0.1em", textTransform: "uppercase",
+  };
+  const btnGhost = {
+    background: "transparent", color: "#4ec9b8", border: "1px solid #4ec9b8",
+    padding: "6px 12px", borderRadius: 4, cursor: "pointer",
+    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontSize: 10, fontWeight: 700,
+    letterSpacing: "0.1em", textTransform: "uppercase",
+  };
+  const inp = {
+    padding: "6px 8px", border: "1px solid #d5d9dc", borderRadius: 4,
+    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontSize: 12, background: "#f2f5f7",
+    color: "#1a1a1a", colorScheme: "light",
+  };
+  const tipoColores = {
+    nacional: "#8a3a3a",
+    autonomico: "#1a1a1a",
+    territorial: "#1a1a1a",
+    local: "#5a7a3a",
+  };
+  const fmtFecha = (f) => {
+    if (!f) return "";
+    const [y, m, d] = f.split("-");
+    const dias = ["Do","Lu","Ma","Mi","Ju","Vi","Sa"];
+    const dow = new Date(f + "T12:00:00").getDay();
+    return `${d}/${m}/${y} · ${dias[dow]}`;
+  };
+
+  return (
+    <div style={overlay} onClick={onCerrar}>
+      <div style={modal} onClick={e => e.stopPropagation()}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, borderBottom: "1px solid #d5d9dc", paddingBottom: 10 }}>
+          <h2 style={{ margin: 0, fontSize: 14, letterSpacing: "0.15em", textTransform: "uppercase", color: "#1a1a1a" }}>📅 Calendario de Festivos</h2>
+          <button onClick={onCerrar} style={{ background: "transparent", color: "#888", border: "1px solid #ccc", padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>Cerrar</button>
+        </div>
+
+        {error && <div style={{ background: "#fee", color: "#900", padding: 8, borderRadius: 4, marginBottom: 10, fontSize: 11 }}>Error: {error}</div>}
+
+        {/* v55: tabs de comunidad */}
+        <div style={{ display: "flex", gap: 4, marginBottom: 10, padding: 4, background: "#e8e4de", borderRadius: 4 }}>
+          {COMUNIDADES.map(c => {
+            const cnt = festivos.filter(f => f.comunidad === c.key).length;
+            const activo = filtroComunidad === c.key;
+            return (
+              <button
+                key={c.key}
+                onClick={() => { setFiltroComunidad(c.key); setNuevoForm(prev => ({...prev, comunidad: c.key})); }}
+                style={{
+                  flex: 1,
+                  background: activo ? "#4ec9b8" : "transparent",
+                  color: activo ? "#f2f5f7" : "#666",
+                  border: "none",
+                  padding: "6px 10px",
+                  borderRadius: 3,
+                  cursor: "pointer",
+                  fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+                  fontSize: 10,
+                  fontWeight: 700,
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                }}
+              >{c.label} <span style={{ opacity: 0.7, fontSize: 9 }}>({cnt})</span></button>
+            );
+          })}
+        </div>
+
+        {/* Barra superior: filtro año + botón nuevo */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 8 }}>
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <span style={{ fontSize: 10, color: "#666", textTransform: "uppercase", letterSpacing: "0.08em" }}>Año:</span>
+            <button onClick={() => setFiltroAnio("")} style={{ ...btnGhost, background: filtroAnio === "" ? "#4ec9b8" : "transparent", color: filtroAnio === "" ? "#f2f5f7" : "#4ec9b8", padding: "3px 8px", fontSize: 9 }}>Todos</button>
+            {anios.map(a => (
+              <button key={a} onClick={() => setFiltroAnio(a)} style={{ ...btnGhost, background: filtroAnio === a ? "#4ec9b8" : "transparent", color: filtroAnio === a ? "#f2f5f7" : "#4ec9b8", padding: "3px 8px", fontSize: 9 }}>{a}</button>
+            ))}
+          </div>
+          {!mostrarNuevo && (
+            <button onClick={() => setMostrarNuevo(true)} style={btnGold}>+ Nuevo festivo</button>
+          )}
+        </div>
+
+        {/* Formulario nuevo */}
+        {mostrarNuevo && (
+          <div style={{ background: "#f2f5f7", padding: 12, borderRadius: 4, marginBottom: 14, border: "1px solid #d5d9dc" }}>
+            <div style={{ display: "grid", gridTemplateColumns: nuevoForm.tipo === "nacional" ? "auto 1fr auto 1fr auto auto" : "auto 1fr auto auto auto auto", gap: 8, alignItems: "center" }}>
+              <input type="date" value={nuevoForm.fecha} onChange={e => setNuevoForm({...nuevoForm, fecha: e.target.value})} style={inp} />
+              <input placeholder="Nombre del festivo" value={nuevoForm.nombre} onChange={e => setNuevoForm({...nuevoForm, nombre: e.target.value})} style={inp} />
+              <select value={nuevoForm.tipo} onChange={e => setNuevoForm({...nuevoForm, tipo: e.target.value})} style={inp}>
+                <option value="nacional">Nacional</option>
+                <option value="autonomico">Autonómico</option>
+                <option value="territorial">Territorial</option>
+                <option value="local">Local</option>
+              </select>
+              {nuevoForm.tipo === "nacional" ? (
+                <div style={{ fontSize: 10, color: "#1a1a1a", fontStyle: "italic", padding: "0 4px" }}>
+                  Se creará en las 4 comunidades
+                </div>
+              ) : (
+                <select value={nuevoForm.comunidad} onChange={e => setNuevoForm({...nuevoForm, comunidad: e.target.value})} style={inp}>
+                  {COMUNIDADES.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
+                </select>
+              )}
+              <button onClick={onAdd} style={btnGold}>Crear</button>
+              <button onClick={() => { setMostrarNuevo(false); }} style={btnGhost}>Cancelar</button>
+            </div>
+          </div>
+        )}
+
+        {cargando && <div style={{ padding: 20, textAlign: "center", color: "#888" }}>Cargando...</div>}
+
+        {!cargando && festivosFiltrados.length === 0 && (
+          <div style={{ padding: 20, textAlign: "center", color: "#888", fontSize: 12 }}>
+            {festivos.length === 0 ? "No hay festivos. Crea el primero." : "No hay festivos con estos filtros."}
+          </div>
+        )}
+
+        {!cargando && festivosFiltrados.map(f => (
+          <div key={f.id} style={{ background: "#f2f5f7", padding: 10, borderRadius: 4, marginBottom: 6, border: "1px solid #d5d9dc" }}>
+            {editando?.id === f.id ? (
+              <div style={{ display: "grid", gridTemplateColumns: editando.tipo === "nacional" ? "auto 1fr auto 1fr auto auto" : "auto 1fr auto auto auto auto", gap: 8, alignItems: "center" }}>
+                <input type="date" value={editando.fecha} onChange={e => setEditando({...editando, fecha: e.target.value})} style={inp} />
+                <input value={editando.nombre} onChange={e => setEditando({...editando, nombre: e.target.value})} style={inp} />
+                <select value={editando.tipo} onChange={e => setEditando({...editando, tipo: e.target.value})} style={inp}>
+                  <option value="nacional">Nacional</option>
+                  <option value="autonomico">Autonómico</option>
+                  <option value="territorial">Territorial</option>
+                  <option value="local">Local</option>
+                </select>
+                {editando.tipo === "nacional" ? (
+                  <div style={{ fontSize: 10, color: "#1a1a1a", fontStyle: "italic", padding: "0 4px" }}>
+                    Se aplica en las 4 comunidades
+                  </div>
+                ) : (
+                  <select value={editando.comunidad} onChange={e => setEditando({...editando, comunidad: e.target.value})} style={inp}>
+                    {COMUNIDADES.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
+                  </select>
+                )}
+                <button onClick={onGuardarEdit} style={btnGold}>Guardar</button>
+                <button onClick={() => setEditando(null)} style={btnGhost}>Cancelar</button>
+              </div>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "180px 1fr auto auto auto", gap: 8, alignItems: "center" }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#1a1a1a", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>
+                  {fmtFecha(f.fecha)}
+                </div>
+                <div style={{ fontSize: 12, color: "#1a1a1a" }}>{f.nombre}</div>
+                <span style={{
+                  fontSize: 9, padding: "2px 8px", borderRadius: 3,
+                  background: tipoColores[f.tipo] || "#888", color: "#f2f5f7",
+                  textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700,
+                }}>{f.tipo}</span>
+                <button onClick={() => setEditando({ id: f.id, fecha: f.fecha, nombre: f.nombre, tipo: f.tipo, comunidad: f.comunidad, _original: { fecha: f.fecha, tipo: f.tipo, comunidad: f.comunidad } })} style={btnGhost}>Editar</button>
+                <button onClick={() => onBorrar(f)} style={{ ...btnGhost, borderColor: "#c00", color: "#c00" }}>🗑</button>
+              </div>
+            )}
+          </div>
+        ))}
+
+        <div style={{ marginTop: 14, padding: 10, background: "#dfe4e8", borderRadius: 4, fontSize: 10, color: "#666", lineHeight: 1.5 }}>
+          ℹ Los cambios en los festivos afectan a los cálculos de horas extra en fechas que caigan en festivo. Los perfiles ya guardados no se recalculan hasta que se vuelvan a abrir.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════
+// BANNER SUPERIOR (sesión actual)
+// ═══════════════════════════════════════════════════════════════════════
+
+function BannerSesion({ usuario, proyectoActivo, onLogout, onAdmin, onLogs, onPuestos, onProyectos, onFestivos, tab, onChangeTab }) {
+  // v113: botón pestaña principal (45H/40H) — negro con letra blanca, turquesa al activar
+  const tabBtn = (id, label) => {
+    const activa = tab === id;
+    return (
+      <button
+        onClick={() => onChangeTab(id)}
+        style={{
+          background: activa ? "#4ec9b8" : "#0a0a0a",
+          color: activa ? "#0a0a0a" : "#f0f0f0",
+          border: `1px solid ${activa ? "#4ec9b8" : "rgba(255,255,255,0.15)"}`,
+          padding: "10px 24px",
+          borderRadius: 6,
+          cursor: "pointer",
+          fontSize: 13,
+          fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+          fontWeight: 700,
+          letterSpacing: "0.05em",
+          textTransform: "uppercase",
+          transition: "all 0.15s",
+        }}
+        onMouseEnter={e => { if (!activa) { e.currentTarget.style.background = "#4ec9b8"; e.currentTarget.style.color = "#0a0a0a"; e.currentTarget.style.borderColor = "#4ec9b8"; } }}
+        onMouseLeave={e => { if (!activa) { e.currentTarget.style.background = "#0a0a0a"; e.currentTarget.style.color = "#f0f0f0"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.15)"; } }}
+      >
+        {label}
+      </button>
+    );
+  };
+
+  // v113: Coste Empresa (mismo estilo que tabBtn pero con control de acceso admin)
+  const tabCosteEmpresa = () => {
+    const id = "costeEmpresa";
+    const activa = tab === id;
+    const esAdmin = usuario.es_admin;
+    return (
+      <button
+        onClick={() => {
+          if (!esAdmin) {
+            alert("Acceso restringido\n\nLa pestaña Coste Empresa solo está disponible para administradores.");
+            return;
+          }
+          onChangeTab(id);
+        }}
+        title={esAdmin ? "" : "Acceso restringido a admin"}
+        style={{
+          background: activa ? "#4ec9b8" : "#0a0a0a",
+          color: activa ? "#0a0a0a" : (esAdmin ? "#f0f0f0" : "#666"),
+          border: `1px solid ${activa ? "#4ec9b8" : "rgba(255,255,255,0.15)"}`,
+          padding: "10px 24px",
+          borderRadius: 6,
+          cursor: "pointer",
+          fontSize: 13,
+          fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+          fontWeight: 700,
+          letterSpacing: "0.05em",
+          textTransform: "uppercase",
+          transition: "all 0.15s",
+          opacity: (esAdmin || activa) ? 1 : 0.6,
+        }}
+        onMouseEnter={e => { if (!activa && esAdmin) { e.currentTarget.style.background = "#4ec9b8"; e.currentTarget.style.color = "#0a0a0a"; e.currentTarget.style.borderColor = "#4ec9b8"; } }}
+        onMouseLeave={e => { if (!activa && esAdmin) { e.currentTarget.style.background = "#0a0a0a"; e.currentTarget.style.color = "#f0f0f0"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.15)"; } }}
+      >
+        {!esAdmin && "🔒 "}Coste Empresa
+      </button>
+    );
+  };
+
+  // v113: botón secundario negro con letra blanca, hover azul
+  const btnSecondary = (onClick, icon, label, isActive) => (
+    <button
+      onClick={onClick}
+      style={{
+        background: isActive ? "#2196f3" : "#0a0a0a",
+        color: "#fff",
+        border: `1px solid ${isActive ? "#2196f3" : "rgba(255,255,255,0.15)"}`,
+        padding: "9px 18px",
+        borderRadius: 6,
+        cursor: "pointer",
+        fontSize: 12,
+        fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+        fontWeight: 700,
+        letterSpacing: "0.05em",
+        textTransform: "uppercase",
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        transition: "all 0.15s",
+      }}
+      onMouseEnter={e => { if (!isActive) { e.currentTarget.style.background = "#2196f3"; e.currentTarget.style.borderColor = "#2196f3"; } }}
+      onMouseLeave={e => { if (!isActive) { e.currentTarget.style.background = "#0a0a0a"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.15)"; } }}
+    >
+      {icon}
+      {label}
+    </button>
+  );
+
+  return (
+    <div className="no-print">
+      {/* FILA 1: sesión + user + admin(azul) + versión ------- 45H/40H/CE */}
+      <div style={{
+        background: "#1a1a1a",
+        padding: "14px 24px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        borderBottom: "1px solid #2a2a2a",
+        gap: 12,
+        flexWrap: "wrap",
+        fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <span style={{ color: "#888", textTransform: "uppercase", fontSize: 11, letterSpacing: "0.15em", fontWeight: 500 }}>Sesión:</span>
+          <span style={{ fontWeight: 700, color: "#f0f0f0", fontSize: 14, letterSpacing: "0.02em" }}>{usuario.nombre}</span>
+          {usuario.es_admin && <span style={{ background: "#2196f3", color: "#fff", padding: "4px 12px", borderRadius: 5, fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>ADMIN</span>}
+          <span style={{ color: "#4ec9b8", fontSize: 12, letterSpacing: "0.15em", fontWeight: 700 }} title="Versión de la app">{APP_VERSION}</span>
+        </div>
+
+        {/* Pestañas 45H / 40H / Coste Empresa (derecha) */}
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          {tabBtn("iruna45", "45H")}
+          {tabBtn("tab40", "40H")}
+          {tabCosteEmpresa()}
+        </div>
+      </div>
+
+      {/* FILA 2: LTN(azul) + USUARIOS/LOGS/COAC/FESTIVOS + CERRAR SESIÓN a la derecha */}
+      <div style={{
+        background: "#1a1a1a",
+        padding: "12px 24px",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        borderBottom: "1px solid #2a2a2a",
+        gap: 12,
+        flexWrap: "wrap",
+        fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+      }}>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          {/* LTN azul (proyecto activo, siempre destacado) */}
+          <button
+            onClick={onProyectos}
+            title="Cambiar de proyecto"
+            style={{
+              background: "#2196f3", color: "#fff",
+              border: "1px solid #2196f3",
+              padding: "9px 18px", borderRadius: 6, cursor: "pointer",
+              fontSize: 12, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+              fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase",
+              display: "flex", alignItems: "center", gap: 6,
+              transition: "all 0.15s",
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = "#42a5f5"; e.currentTarget.style.borderColor = "#42a5f5"; }}
+            onMouseLeave={e => { e.currentTarget.style.background = "#2196f3"; e.currentTarget.style.borderColor = "#2196f3"; }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+            {proyectoActivo?.nombre || "Proyectos"}
+          </button>
+
+          {usuario.es_admin && (
+            <>
+              {btnSecondary(onAdmin, (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              ), "Usuarios")}
+              {btnSecondary(onLogs, (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+              ), "Logs")}
+              {btnSecondary(onPuestos, (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 7h-3V5a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2v2H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/></svg>
+              ), "COAC")}
+              {btnSecondary(onFestivos, (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              ), "Festivos")}
+            </>
+          )}
+        </div>
+
+        {/* Cerrar sesión a la derecha */}
+        <button
+          onClick={onLogout}
+          style={{
+            background: "transparent", color: "#fff",
+            border: "1px solid rgba(255,255,255,0.2)",
+            padding: "9px 18px", borderRadius: 6, cursor: "pointer",
+            fontSize: 12, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+            fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase",
+            display: "flex", alignItems: "center", gap: 6,
+            transition: "all 0.15s",
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = "rgba(200,80,80,0.15)"; e.currentTarget.style.borderColor = "rgba(200,80,80,0.4)"; }}
+          onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.2)"; }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          Cerrar sesión
+        </button>
+      </div>
+    </div>
+  );
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════
+// EXPORT DEFAULT
+// ═══════════════════════════════════════════════════════════════════════
+
+export default function App() {
+  const [usuario, setUsuario] = useState(null);
+  const [comprobando, setComprobando] = useState(true);
+  const [mostrarAdmin, setMostrarAdmin] = useState(false);
+  const [mostrarLogs, setMostrarLogs] = useState(false);
+  const [mostrarPuestos, setMostrarPuestos] = useState(false);
+  const [mostrarProyectos, setMostrarProyectos] = useState(false);
+  // v149: contador que avisa al selector de que vuelva a pedir la lista de
+  // proyectos cuando se cierra el panel de gestión.
+  const [refrescoProyectos, setRefrescoProyectos] = useState(0);
+  const [mostrarExportar, setMostrarExportar] = useState(false); // v92
+  const [proyectoCalendarioSelector, setProyectoCalendarioSelector] = useState(null); // v88: proyecto para editar calendario desde selector
+  const [mostrarFestivos, setMostrarFestivos] = useState(false); // v54
+  const [proyectoActivo, setProyectoActivo] = useState(null); // v45: proyecto seleccionado
+  const [calendarioActivo, setCalendarioActivo] = useState(null); // v59: calendario del proyecto activo
+  const [tab, setTab] = useState("iruna45"); // "iruna45" | "tab40"
+
+  // v67/v68: inyectar Courier Prime desde Google Fonts para que Chrome la incruste bien en PDFs
+  // (evita el aviso "No se puede extraer la fuente T3Font_0" al abrir en Adobe Reader)
+  useEffect(() => {
+    const id = "bd-google-fonts-courier";
+    if (document.getElementById(id)) return;
+    const link1 = document.createElement("link");
+    link1.rel = "preconnect";
+    link1.href = "https://fonts.googleapis.com";
+    document.head.appendChild(link1);
+    const link2 = document.createElement("link");
+    link2.rel = "preconnect";
+    link2.href = "https://fonts.gstatic.com";
+    link2.crossOrigin = "anonymous";
+    document.head.appendChild(link2);
+    const link3 = document.createElement("link");
+    link3.id = id;
+    link3.rel = "stylesheet";
+    // v68: display=block asegura que Chrome espera a la fuente antes de renderizar (mejor para PDF)
+    link3.href = "https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400;1,700&display=block";
+    document.head.appendChild(link3);
+    // v68: forzar carga inmediata para que esté disponible al generar PDF
+    if (document.fonts && document.fonts.load) {
+      document.fonts.load("400 12px 'Courier Prime'").catch(() => {});
+      document.fonts.load("700 12px 'Courier Prime'").catch(() => {});
+    }
+  }, []);
+
+  // v59: cargar calendario cuando cambia el proyecto activo
+  useEffect(() => {
+    (async () => {
+      if (!proyectoActivo?.id) { setCalendarioActivo(null); return; }
+      try {
+        const cal = await obtenerCalendarioProyecto(proyectoActivo.id);
+        setCalendarioActivo(cal || null);
+      } catch (err) {
+        console.warn("Error cargando calendario proyecto activo:", err);
+        setCalendarioActivo(null);
+      }
+    })();
+  }, [proyectoActivo?.id]);
+
+  // v54: Cargar festivos desde Supabase al arrancar. Si falla, se queda el array por defecto.
+  useEffect(() => {
+    (async () => {
+      const lista = await listarFestivosSupabase();
+      if (Array.isArray(lista) && lista.length > 0) {
+        FESTIVOS_BILBAO = lista.map(f => ({
+          fecha: f.fecha,
+          nombre: f.nombre,
+          tipo: f.tipo || "nacional",
+          comunidad: f.comunidad || "bilbao",
+        }));
+      }
+    })();
+  }, []);
+
+  // ── Carga inicial: lee sesión, comprueba si ha expirado, entra directo si vale
+  useEffect(() => {
+    try {
+      const guardado = localStorage.getItem(AUTH_KEY);
+      if (!guardado) { setComprobando(false); return; }
+
+      const parsed = JSON.parse(guardado);
+      const ahora = Date.now();
+      const ultima = parsed.ultima_actividad || 0;
+      const tiempoSinActividad = ahora - ultima;
+
+      // Si pasaron más de SESION_DURACION_MS sin actividad → caducada
+      if (tiempoSinActividad > SESION_DURACION_MS) {
+        localStorage.removeItem(AUTH_KEY);
+        setComprobando(false);
+        return;
+      }
+
+      // Sesión válida: entrar DIRECTO sin esperar a Supabase (modo híbrido)
+      setUsuario({
+        id: parsed.id,
+        nombre: parsed.nombre,
+        es_admin: parsed.es_admin,
+        rol: parsed.rol || (parsed.es_admin ? "admin" : "user"), // v88
+        pin: parsed.pin,
+      });
+      // Restaurar proyecto activo si lo tenía seleccionado (v45)
+      if (parsed.proyecto_activo) {
+        setProyectoActivo(parsed.proyecto_activo);
+      }
+      // Renovar timestamp
+      localStorage.setItem(AUTH_KEY, JSON.stringify({ ...parsed, ultima_actividad: ahora }));
+      setComprobando(false);
+
+      // Revalidar contra Supabase EN SEGUNDO PLANO. Si falla, no hacer nada
+      // (el usuario sigue dentro). Solo cerrar si Supabase confirma que el
+      // usuario fue borrado o el PIN cambió.
+      loginUsuario(parsed.nombre, parsed.pin)
+        .then(u => {
+          if (!u) {
+            // Confirmado: el usuario ya no existe o cambió el PIN
+            localStorage.removeItem(AUTH_KEY);
+            setUsuario(null);
+            return;
+          }
+          // v147: refrescar permisos. Antes, si un admin cambiaba el rol de
+          // alguien, su navegador seguía con el rol viejo hasta que cerraba
+          // sesión a mano. Ahora se actualiza solo al abrir la app.
+          const rolNuevo = u.rol || (u.es_admin ? "admin" : "user");
+          const rolViejo = parsed.rol || (parsed.es_admin ? "admin" : "user");
+          if (rolNuevo !== rolViejo || !!u.es_admin !== !!parsed.es_admin) {
+            setUsuario(prev => prev ? { ...prev, es_admin: u.es_admin, rol: rolNuevo } : prev);
+            try {
+              const actual = JSON.parse(localStorage.getItem(AUTH_KEY) || "{}");
+              localStorage.setItem(AUTH_KEY, JSON.stringify({
+                ...actual, es_admin: u.es_admin, rol: rolNuevo,
+              }));
+            } catch {}
+          }
+        })
+        .catch(() => { /* error de red: dejar al usuario dentro */ });
+    } catch {
+      setComprobando(false);
+    }
+  }, []);
+
+  // ── Detector de actividad: cada interacción renueva el timestamp
+  // y un check periódico cierra sesión si pasó SESION_DURACION_MS
+  useEffect(() => {
+    if (!usuario) return;
+
+    const renovar = () => {
+      try {
+        const guardado = localStorage.getItem(AUTH_KEY);
+        if (!guardado) return;
+        const parsed = JSON.parse(guardado);
+        parsed.ultima_actividad = Date.now();
+        localStorage.setItem(AUTH_KEY, JSON.stringify(parsed));
+      } catch {}
+    };
+
+    // Throttle: como mucho una vez cada 30 segundos
+    let ultimoRenovado = Date.now();
+    const onActividad = () => {
+      const ahora = Date.now();
+      if (ahora - ultimoRenovado > 30000) {
+        ultimoRenovado = ahora;
+        renovar();
+      }
+    };
+
+    const eventos = ["mousedown", "keydown", "scroll", "touchstart"];
+    eventos.forEach(e => window.addEventListener(e, onActividad, { passive: true }));
+
+    // Check periódico de expiración (cada 60s mira si pasaron 30 min sin actividad)
+    const timer = setInterval(() => {
+      try {
+        const guardado = localStorage.getItem(AUTH_KEY);
+        if (!guardado) {
+          setUsuario(null);
+          return;
+        }
+        const parsed = JSON.parse(guardado);
+        const tiempoSinActividad = Date.now() - (parsed.ultima_actividad || 0);
+        if (tiempoSinActividad > SESION_DURACION_MS) {
+          localStorage.removeItem(AUTH_KEY);
+          setUsuario(null);
+        }
+      } catch {}
+    }, 60000);
+
+    return () => {
+      eventos.forEach(e => window.removeEventListener(e, onActividad));
+      clearInterval(timer);
+    };
+  }, [usuario]);
+
+  // Wrapper para el setUsuario que recibe PantallaLogin (incluye ultima_actividad)
+  const onLoginAcierto = (u) => {
+    setUsuario(u);
+    // Al hacer login siempre pasamos por el selector de proyecto
+    setProyectoActivo(null);
+  };
+
+  const cerrarSesion = () => {
+    try { localStorage.removeItem(AUTH_KEY); } catch {}
+    setUsuario(null);
+    setProyectoActivo(null);
+  };
+
+  // v45: Seleccionar un proyecto y persistir en localStorage
+  const seleccionarProyecto = (p) => {
+    setProyectoActivo(p);
+    try {
+      const guardado = localStorage.getItem(AUTH_KEY);
+      if (guardado) {
+        const parsed = JSON.parse(guardado);
+        parsed.proyecto_activo = p;
+        localStorage.setItem(AUTH_KEY, JSON.stringify(parsed));
+      }
+    } catch {}
+  };
+
+  // v45: Salir del proyecto activo → volver al selector
+  const salirDelProyecto = () => {
+    setProyectoActivo(null);
+    try {
+      const guardado = localStorage.getItem(AUTH_KEY);
+      if (guardado) {
+        const parsed = JSON.parse(guardado);
+        delete parsed.proyecto_activo;
+        localStorage.setItem(AUTH_KEY, JSON.stringify(parsed));
+      }
+    } catch {}
+  };
+
+  if (comprobando) return <div style={{ minHeight: "100vh", background: "#1a1a1a" }} />;
+  if (!usuario) return <PantallaLogin onAcierto={onLoginAcierto} />;
+
+  // v45: Si hay usuario pero no ha elegido proyecto, mostrar selector
+  if (!proyectoActivo) {
+    return (
+      <>
+        <PantallaSelectorProyecto
+          usuario={usuario}
+          onSeleccionar={seleccionarProyecto}
+          onLogout={cerrarSesion}
+          onGestionar={() => setMostrarProyectos(true)}
+          onEditarCalendario={(p) => setProyectoCalendarioSelector(p)}
+          onExportarListado={() => setMostrarExportar(true)}
+          refrescoToken={refrescoProyectos}
+        />
+        {mostrarProyectos && usuario.es_admin && (
+          <PanelProyectos usuarioActual={usuario} onCerrar={() => { setMostrarProyectos(false); setRefrescoProyectos(n => n + 1); }} />
+        )}
+        {mostrarExportar && (usuario.es_admin || usuario.rol === "coordinador") && (
+          <PanelExportarListado usuarioActual={usuario} onCerrar={() => setMostrarExportar(false)} />
+        )}
+        {proyectoCalendarioSelector && (usuario.es_admin || usuario.rol === "coordinador") && (
+          <PanelCalendarioProyecto
+            proyecto={proyectoCalendarioSelector}
+            usuarioActual={usuario}
+            onCerrar={() => setProyectoCalendarioSelector(null)}
+          />
+        )}
+      </>
+    );
+  }
+
+  return (
+    <UsuarioContext.Provider value={usuario}>
+      <ProyectoContext.Provider value={proyectoActivo ? { ...proyectoActivo, __calendario: calendarioActivo } : null}>
+      <div style={{ minHeight: "100vh", background: "#0a0f14" }}>
+        {/* v111: fondo global oscuro + Inter cargada */}
+        <style>{`
+          @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        `}</style>
+        <BannerSesion
+          usuario={usuario}
+          proyectoActivo={proyectoActivo}
+          onLogout={cerrarSesion}
+          onAdmin={() => setMostrarAdmin(true)}
+          onLogs={() => setMostrarLogs(true)}
+          onPuestos={() => setMostrarPuestos(true)}
+          onFestivos={() => setMostrarFestivos(true)}
+          onProyectos={salirDelProyecto}
+          tab={tab}
+          onChangeTab={setTab}
+        />
+        {/* key={tab} fuerza remount al cambiar de pestaña → cada una tiene su propio estado */}
+        {tab === "costeEmpresa"
+          ? (usuario.es_admin ? <CosteEmpresa key="ce" /> : <App45 key="iruna45" modoTab="iruna45" />)
+          : <App45 key={tab} modoTab={tab} />}
+        {mostrarAdmin && usuario.es_admin && (
+          <PanelAdmin usuarioActual={usuario} onCerrar={() => setMostrarAdmin(false)} />
+        )}
+        {mostrarLogs && usuario.es_admin && (
+          <PanelLogs usuarioActual={usuario} onCerrar={() => setMostrarLogs(false)} />
+        )}
+        {mostrarPuestos && usuario.es_admin && (
+          <PanelPuestos usuarioActual={usuario} onCerrar={() => setMostrarPuestos(false)} />
+        )}
+        {mostrarProyectos && usuario.es_admin && (
+          <PanelProyectos usuarioActual={usuario} onCerrar={() => setMostrarProyectos(false)} />
+        )}
+        {mostrarFestivos && usuario.es_admin && (
+          <PanelFestivos usuarioActual={usuario} onCerrar={() => setMostrarFestivos(false)} />
+        )}
+      </div>
+      </ProyectoContext.Provider>
+    </UsuarioContext.Provider>
+  );
+}
