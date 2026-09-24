@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v156";
+const APP_VERSION = "v159";
 
 // v97: Departamentos de un rodaje audiovisual (obligatorio en cada perfil)
 const DEPARTAMENTOS = [
@@ -123,6 +123,26 @@ function mapearContadoresADesglose(desglose, contadoresPorMes) {
     if (d.anio == null || d.mesNum == null) return 0;
     const ym = `${d.anio}-${String(d.mesNum + 1).padStart(2, "0")}`;
     return contadoresPorMes[ym] || 0;
+  });
+}
+
+// v159: reparte las horas over 45 estimadas en el calendario del proyecto entre
+// los meses del contrato de un trabajador. Regla binaria, no proporcional:
+//   · mes completo ............... todas las horas del mes
+//   · entra el día 15 o después .. la mitad
+//   · sale antes del día 14 ...... la mitad
+// Las medias horas se conservan (5h → 2,5h).
+function repartirOver45PorMes(desglose, estimacionPorMes) {
+  if (!desglose || !estimacionPorMes) return [];
+  return desglose.map(d => {
+    if (d.anio == null || d.mesNum == null) return 0;
+    const ym = `${d.anio}-${String(d.mesNum + 1).padStart(2, "0")}`;
+    const horasMes = Number(estimacionPorMes[ym]) || 0;
+    if (!horasMes) return 0;
+    if (d.esCompleto) return horasMes;
+    const desde = Number(d.desde) || 1;
+    const hasta = Number(d.hasta) || 31;
+    return (desde >= 15 || hasta < 14) ? horasMes / 2 : horasMes;
   });
 }
 
@@ -3423,22 +3443,16 @@ function App45({ modoTab = "iruna45" }) {
     //   · entra el día 15 o después ....... 50 %
     //   · sale antes del día 14 ........... 50 %
     // Si sale media hora (5h → 2,5h) se deja, el campo admite medias horas.
-    if (!es40h && cal.over45_activo) {
-      const est = cal.over45_horas_mes || {};
-      const nuevasOver45 = p.desglose.map(d => {
-        // mismo formato que mapearContadoresADesglose: mesNum es 0-based
-        if (d.anio == null || d.mesNum == null) return 0;
-        const ym = `${d.anio}-${String(d.mesNum + 1).padStart(2, "0")}`;
-        const horasMes = Number(est[ym]) || 0;
-        if (!horasMes) return 0;
-        if (d.esCompleto) return horasMes;
-        const desde = Number(d.desde) || 1;
-        const hasta = Number(d.hasta) || 31;
-        const entraTarde = desde >= 15;
-        const saleTemprano = hasta < 14;
-        return (entraTarde || saleTemprano) ? horasMes / 2 : horasMes;
-      });
-      setOver45PorMes(nuevasOver45);
+    // v159: "Aplicar calendario" es una acción explícita, así que trae TODO lo
+    // del proyecto, también sobre un perfil ya cargado: horas de referencia,
+    // los dos interruptores de 45H y el reparto de horas over 45.
+    if (!es40h) {
+      if (cal.horas_ref_45 !== null && cal.horas_ref_45 !== undefined && Number(cal.horas_ref_45) > 0) {
+        setHorasRef(Number(cal.horas_ref_45));
+      }
+      setOver45Activo(!!cal.over45_activo);
+      setFestivo45Activo(!!cal.festivo_45_activo);
+      if (cal.over45_activo) setOver45PorMes(repartirOver45PorMes(p.desglose, cal.over45_horas_mes || {}));
     }
     return true;
   };
@@ -3593,6 +3607,12 @@ function App45({ modoTab = "iruna45" }) {
         setFestivosPorMes(nuevosFestivos);
         setVacDiasPorMes(nuevasVac);
         setComidaDiasPorMes(prev => Array.from({ length: n }, (_, i) => prev[i] ?? null));
+        // v159: las horas over 45 se reparten igual que los festivos y las
+        // vacaciones. Antes solo ocurría al pulsar "Aplicar calendario", así que
+        // una ficha nueva se quedaba sin ellas.
+        if (!es40h && cal.over45_activo) {
+          setOver45PorMes(repartirOver45PorMes(p.desglose, cal.over45_horas_mes || {}));
+        }
       } else {
         // Comportamiento original si no hay calendario
         setHorasPorMes(prev => Array.from({ length: n }, (_, i) => {
