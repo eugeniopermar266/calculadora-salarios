@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v155";
+const APP_VERSION = "v156";
 
 // v97: Departamentos de un rodaje audiovisual (obligatorio en cada perfil)
 const DEPARTAMENTOS = [
@@ -3334,6 +3334,21 @@ function App45({ modoTab = "iruna45" }) {
     if (!modosToggleadoManualRef.current.ind) setIndemAcumulada(modoIndProy);
   }, [proyectoActivoCtx?.__calendario?.id, proyectoActivoCtx?.__calendario?.modo_vacaciones, proyectoActivoCtx?.__calendario?.modo_indemnizacion]);
 
+  // v156: ajustes 45H que vienen del proyecto (horas de referencia y los dos
+  // interruptores). Mismo criterio que los modos de arriba: no se tocan si hay
+  // un perfil cargado. Las horas de referencia son del proyecto, así que todos
+  // los trabajadores de 45H comparten el mismo valor.
+  useEffect(() => {
+    const cal = proyectoActivoCtx?.__calendario;
+    if (!cal || es40h) return;
+    if (perfilCargadoRef.current) return;
+    if (cal.horas_ref_45 !== null && cal.horas_ref_45 !== undefined && Number(cal.horas_ref_45) > 0) {
+      setHorasRef(Number(cal.horas_ref_45));
+    }
+    setOver45Activo(!!cal.over45_activo);
+    setFestivo45Activo(!!cal.festivo_45_activo);
+  }, [proyectoActivoCtx?.__calendario?.id, proyectoActivoCtx?.__calendario?.horas_ref_45, proyectoActivoCtx?.__calendario?.over45_activo, proyectoActivoCtx?.__calendario?.festivo_45_activo, es40h]);
+
   // v63: cargar festivos de la comunidad del calendario del proyecto activo
   useEffect(() => {
     (async () => {
@@ -3401,6 +3416,30 @@ function App45({ modoTab = "iruna45" }) {
     }
     setFestivosPorMes(nuevosFestivos);
     setVacDiasPorMes(nuevasVac);
+
+    // v156: horas over 45 estimadas en el calendario del proyecto, repartidas a
+    // esta ficha. Regla acordada, binaria (no proporcional):
+    //   · mes completo .................... 100 %
+    //   · entra el día 15 o después ....... 50 %
+    //   · sale antes del día 14 ........... 50 %
+    // Si sale media hora (5h → 2,5h) se deja, el campo admite medias horas.
+    if (!es40h && cal.over45_activo) {
+      const est = cal.over45_horas_mes || {};
+      const nuevasOver45 = p.desglose.map(d => {
+        // mismo formato que mapearContadoresADesglose: mesNum es 0-based
+        if (d.anio == null || d.mesNum == null) return 0;
+        const ym = `${d.anio}-${String(d.mesNum + 1).padStart(2, "0")}`;
+        const horasMes = Number(est[ym]) || 0;
+        if (!horasMes) return 0;
+        if (d.esCompleto) return horasMes;
+        const desde = Number(d.desde) || 1;
+        const hasta = Number(d.hasta) || 31;
+        const entraTarde = desde >= 15;
+        const saleTemprano = hasta < 14;
+        return (entraTarde || saleTemprano) ? horasMes / 2 : horasMes;
+      });
+      setOver45PorMes(nuevasOver45);
+    }
     return true;
   };
 
@@ -5927,7 +5966,7 @@ async function obtenerCalendarioProyecto(proyectoId) {
   }
 }
 
-async function crearCalendarioProyecto(auth, { proyectoId, fechaInicio, fechaFin, comunidad, dias = {}, notas = "", modoVacaciones = "mes_a_mes", modoIndemnizacion = "mes_a_mes" }) {
+async function crearCalendarioProyecto(auth, { proyectoId, fechaInicio, fechaFin, comunidad, dias = {}, notas = "", modoVacaciones = "mes_a_mes", modoIndemnizacion = "mes_a_mes", horasRef45 = null, over45Activo = false, over45HorasMes = {}, festivo45Activo = false }) {
   // v88: auth puede ser string (admin pin, retrocompat) u objeto {adminPin, userPin}
   const headers = { "Prefer": "return=representation" };
   if (typeof auth === "string") {
@@ -5948,6 +5987,10 @@ async function crearCalendarioProyecto(auth, { proyectoId, fechaInicio, fechaFin
       notas,
       modo_vacaciones: modoVacaciones,      // v86
       modo_indemnizacion: modoIndemnizacion, // v86
+      horas_ref_45: horasRef45,              // v156
+      over45_activo: over45Activo,           // v156
+      over45_horas_mes: over45HorasMes,      // v156
+      festivo_45_activo: festivo45Activo,    // v156
     }),
   });
 }
@@ -9456,6 +9499,13 @@ function labelMesCorto(ym) {
   return `${MESES[m - 1]}-${String(y).slice(2)}`;
 }
 
+// v156: etiqueta larga de mes para el panel del calendario
+function labelMesLargo(ym) {
+  const [y, m] = ym.split("-").map(Number);
+  const MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+  return `${MESES[m - 1]} ${y}`;
+}
+
 // Calcula coste SS total de un perfil (usando calcularCosteEmpresaMes sobre su desglose)
 function calcularCosteSSPerfil(datos) {
   const desglose = datos?._calculado?.desglose45 || datos?.desglose45 || [];
@@ -10333,7 +10383,10 @@ function PanelCalendarioProyecto({ proyecto, usuarioActual, onCerrar }) {
   const [calendario, setCalendario] = useState(null); // null=cargando, false=no existe, obj=datos
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
-  const [form, setForm] = useState({ fechaInicio: "", fechaFin: "", comunidad: "", modoVacaciones: "mes_a_mes", modoIndemnizacion: "mes_a_mes" }); // v86
+  // v156: horasRef45, over45 y festivo45 son datos DEL PROYECTO: todos los
+  // trabajadores de 45H comparten el mismo valor.
+  const [form, setForm] = useState({ fechaInicio: "", fechaFin: "", comunidad: "", modoVacaciones: "mes_a_mes", modoIndemnizacion: "mes_a_mes", horasRef45: "", over45Activo: false, festivo45Activo: false }); // v86 · v156
+  const [over45HorasMes, setOver45HorasMes] = useState({}); // v156: { "2026-06": 6 }
   const [festivosComunidad, setFestivosComunidad] = useState([]);
   const [guardando, setGuardando] = useState(false);
   const [mensaje, setMensaje] = useState(null);
@@ -10376,13 +10429,18 @@ function PanelCalendarioProyecto({ proyecto, usuarioActual, onCerrar }) {
           comunidad: cal.comunidad || "",
           modoVacaciones: cal.modo_vacaciones || "mes_a_mes",
           modoIndemnizacion: cal.modo_indemnizacion || "mes_a_mes",
+          horasRef45: cal.horas_ref_45 ?? "",          // v156
+          over45Activo: !!cal.over45_activo,           // v156
+          festivo45Activo: !!cal.festivo_45_activo,    // v156
         });
+        setOver45HorasMes(cal.over45_horas_mes || {}); // v156
         setDias(cal.dias || {});
         // Situar el mes actual en el primer mes del rango
         if (cal.fecha_inicio) setMesActual(cal.fecha_inicio.slice(0, 7));
       } else {
         setCalendario(false);
-        setForm({ fechaInicio: "", fechaFin: "", comunidad: "", modoVacaciones: "mes_a_mes", modoIndemnizacion: "mes_a_mes" });
+        setForm({ fechaInicio: "", fechaFin: "", comunidad: "", modoVacaciones: "mes_a_mes", modoIndemnizacion: "mes_a_mes", horasRef45: "", over45Activo: false, festivo45Activo: false });
+        setOver45HorasMes({}); // v156
         setDias({});
       }
       setTocado(false);
@@ -10391,6 +10449,38 @@ function PanelCalendarioProyecto({ proyecto, usuarioActual, onCerrar }) {
   };
 
   useEffect(() => { recargar(); }, [proyecto.id]);
+
+  // v156: meses que abarca el rango del calendario
+  const mesesDelRango = (() => {
+    if (!form.fechaInicio || !form.fechaFin) return [];
+    const out = [];
+    const d = new Date(form.fechaInicio + "T12:00:00");
+    const fin = new Date(form.fechaFin + "T12:00:00");
+    while (d <= fin) {
+      const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      if (!out.includes(ym)) out.push(ym);
+      d.setMonth(d.getMonth() + 1);
+      d.setDate(1);
+    }
+    return out;
+  })();
+
+  // v156: horas de referencia sugeridas = días laborables del mes que más tiene.
+  // Cuenta lo mismo que la ficha: laborales sin festivos no trabajados ni vacaciones.
+  const horasRefSugeridas = (() => {
+    if (!form.fechaInicio || !form.fechaFin || !dias) return 0;
+    const fechasFest = (festivosComunidad || []).map(f => f.fecha);
+    const porMes = {};
+    for (const [fecha, info] of Object.entries(dias)) {
+      if (fecha < form.fechaInicio || fecha > form.fechaFin) continue;
+      if (!info?.laboral) continue;
+      if (info?.vacaciones) continue;
+      if (fechasFest.includes(fecha) && !info?.festivo_trabajado) continue;
+      const ym = fecha.slice(0, 7);
+      porMes[ym] = (porMes[ym] || 0) + 1;
+    }
+    return Object.values(porMes).reduce((m, v) => Math.max(m, v), 0);
+  })();
 
   // ── Cargar festivos de la comunidad
   useEffect(() => {
@@ -10467,6 +10557,10 @@ function PanelCalendarioProyecto({ proyecto, usuarioActual, onCerrar }) {
           comunidad: form.comunidad, dias,
           modo_vacaciones: form.modoVacaciones,      // v86
           modo_indemnizacion: form.modoIndemnizacion, // v86
+          horas_ref_45: form.horasRef45 === "" ? null : Number(form.horasRef45), // v156
+          over45_activo: !!form.over45Activo,          // v156
+          over45_horas_mes: over45HorasMes,            // v156
+          festivo_45_activo: !!form.festivo45Activo,   // v156
         });
         setMensaje({ tipo: "ok", texto: "✓ Calendario actualizado" });
       } else {
@@ -10475,6 +10569,9 @@ function PanelCalendarioProyecto({ proyecto, usuarioActual, onCerrar }) {
           comunidad: form.comunidad, dias,
           modoVacaciones: form.modoVacaciones,        // v86
           modoIndemnizacion: form.modoIndemnizacion,  // v86
+          horasRef45: form.horasRef45 === "" ? null : Number(form.horasRef45), // v156
+          over45Activo: !!form.over45Activo, over45HorasMes,                    // v156
+          festivo45Activo: !!form.festivo45Activo,                              // v156
         });
         setMensaje({ tipo: "ok", texto: "✓ Calendario creado" });
       }
@@ -10771,6 +10868,73 @@ function PanelCalendarioProyecto({ proyecto, usuarioActual, onCerrar }) {
               <div style={{ marginTop: 12, fontSize: 11, color: "#666", fontStyle: "italic", textAlign: "center", fontFamily: "'Inter', sans-serif" }}>
                 Al crear un nuevo perfil se aplicará esta configuración. Los perfiles existentes te preguntará si quieres actualizarlos al cargarlos.
               </div>
+            </div>
+
+            {/* v156: configuración 45H del proyecto — la comparten todos los trabajadores */}
+            <div style={{ background: "rgba(30,30,30,0.5)", border: "1px solid rgba(200,150,58,0.35)", padding: 20, borderRadius: 12, marginBottom: 14 }}>
+              <div style={{ fontSize: 11, color: "#c8963a", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 600, marginBottom: 14, textAlign: "center", fontFamily: "'Inter', sans-serif" }}>
+                Configuración 45H del proyecto
+              </div>
+
+              <div style={{ background: "rgba(20,20,20,0.6)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: 14, marginBottom: 12 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                  <span style={{ fontSize: 13, color: "#f0f0f0", fontFamily: "'Inter', sans-serif" }}>Horas de referencia al mes</span>
+                  <input type="number" min="0" step="1" value={form.horasRef45}
+                    onChange={e => { setForm({...form, horasRef45: e.target.value}); setTocado(true); }}
+                    onFocus={e => e.target.select()}
+                    placeholder={String(horasRefSugeridas || 22)}
+                    style={{ width: 80, padding: "8px 10px", fontSize: 14, fontWeight: 700, textAlign: "center", background: "rgba(0,0,0,0.4)", border: "1px solid rgba(200,150,58,0.5)", borderRadius: 6, color: "#f0c070", outline: "none", colorScheme: "dark" }} />
+                  {horasRefSugeridas > 0 && (
+                    <button type="button" onClick={() => { setForm({...form, horasRef45: String(horasRefSugeridas)}); setTocado(true); }}
+                      style={{ padding: "7px 12px", fontSize: 11, background: "rgba(200,150,58,0.15)", border: "1px solid rgba(200,150,58,0.4)", borderRadius: 6, color: "#f0c070", cursor: "pointer", fontFamily: "'Inter', sans-serif", fontWeight: 600 }}>
+                      Usar {horasRefSugeridas} (mes más largo)
+                    </button>
+                  )}
+                </div>
+                <div style={{ marginTop: 8, fontSize: 11, color: "#777", fontFamily: "'Inter', sans-serif", lineHeight: 1.5 }}>
+                  Las horas extra incluidas en el bruto de 45H. Se toma el mes del calendario con más días laborables.
+                  Todos los trabajadores de 45H de este proyecto usarán este mismo valor.
+                </div>
+              </div>
+
+              <label style={{ display: "flex", alignItems: "center", gap: 10, padding: 10, borderRadius: 8, background: form.over45Activo ? "rgba(200,150,58,0.10)" : "rgba(20,20,20,0.6)", border: "1px solid rgba(255,255,255,0.08)", marginBottom: 10, cursor: "pointer", fontFamily: "'Inter', sans-serif" }}>
+                <input type="checkbox" checked={form.over45Activo} onChange={e => { setForm({...form, over45Activo: e.target.checked}); setTocado(true); }} style={{ accentColor: "#c8963a", width: 16, height: 16 }} />
+                <span>
+                  <span style={{ fontSize: 13, color: "#f0f0f0", fontWeight: 600 }}>Horas extras over 45h · Todo incluido</span>
+                  <span style={{ display: "block", fontSize: 11, color: "#777", marginTop: 2 }}>Se activará en la ficha de todos los trabajadores de 45H.</span>
+                </span>
+              </label>
+
+              <label style={{ display: "flex", alignItems: "center", gap: 10, padding: 10, borderRadius: 8, background: form.festivo45Activo ? "rgba(200,150,58,0.10)" : "rgba(20,20,20,0.6)", border: "1px solid rgba(255,255,255,0.08)", marginBottom: 12, cursor: "pointer", fontFamily: "'Inter', sans-serif" }}>
+                <input type="checkbox" checked={form.festivo45Activo} onChange={e => { setForm({...form, festivo45Activo: e.target.checked}); setTocado(true); }} style={{ accentColor: "#c8963a", width: 16, height: 16 }} />
+                <span>
+                  <span style={{ fontSize: 13, color: "#f0f0f0", fontWeight: 600 }}>Festivo Trabajado 45h · Todo incluido</span>
+                  <span style={{ display: "block", fontSize: 11, color: "#777", marginTop: 2 }}>Cambia el valor del festivo trabajado en todas las fichas de 45H.</span>
+                </span>
+              </label>
+
+              {form.over45Activo && mesesDelRango.length > 0 && (
+                <div style={{ background: "rgba(20,20,20,0.6)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: 14 }}>
+                  <div style={{ fontSize: 11, color: "#c8963a", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 600, marginBottom: 4, fontFamily: "'Inter', sans-serif" }}>
+                    Estimación de horas over 45 por mes
+                  </div>
+                  <div style={{ fontSize: 11, color: "#777", marginBottom: 12, fontFamily: "'Inter', sans-serif", lineHeight: 1.5 }}>
+                    Se reparten a todos los trabajadores. Mes completo, las horas enteras;
+                    si entra el día 15 o después, o sale antes del 14, la mitad.
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: 8 }}>
+                    {mesesDelRango.map(ym => (
+                      <div key={ym} style={{ background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 8, padding: 8 }}>
+                        <div style={{ fontSize: 10, color: "#999", textTransform: "capitalize", marginBottom: 5, fontFamily: "'Inter', sans-serif" }}>{labelMesLargo(ym)}</div>
+                        <input type="number" min="0" step="0.5" value={over45HorasMes[ym] ?? ""} placeholder="0"
+                          onChange={e => { const v = e.target.value; setOver45HorasMes(prev => ({ ...prev, [ym]: v === "" ? "" : (parseFloat(v) || 0) })); setTocado(true); }}
+                          onFocus={e => e.target.select()}
+                          style={{ width: "100%", padding: "6px 8px", fontSize: 13, fontWeight: 700, textAlign: "center", background: "rgba(0,0,0,0.4)", border: "1px solid rgba(200,150,58,0.4)", borderRadius: 6, color: "#f0c070", outline: "none", colorScheme: "dark", boxSizing: "border-box" }} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Añadir tramo — botón centrado abajo, campos ocupan todo el ancho */}
