@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v153";
+const APP_VERSION = "v154";
 
 // v97: Departamentos de un rodaje audiovisual (obligatorio en cada perfil)
 const DEPARTAMENTOS = [
@@ -2213,11 +2213,11 @@ function InputsPorMes({ desglose, horasPorMes, setHorasPorMes, vacDiasPorMes, se
   const hasO45 = !!setOver45PorMes;   // v150: solo 45H y con la opción activada
 
   // v75: ancho fijo mes + resto uniforme para no descentrar según largo del nombre
-  const colsBase = hasFest && hasJE ? "95px 1fr 1fr 1fr 1fr" : hasFest ? "95px 1fr 1fr 1fr" : "95px 1fr 1fr";
+  const colsBase = hasFest && hasJE ? "78px 1fr 1fr 1fr 1fr" : hasFest ? "78px 1fr 1fr 1fr" : "78px 1fr 1fr";   // v154
   const cols = hasO45 ? colsBase + " 1fr" : colsBase;   // v150: una columna más solo si aplica
 
   return (
-    <div>
+    <div className="mes-num">
       <div style={{ display:"grid", gridTemplateColumns:cols, gap:6, marginBottom:12, padding:"0 2px 6px", borderBottom:"1px solid #eae7e2" }}>
         <div style={{ fontSize:9, color:"#888", letterSpacing:"0.12em", textTransform:"uppercase", fontFamily:"'Courier Prime', 'Courier New', monospace", fontWeight:700 }}>Mes</div>
         <div style={{ fontSize:9, color:"#3a6090", letterSpacing:"0.1em", textTransform:"uppercase", fontFamily:"'Courier Prime', 'Courier New', monospace", textAlign:"center", fontWeight:700 }}>H.Ext</div>
@@ -2261,7 +2261,7 @@ function InputsPorMes({ desglose, horasPorMes, setHorasPorMes, vacDiasPorMes, se
                     setHorasPorMes(a);
                   }}
                   title={`Estimado L-V: ${autoH}h (puedes modificarlo)`}
-                  style={{ background: esEstimadoOriginal?"#eef3f8":"#dfe4e8", border:`1px solid ${esEstimadoOriginal?"#d5d9dc":"#4a6a9a"}`, borderRadius:4, color:"#1a1a1a", fontFamily:"'Courier Prime', 'Courier New', monospace", fontSize:11, padding:"4px 4px", outline:"none", textAlign:"center", colorScheme:"light", minWidth:0, width:"100%", boxSizing:"border-box" }}
+                  style={{ background: esEstimadoOriginal?"#eef3f8":"#dfe4e8", border:`1px solid ${esEstimadoOriginal?"#d5d9dc":"#4a6a9a"}`, borderRadius:4, color:"#1a1a1a", fontFamily:"'Courier Prime', 'Courier New', monospace", fontSize:12, padding:"6px 2px", outline:"none", textAlign:"center", colorScheme:"light", minWidth:0, width:"100%", boxSizing:"border-box", fontWeight:600 }}
                   onFocus={e=>e.target.style.borderColor="#4a6a9a"} onBlur={e=>e.target.style.borderColor=esEstimadoOriginal?"#d5d9dc":"#4a6a9a"} />
               </div>
             );
@@ -2271,7 +2271,7 @@ function InputsPorMes({ desglose, horasPorMes, setHorasPorMes, vacDiasPorMes, se
             <input type="number" min="0" step="0.5" value={(over45PorMes||[])[i]||""} placeholder="0"
               onChange={e=>setO45(i,parseFloat(e.target.value)||0)}
               title="Horas extra over 45h — se pagan al precio pactado, aparte de las del calendario"
-              style={{ background:"#fdf4ea", border:"1px solid #e0c090", borderRadius:4, color:"#b07030", fontFamily:"'Courier Prime', 'Courier New', monospace", fontSize:11, padding:"4px 4px", outline:"none", textAlign:"center", colorScheme:"light", minWidth:0, width:"100%", boxSizing:"border-box" }}
+              style={{ background:"#fdf4ea", border:"1px solid #e0c090", borderRadius:4, color:"#b07030", fontFamily:"'Courier Prime', 'Courier New', monospace", fontSize:12, padding:"6px 2px", outline:"none", textAlign:"center", colorScheme:"light", minWidth:0, width:"100%", boxSizing:"border-box", fontWeight:600 }}
               onFocus={e=>e.target.style.borderColor="#b07030"} onBlur={e=>e.target.style.borderColor="#e0c090"} />
           </div>}
           {hasJE && <div>
@@ -2279,21 +2279,21 @@ function InputsPorMes({ desglose, horasPorMes, setHorasPorMes, vacDiasPorMes, se
             <input type="number" min="0" step="1" value={(jornadasEspecialesPorMes||[])[i]||""} placeholder="0"
               onChange={e=>setJE(i,parseFloat(e.target.value)||0)}
               title="Jornadas especiales (cada una = 1 HX + 20€)"
-              style={{ background:"#fff0f6", border:"1px solid #f0b0d0", borderRadius:4, color:"#8a1e4a", fontFamily:"'Courier Prime', 'Courier New', monospace", fontSize:11, padding:"4px 4px", outline:"none", textAlign:"center", colorScheme:"light", minWidth:0, width:"100%", boxSizing:"border-box" }}
+              style={{ background:"#fff0f6", border:"1px solid #f0b0d0", borderRadius:4, color:"#8a1e4a", fontFamily:"'Courier Prime', 'Courier New', monospace", fontSize:12, padding:"6px 2px", outline:"none", textAlign:"center", colorScheme:"light", minWidth:0, width:"100%", boxSizing:"border-box", fontWeight:600 }}
               onFocus={e=>e.target.style.borderColor="#d63a7a"} onBlur={e=>e.target.style.borderColor="#f0b0d0"} />
           </div>}
           <div>
             <div style={{ fontSize:8, lineHeight:1, marginBottom:2, visibility:"hidden" }}>·</div>
             <input type="number" min="0" step="1" value={vacDiasPorMes[i]||""} placeholder="0"
               onChange={e=>setV(i,parseFloat(e.target.value)||0)}
-              style={{ background:"#dfe4e8", border:"1px solid #e0c8b0", borderRadius:4, color:"#8a2a20", fontFamily:"'Courier Prime', 'Courier New', monospace", fontSize:11, padding:"4px 4px", outline:"none", textAlign:"center", colorScheme:"light", minWidth:0, width:"100%", boxSizing:"border-box" }}
+              style={{ background:"#dfe4e8", border:"1px solid #e0c8b0", borderRadius:4, color:"#8a2a20", fontFamily:"'Courier Prime', 'Courier New', monospace", fontSize:12, padding:"6px 2px", outline:"none", textAlign:"center", colorScheme:"light", minWidth:0, width:"100%", boxSizing:"border-box", fontWeight:600 }}
               onFocus={e=>e.target.style.borderColor="#4ec9b8"} onBlur={e=>e.target.style.borderColor="#e0c8b0"} />
           </div>
           {hasFest && <div>
             <div style={{ fontSize:8, lineHeight:1, marginBottom:2, visibility:"hidden" }}>·</div>
             <input type="number" min="0" step="1" value={(festivosPorMes||[])[i]||""} placeholder="0"
               onChange={e=>setF(i,parseFloat(e.target.value)||0)}
-              style={{ background:"#dfe4e8", border:"1px solid #c8b0d8", borderRadius:4, color:"#6a3a9a", fontFamily:"'Courier Prime', 'Courier New', monospace", fontSize:11, padding:"4px 4px", outline:"none", textAlign:"center", colorScheme:"light", minWidth:0, width:"100%", boxSizing:"border-box" }}
+              style={{ background:"#dfe4e8", border:"1px solid #c8b0d8", borderRadius:4, color:"#6a3a9a", fontFamily:"'Courier Prime', 'Courier New', monospace", fontSize:12, padding:"6px 2px", outline:"none", textAlign:"center", colorScheme:"light", minWidth:0, width:"100%", boxSizing:"border-box", fontWeight:600 }}
               onFocus={e=>e.target.style.borderColor="#8a5aaa"} onBlur={e=>e.target.style.borderColor="#c8b0d8"} />
           </div>}
         </div>
@@ -2769,7 +2769,7 @@ function DocumentoImprimible({
   totalFestDias45, totalFestImport45,
   totJEDias = 0, totJEImporte = 0, // v73: jornadas especiales
   totOver45Horas = 0, totOver45Importe = 0, over45Precio = 0, over45Aplica = false, // v150
-  valorFestivo45 = 0, festPactadoAplica = false, // v150
+  valorFestivo45 = 0, festivo45Aplica = false, // v150
   plusHerramienta, plusCoche, plusVivienda, plusSeguroVida, plusComida,
   es40h = false,
   codigoContable = "",
@@ -3010,7 +3010,7 @@ function DocumentoImprimible({
           </tr>
           <tr>
             <td style={tdLabel}><strong>Hora Extra ×1,5:</strong> <span style={{ color: "#1a1a1a" }}>{fmtE(vHoraEx)}</span></td>
-            <td style={tdLabel}><strong>{festPactadoAplica ? "Festivo pactado:" : "Festivo ×1,75:"}</strong> <span style={{ color: "#6a3a9a" }}>{fmtE(valorFestivo45 || salarioDia * 1.75)}</span></td>
+            <td style={tdLabel}><strong>{festivo45Aplica ? "Festivo pactado:" : "Festivo ×1,75:"}</strong> <span style={{ color: "#6a3a9a" }}>{fmtE(valorFestivo45 || salarioDia * 1.75)}</span></td>
             <td style={tdLabel}><strong>Total H.Extra:</strong> {fmtE(totHx)} ({horasPorMes.reduce((s,v)=>s+(v||0),0)}h)</td>
           </tr>
         </tbody>
@@ -3167,7 +3167,7 @@ function DocumentoImprimible({
           )}
           {totalFestDias45 > 0 && (
             <tr>
-              <td style={tdLabel}>+ Festivos trabajados ({totalFestDias45}d){festPactadoAplica ? " · pactado" : ""}</td>
+              <td style={tdLabel}>+ Festivos trabajados ({totalFestDias45}d){festivo45Aplica ? " · pactado" : ""}</td>
               <td style={{ ...tdValue, textAlign: "right", color: "#6a3a9a", fontWeight: 700 }}>+ {fmtE(totalFestImport45)}</td>
             </tr>
           )}
@@ -3303,8 +3303,8 @@ function App45({ modoTab = "iruna45" }) {
   const [over45PorMes,     setOver45PorMes]    = useState([]);
   // v150: festivo trabajado a precio pactado — salario pactado / 30 * 1,75
   // (el ordinario usa la base 40h). No afecta a las jornadas especiales.
-  const [festPactadoActivo, setFestPactadoActivo] = useState(false);
-  const [festPactadoPrecioManual, setFestPactadoPrecioManual] = useState("");
+  const [festivo45Activo, setFestivo45Activo] = useState(false);
+  const [festivo45PrecioManual, setFestivo45PrecioManual] = useState("");
   const [festivosActivos,  setFestivosActivos] = useState({});
   const [vacAcumulada,     setVacAcumulada]    = useState(false);
   const [indemAcumulada,   setIndemAcumulada]  = useState(false);
@@ -3724,13 +3724,13 @@ function App45({ modoTab = "iruna45" }) {
 
   // v150: valor del festivo trabajado. Ordinario = salarioDia (base 40h) x 1,75.
   // Pactado = salario pactado ÍNTEGRO / 30 x 1,75. Solo en 45H.
-  const festPactadoPrecioCalc = es40h ? 0 : ((Number(salario45) || 0) / 30) * 1.75;
-  const festPactadoAplica = !es40h && festPactadoActivo;
+  const festivo45PrecioCalc = es40h ? 0 : ((Number(salario45) || 0) / 30) * 1.75;
+  const festivo45Aplica = !es40h && festivo45Activo;
   const valorFestivoOrdinario = salarioDia * 1.75;
-  const valorFestivo45 = festPactadoAplica
-    ? ((festPactadoPrecioManual !== "" && festPactadoPrecioManual !== null && !isNaN(parseFloat(festPactadoPrecioManual)))
-        ? parseFloat(festPactadoPrecioManual)
-        : festPactadoPrecioCalc)
+  const valorFestivo45 = festivo45Aplica
+    ? ((festivo45PrecioManual !== "" && festivo45PrecioManual !== null && !isNaN(parseFloat(festivo45PrecioManual)))
+        ? parseFloat(festivo45PrecioManual)
+        : festivo45PrecioCalc)
     : valorFestivoOrdinario;
 
   const rawMes45 = p ? p.desglose.map((d, i) => ({
@@ -3905,7 +3905,7 @@ function App45({ modoTab = "iruna45" }) {
     lines.push(["Salario / semana (€)", decimal(salarioDia * 7)].join(sep));
     lines.push(["Valor hora (€)", decimal(vHora)].join(sep));
     lines.push(["Hora extra ×1,5 (€)", decimal(vHoraEx)].join(sep));
-    lines.push([festPactadoAplica ? "Festivo pactado (€)" : "Festivo ×1,75 (€)", decimal(valorFestivo45)].join(sep));   // v150
+    lines.push([festivo45Aplica ? "Festivo pactado (€)" : "Festivo ×1,75 (€)", decimal(valorFestivo45)].join(sep));   // v150
     lines.push([""].join(sep));
 
     lines.push(["NÓMINA POR MES"].join(sep));
@@ -4373,7 +4373,7 @@ ${docHTML}
               horasPorMes, vacDiasPorMes, festivosPorMes, jornadasEspecialesPorMes, festivosActivos, comidaDiasPorMes,
               // v150: horas over 45h y festivo pactado
               over45Activo, over45PrecioManual, over45PorMes,
-              festPactadoActivo, festPactadoPrecioManual,
+              festivo45Activo, festivo45PrecioManual,
               plusHerramienta, plusCoche, plusVivienda, plusSeguroVida, plusComida,
               // Snapshot de resultados calculados (para Coste Empresa)
               _calculado: {
@@ -4450,8 +4450,8 @@ ${docHTML}
               setOver45Activo(!!d.over45Activo);
               setOver45PrecioManual(d.over45PrecioManual ?? "");
               setOver45PorMes(d.over45PorMes || []);
-              setFestPactadoActivo(!!d.festPactadoActivo);
-              setFestPactadoPrecioManual(d.festPactadoPrecioManual ?? "");
+              setFestivo45Activo(!!d.festivo45Activo);
+              setFestivo45PrecioManual(d.festivo45PrecioManual ?? "");
               if (d.festivosActivos !== undefined) setFestivosActivos(d.festivosActivos);
               if (d.comidaDiasPorMes !== undefined) setComidaDiasPorMes(d.comidaDiasPorMes);
               if (d.plusHerramienta !== undefined) setPlusHerramienta(d.plusHerramienta);
@@ -4702,7 +4702,7 @@ ${docHTML}
                     <input type="checkbox" checked={over45Activo} onChange={e=>setOver45Activo(e.target.checked)}
                       style={{ width:16, height:16, accentColor:"#c8963a", cursor:"pointer" }} />
                     <span>
-                      <span style={{ fontSize:12, fontWeight:700, color:"#1a1a1a" }}>Horas extra over 45h a precio pactado</span>
+                      <span style={{ fontSize:12, fontWeight:700, color:"#1a1a1a" }}>Horas extras over 45h · Todo incluido</span>
                       <span style={{ display:"block", fontSize:10.5, color:"#666", marginTop:2 }}>
                         Solo para las horas por encima de las que marca el calendario. Las del calendario no cambian.
                       </span>
@@ -4731,30 +4731,30 @@ ${docHTML}
 
               {/* v150: festivo trabajado a precio pactado — interruptor propio */}
               {!es40h && (
-                <div style={{ marginBottom:14, padding:"12px 14px", background:"#f2f5f7", border:`1px solid ${festPactadoActivo ? "#c8963a" : "#d5d9dc"}`, borderRadius:6 }}>
+                <div style={{ marginBottom:14, padding:"12px 14px", background:"#f2f5f7", border:`1px solid ${festivo45Activo ? "#c8963a" : "#d5d9dc"}`, borderRadius:6 }}>
                   <label style={{ display:"flex", alignItems:"center", gap:10, cursor:"pointer" }}>
-                    <input type="checkbox" checked={festPactadoActivo} onChange={e=>setFestPactadoActivo(e.target.checked)}
+                    <input type="checkbox" checked={festivo45Activo} onChange={e=>setFestivo45Activo(e.target.checked)}
                       style={{ width:16, height:16, accentColor:"#c8963a", cursor:"pointer" }} />
                     <span>
-                      <span style={{ fontSize:12, fontWeight:700, color:"#1a1a1a" }}>Festivo trabajado a precio pactado</span>
+                      <span style={{ fontSize:12, fontWeight:700, color:"#1a1a1a" }}>Festivo Trabajado 45h · Todo incluido</span>
                       <span style={{ display:"block", fontSize:10.5, color:"#666", marginTop:2 }}>
                         Afecta a todos los festivos trabajados. Las jornadas especiales no cambian.
                       </span>
                     </span>
                   </label>
-                  {festPactadoActivo && (
+                  {festivo45Activo && (
                     <div style={{ marginTop:12, display:"flex", gap:12, alignItems:"flex-end", flexWrap:"wrap" }}>
                       <div>
                         <label style={{ display:"block", fontSize:10, fontWeight:600, letterSpacing:"0.08em", textTransform:"uppercase", color:"#666", marginBottom:5 }}>Precio festivo</label>
                         <input type="number" min="0" step="0.01"
-                          value={festPactadoPrecioManual}
-                          placeholder={fmt(festPactadoPrecioCalc)}
-                          onChange={e=>setFestPactadoPrecioManual(e.target.value)}
+                          value={festivo45PrecioManual}
+                          placeholder={fmt(festivo45PrecioCalc)}
+                          onChange={e=>setFestivo45PrecioManual(e.target.value)}
                           onWheel={e=>e.target.blur()}
                           style={{ width:130, padding:"9px 12px", fontSize:13, fontWeight:700, border:"1px solid #c8963a", borderRadius:6, background:"#fff", color:"#6a3a9a", outline:"none", colorScheme:"light" }} />
                       </div>
                       <div style={{ fontSize:10.5, color:"#666", lineHeight:1.5, flex:1, minWidth:220 }}>
-                        Calculado: <strong style={{ color:"#6a3a9a" }}>{fmtE(festPactadoPrecioCalc)}</strong> ·
+                        Calculado: <strong style={{ color:"#6a3a9a" }}>{fmtE(festivo45PrecioCalc)}</strong> ·
                         salario pactado ÷ 30 × 1,75.<br />
                         Festivo ordinario: {fmtE(valorFestivoOrdinario)}. Déjalo vacío para usar el calculado.
                       </div>
@@ -5056,7 +5056,7 @@ ${docHTML}
                     { l:"Salario / Semana", v: salarioDia * 7,      s:"Día × 7" },
                     { l:"Valor Hora",       v: vHora,               s:"Hora Extra" },
                     { l:"Hora Extra",       v: vHoraEx,             s:"Hora × 1,5" },
-                    { l:"Festivo",          v: valorFestivo45,      s: festPactadoAplica ? "Pactado · Día × 1,75" : "Día × 1,75" },   // v150
+                    { l:"Festivo",          v: valorFestivo45,      s: festivo45Aplica ? "Pactado · Día × 1,75" : "Día × 1,75" },   // v150
                   ].map(it=>(
                     <div key={it.l} style={{ background:"#fff", borderRadius:8, padding:"14px 10px", border:"1px solid #d5d9dc", display:"flex", flexDirection:"column", justifyContent:"space-between", minHeight:110 }}>
                       <div style={{ fontSize:9, color:"#666", letterSpacing:"0.06em", textTransform:"uppercase", fontFamily:"'Inter', -apple-system, sans-serif", fontWeight: 600, textAlign:"center", minHeight:26, display:"flex", alignItems:"center", justifyContent:"center", whiteSpace:"nowrap" }}>{it.l}</div>
@@ -5609,7 +5609,7 @@ ${docHTML}
               totalVac45={totalVac45} totalIndem45={totalIndem45}
               totalFestDias45={totalFestDias45} totalFestImport45={totalFestImport45} totJEDias={totJEDias} totJEImporte={totJEImporte}
               totOver45Horas={totOver45Horas} totOver45Importe={totOver45Importe} over45Precio={over45Precio} over45Aplica={over45Aplica}
-              valorFestivo45={valorFestivo45} festPactadoAplica={festPactadoAplica}
+              valorFestivo45={valorFestivo45} festivo45Aplica={festivo45Aplica}
               plusHerramienta={plusHerramienta} plusCoche={plusCoche}
               plusVivienda={plusVivienda} plusSeguroVida={plusSeguroVida}
               plusComida={plusComida}
@@ -5643,7 +5643,7 @@ ${docHTML}
             totalVac45={totalVac45} totalIndem45={totalIndem45}
             totalFestDias45={totalFestDias45} totalFestImport45={totalFestImport45} totJEDias={totJEDias} totJEImporte={totJEImporte}
               totOver45Horas={totOver45Horas} totOver45Importe={totOver45Importe} over45Precio={over45Precio} over45Aplica={over45Aplica}
-              valorFestivo45={valorFestivo45} festPactadoAplica={festPactadoAplica}
+              valorFestivo45={valorFestivo45} festivo45Aplica={festivo45Aplica}
             plusHerramienta={plusHerramienta} plusCoche={plusCoche}
             plusVivienda={plusVivienda} plusSeguroVida={plusSeguroVida}
             plusComida={plusComida}
@@ -9721,7 +9721,7 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
           c.over45Precio || 0,
           c.totOver45Importe || 0,
           c.valorFestivo45 || (salarioDia * 1.75),
-          d.festPactadoActivo ? "Sí" : "No",
+          d.festivo45Activo ? "Sí" : "No",
           p.autor || "",
           p.created_at ? new Date(p.created_at).toLocaleDateString("es-ES") : "",
           p.updated_at ? new Date(p.updated_at).toLocaleDateString("es-ES") : "",
@@ -11879,6 +11879,10 @@ export default function App() {
         {/* v111: fondo global oscuro + Inter cargada */}
         <style>{`
           @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+          /* v154: sin flechas en la tabla de meses — tapaban la cifra */
+          .mes-num input[type="number"]::-webkit-outer-spin-button,
+          .mes-num input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+          .mes-num input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
         `}</style>
         <BannerSesion
           usuario={usuario}
