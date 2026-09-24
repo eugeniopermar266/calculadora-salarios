@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v161";
+const APP_VERSION = "v162";
 
 // v97: Departamentos de un rodaje audiovisual (obligatorio en cada perfil)
 const DEPARTAMENTOS = [
@@ -5125,18 +5125,20 @@ ${docHTML}
 
               <div style={P}>
                 <div style={ST}>▸ Valores de Referencia <BadgeBrutos /></div>
-                <div style={{ display:"grid", gridTemplateColumns:"repeat(5,1fr)", gap:10 }}>
+                {/* v162: la tarjeta de over 45 solo existe con la opción marcada */}
+                <div style={{ display:"grid", gridTemplateColumns:`repeat(${over45Aplica ? 6 : 5},1fr)`, gap:10 }}>
                   {[
                     { l:"Salario / Día",    v: salarioDia,          s:"Base ÷ 30" },
                     { l:"Salario / Semana", v: salarioDia * 7,      s:"Día × 7" },
                     { l:"Valor Hora",       v: vHora,               s:"Hora Extra" },
                     { l:"Hora Extra",       v: vHoraEx,             s:"Hora × 1,5" },
-                    { l:"Festivo",          v: valorFestivo45,      s: festivo45Aplica ? "Pactado · Día × 1,75" : "Día × 1,75" },   // v150
+                    ...(over45Aplica ? [{ l:"H.Extra Over 45", v: over45Precio, s:"Todo incluido · Hora × 1,5", destaca:true }] : []),   // v162
+                    { l:"Festivo",          v: valorFestivo45,      s: festivo45Aplica ? "Todo incluido · Día × 1,75" : "Día × 1,75", destaca: festivo45Aplica },   // v150 · v162
                   ].map(it=>(
-                    <div key={it.l} style={{ background:"#fff", borderRadius:8, padding:"14px 10px", border:"1px solid #d5d9dc", display:"flex", flexDirection:"column", justifyContent:"space-between", minHeight:110 }}>
+                    <div key={it.l} style={{ background:"#fff", borderRadius:8, padding:"14px 10px", border:`1px solid ${it.destaca ? "#e0c090" : "#d5d9dc"}`, display:"flex", flexDirection:"column", justifyContent:"space-between", minHeight:110 }}>
                       <div style={{ fontSize:9, color:"#666", letterSpacing:"0.06em", textTransform:"uppercase", fontFamily:"'Inter', -apple-system, sans-serif", fontWeight: 600, textAlign:"center", minHeight:26, display:"flex", alignItems:"center", justifyContent:"center", whiteSpace:"nowrap" }}>{it.l}</div>
                       <div style={{ fontSize:17, fontWeight:700, color:"#1a1a1a", fontFamily:"'Inter', -apple-system, sans-serif", textAlign:"center" }}>{fmt(it.v)} €</div>
-                      <div style={{ fontSize:10, color:"#4ec9b8", fontFamily:"'Inter', -apple-system, sans-serif", fontWeight: 500, textAlign:"center" }}>{it.s}</div>
+                      <div style={{ fontSize:10, color: it.destaca ? "#b07030" : "#4ec9b8", fontFamily:"'Inter', -apple-system, sans-serif", fontWeight: it.destaca ? 600 : 500, textAlign:"center" }}>{it.s}</div>
                     </div>
                   ))}
                 </div>
