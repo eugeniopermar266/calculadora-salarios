@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v149";
+const APP_VERSION = "v150";
 
 // v97: Departamentos de un rodaje audiovisual (obligatorio en cada perfil)
 const DEPARTAMENTOS = [
@@ -2194,29 +2194,34 @@ function TablaMeses({ porMes, vacAcumulada, indemAcumulada, horasAcumuladas, com
 }
 
 // ─── INPUTS POR MES (horas extra y días vacaciones) ─────────────────────────
-function InputsPorMes({ desglose, horasPorMes, setHorasPorMes, vacDiasPorMes, setVacDiasPorMes, festivosPorMes, setFestivosPorMes, jornadasEspecialesPorMes, setJornadasEspecialesPorMes }) {
+function InputsPorMes({ desglose, horasPorMes, setHorasPorMes, vacDiasPorMes, setVacDiasPorMes, festivosPorMes, setFestivosPorMes, jornadasEspecialesPorMes, setJornadasEspecialesPorMes, over45PorMes, setOver45PorMes }) {
   if (!desglose || desglose.length === 0) return null;
 
   const setH = (i,v) => { const a=[...horasPorMes];   a[i]=v; setHorasPorMes(a); };
   const setV = (i,v) => { const a=[...vacDiasPorMes]; a[i]=v; setVacDiasPorMes(a); };
   const setF = (i,v) => { const a=[...(festivosPorMes||[])]; a[i]=v; setFestivosPorMes(a); };
   const setJE = (i,v) => { const a=[...(jornadasEspecialesPorMes||[])]; a[i]=v; setJornadasEspecialesPorMes(a); };
+  const setO45 = (i,v) => { const a=[...(over45PorMes||[])]; a[i]=v; setOver45PorMes(a); };   // v150
 
   const totalH = horasPorMes.reduce((s,v)=>s+(v||0),0);
   const totalV = vacDiasPorMes.reduce((s,v)=>s+(v||0),0);
   const totalF = (festivosPorMes||[]).reduce((s,v)=>s+(v||0),0);
   const totalJE = (jornadasEspecialesPorMes||[]).reduce((s,v)=>s+(v||0),0);
+  const totalO45 = (over45PorMes||[]).reduce((s,v)=>s+(v||0),0);   // v150
   const hasFest = !!setFestivosPorMes;
   const hasJE = !!setJornadasEspecialesPorMes;
+  const hasO45 = !!setOver45PorMes;   // v150: solo 45H y con la opción activada
 
   // v75: ancho fijo mes + resto uniforme para no descentrar según largo del nombre
-  const cols = hasFest && hasJE ? "95px 1fr 1fr 1fr 1fr" : hasFest ? "95px 1fr 1fr 1fr" : "95px 1fr 1fr";
+  const colsBase = hasFest && hasJE ? "95px 1fr 1fr 1fr 1fr" : hasFest ? "95px 1fr 1fr 1fr" : "95px 1fr 1fr";
+  const cols = hasO45 ? colsBase + " 1fr" : colsBase;   // v150: una columna más solo si aplica
 
   return (
     <div>
       <div style={{ display:"grid", gridTemplateColumns:cols, gap:6, marginBottom:12, padding:"0 2px 6px", borderBottom:"1px solid #eae7e2" }}>
         <div style={{ fontSize:9, color:"#888", letterSpacing:"0.12em", textTransform:"uppercase", fontFamily:"'Courier Prime', 'Courier New', monospace", fontWeight:700 }}>Mes</div>
         <div style={{ fontSize:9, color:"#3a6090", letterSpacing:"0.1em", textTransform:"uppercase", fontFamily:"'Courier Prime', 'Courier New', monospace", textAlign:"center", fontWeight:700 }}>H.Ext</div>
+        {hasO45 && <div style={{ fontSize:9, color:"#b07030", letterSpacing:"0.1em", textTransform:"uppercase", fontFamily:"'Courier Prime', 'Courier New', monospace", textAlign:"center", fontWeight:700 }} title="Horas extra over 45h — precio pactado aparte">Over45</div>}
         {hasJE && <div style={{ fontSize:9, color:"#8a1e4a", letterSpacing:"0.1em", textTransform:"uppercase", fontFamily:"'Courier Prime', 'Courier New', monospace", textAlign:"center", fontWeight:700 }} title="Jornadas Especiales">J.Esp</div>}
         <div style={{ fontSize:9, color:"#907060", letterSpacing:"0.1em", textTransform:"uppercase", fontFamily:"'Courier Prime', 'Courier New', monospace", textAlign:"center", fontWeight:700 }}>Vac</div>
         {hasFest && <div style={{ fontSize:9, color:"#6a4a8a", letterSpacing:"0.1em", textTransform:"uppercase", fontFamily:"'Courier Prime', 'Courier New', monospace", textAlign:"center", fontWeight:700 }}>Fest</div>}
@@ -2261,6 +2266,14 @@ function InputsPorMes({ desglose, horasPorMes, setHorasPorMes, vacDiasPorMes, se
               </div>
             );
           })()}
+          {hasO45 && <div>
+            <div style={{ fontSize:8, lineHeight:1, marginBottom:2, visibility:"hidden" }}>·</div>
+            <input type="number" min="0" step="0.5" value={(over45PorMes||[])[i]||""} placeholder="0"
+              onChange={e=>setO45(i,parseFloat(e.target.value)||0)}
+              title="Horas extra over 45h — se pagan al precio pactado, aparte de las del calendario"
+              style={{ background:"#fdf4ea", border:"1px solid #e0c090", borderRadius:4, color:"#b07030", fontFamily:"'Courier Prime', 'Courier New', monospace", fontSize:11, padding:"4px 4px", outline:"none", textAlign:"center", colorScheme:"light", minWidth:0, width:"100%", boxSizing:"border-box" }}
+              onFocus={e=>e.target.style.borderColor="#b07030"} onBlur={e=>e.target.style.borderColor="#e0c090"} />
+          </div>}
           {hasJE && <div>
             <div style={{ fontSize:8, lineHeight:1, marginBottom:2, visibility:"hidden" }}>·</div>
             <input type="number" min="0" step="1" value={(jornadasEspecialesPorMes||[])[i]||""} placeholder="0"
@@ -2296,6 +2309,7 @@ function InputsPorMes({ desglose, horasPorMes, setHorasPorMes, vacDiasPorMes, se
             return s + (v || 0);
           },0)}h
         </div>
+        {hasO45 && <div style={{ textAlign:"center", fontSize:12, fontWeight:700, color:"#b07030", fontFamily:"'Courier Prime', 'Courier New', monospace" }}>{totalO45}h</div>}
         {hasJE && <div style={{ textAlign:"center", fontSize:12, fontWeight:700, color:"#8a1e4a", fontFamily:"'Courier Prime', 'Courier New', monospace" }}>{totalJE}d</div>}
         <div style={{ textAlign:"center", fontSize:12, fontWeight:700, color:"#8a2a20", fontFamily:"'Courier Prime', 'Courier New', monospace" }}>{totalV}d</div>
         {hasFest && <div style={{ textAlign:"center", fontSize:12, fontWeight:700, color:"#6a3a9a", fontFamily:"'Courier Prime', 'Courier New', monospace" }}>{totalF}d</div>}
@@ -2754,6 +2768,8 @@ function DocumentoImprimible({
   totalVac45, totalIndem45,
   totalFestDias45, totalFestImport45,
   totJEDias = 0, totJEImporte = 0, // v73: jornadas especiales
+  totOver45Horas = 0, totOver45Importe = 0, over45Precio = 0, over45Aplica = false, // v150
+  valorFestivo45 = 0, festPactadoAplica = false, // v150
   plusHerramienta, plusCoche, plusVivienda, plusSeguroVida, plusComida,
   es40h = false,
   codigoContable = "",
@@ -2994,7 +3010,7 @@ function DocumentoImprimible({
           </tr>
           <tr>
             <td style={tdLabel}><strong>Hora Extra ×1,5:</strong> <span style={{ color: "#1a1a1a" }}>{fmtE(vHoraEx)}</span></td>
-            <td style={tdLabel}><strong>Festivo ×1,75:</strong> <span style={{ color: "#6a3a9a" }}>{fmtE(salarioDia * 1.75)}</span></td>
+            <td style={tdLabel}><strong>{festPactadoAplica ? "Festivo pactado:" : "Festivo ×1,75:"}</strong> <span style={{ color: "#6a3a9a" }}>{fmtE(valorFestivo45 || salarioDia * 1.75)}</span></td>
             <td style={tdLabel}><strong>Total H.Extra:</strong> {fmtE(totHx)} ({horasPorMes.reduce((s,v)=>s+(v||0),0)}h)</td>
           </tr>
         </tbody>
@@ -3143,9 +3159,15 @@ function DocumentoImprimible({
               <td style={{ ...tdValue, textAlign: "right", color: "#8a2a20", fontWeight: 700 }}>− {fmtE(totVd)}</td>
             </tr>
           )}
+          {totOver45Horas > 0 && (
+            <tr>
+              <td style={tdLabel}>+ Horas extra over 45h ({totOver45Horas}h × {fmtE(over45Precio)})</td>
+              <td style={{ ...tdValue, textAlign: "right", color: "#4a5157", fontWeight: 700 }}>+ {fmtE(totOver45Importe)}</td>
+            </tr>
+          )}
           {totalFestDias45 > 0 && (
             <tr>
-              <td style={tdLabel}>+ Festivos trabajados ({totalFestDias45}d)</td>
+              <td style={tdLabel}>+ Festivos trabajados ({totalFestDias45}d){festPactadoAplica ? " · pactado" : ""}</td>
               <td style={{ ...tdValue, textAlign: "right", color: "#6a3a9a", fontWeight: 700 }}>+ {fmtE(totalFestImport45)}</td>
             </tr>
           )}
@@ -3274,6 +3296,15 @@ function App45({ modoTab = "iruna45" }) {
   const [vacDiasPorMes,    setVacDiasPorMes]   = useState([]);
   const [festivosPorMes,   setFestivosPorMes]  = useState([]);
   const [jornadasEspecialesPorMes, setJornadasEspecialesPorMes] = useState([]); // v73: JE por mes (editable)
+  // v150: horas extra "over 45h" — solo 45H. Horas POR ENCIMA de las que marca el
+  // calendario, pagadas a un precio pactado aparte. Las del calendario no cambian.
+  const [over45Activo,     setOver45Activo]    = useState(false);
+  const [over45PrecioManual, setOver45PrecioManual] = useState(""); // vacío = usar el calculado
+  const [over45PorMes,     setOver45PorMes]    = useState([]);
+  // v150: festivo trabajado a precio pactado — salario pactado / 30 * 1,75
+  // (el ordinario usa la base 40h). No afecta a las jornadas especiales.
+  const [festPactadoActivo, setFestPactadoActivo] = useState(false);
+  const [festPactadoPrecioManual, setFestPactadoPrecioManual] = useState("");
   const [festivosActivos,  setFestivosActivos] = useState({});
   const [vacAcumulada,     setVacAcumulada]    = useState(false);
   const [indemAcumulada,   setIndemAcumulada]  = useState(false);
@@ -3676,6 +3707,32 @@ function App45({ modoTab = "iruna45" }) {
   const sumaRef    = baseRef + vacRef + indemRef + hxRef;
   const salarioDia = baseRef / 30;
 
+  // v150: precio de la hora extra "over 45h". Fórmula distinta de la ordinaria:
+  // parte del salario pactado ÍNTEGRO (no de la base 40h) y divide entre 45 (no 40).
+  //   salario45 / 30 * 7 / 45 * 1,5
+  // Sale más caro que la hora ordinaria; es el precio que se negocia aparte para
+  // las horas que superan las que marca el calendario. No toca el cálculo vigente.
+  const over45PrecioCalc = es40h ? 0 : ((Number(salario45) || 0) / 30 * 7 / 45) * 1.5;
+  const over45Precio = es40h ? 0
+    : (over45PrecioManual !== "" && over45PrecioManual !== null && !isNaN(parseFloat(over45PrecioManual))
+        ? parseFloat(over45PrecioManual)
+        : over45PrecioCalc);
+  const over45Aplica = !es40h && over45Activo;
+  const over45HorasMes = (i) => over45Aplica ? (Number(over45PorMes[i]) || 0) : 0;
+  const totalOver45Horas = p ? p.desglose.reduce((s,_,i)=>s+over45HorasMes(i), 0) : 0;
+  const totalOver45Importe = totalOver45Horas * over45Precio;
+
+  // v150: valor del festivo trabajado. Ordinario = salarioDia (base 40h) x 1,75.
+  // Pactado = salario pactado ÍNTEGRO / 30 x 1,75. Solo en 45H.
+  const festPactadoPrecioCalc = es40h ? 0 : ((Number(salario45) || 0) / 30) * 1.75;
+  const festPactadoAplica = !es40h && festPactadoActivo;
+  const valorFestivoOrdinario = salarioDia * 1.75;
+  const valorFestivo45 = festPactadoAplica
+    ? ((festPactadoPrecioManual !== "" && festPactadoPrecioManual !== null && !isNaN(parseFloat(festPactadoPrecioManual)))
+        ? parseFloat(festPactadoPrecioManual)
+        : festPactadoPrecioCalc)
+    : valorFestivoOrdinario;
+
   const rawMes45 = p ? p.desglose.map((d, i) => ({
     vac40:   vacRef   * d.fraccion,
     indem40: indemRef * d.fraccion,
@@ -3752,7 +3809,11 @@ function App45({ modoTab = "iruna45" }) {
     // v73: importe JE por mes (aparte del pool objetivo)
     const importeJE = importeJEPorMes[i] || 0;
     const totalJEDias = jeInfoPorMes[i]?.totalJE || 0;
-    const totalMes = base40 + vac40 + indem40 + cobroHx + plusAct - vdShow + importeJE;
+    // v150: las horas over 45h van POR ENCIMA del salario pactado, igual que las JE.
+    // Por eso NO entran en cobroNatural: si entraran, reducirían el Plus de Actividad.
+    const over45Horas   = over45HorasMes(i);
+    const over45Importe = over45Horas * over45Precio;
+    const totalMes = base40 + vac40 + indem40 + cobroHx + plusAct - vdShow + importeJE + over45Importe;
     // v50: Vacación mostrada en pantalla = prorrateada − días disfrutados
     const vacMostrar = vac40 - vdShow;
     return {
@@ -3762,6 +3823,7 @@ function App45({ modoTab = "iruna45" }) {
       hMes, base40, vac40, vacMostrar, indem40, cobroHx, plusAct,
       vdDias: vacDiasPorMes[i]||0, vdShow,
       importeJE, totalJEDias, // v73
+      over45Horas, over45Importe, // v150
       objetivo, totalMes,
     };
   }) : [];
@@ -3776,6 +3838,8 @@ function App45({ modoTab = "iruna45" }) {
   const totFinal  = desglose45.reduce((s,d)=>s+d.totalMes, 0);
   const totJEDias = desglose45.reduce((s,d)=>s+(d.totalJEDias||0), 0); // v73
   const totJEImporte = desglose45.reduce((s,d)=>s+(d.importeJE||0), 0); // v73
+  const totOver45Horas   = desglose45.reduce((s,d)=>s+(d.over45Horas||0), 0);   // v150
+  const totOver45Importe = desglose45.reduce((s,d)=>s+(d.over45Importe||0), 0); // v150
 
   const complementos45 = p ? p.desglose.map((d, i) => {
     const calcPlus = (plus) => !plus.importe ? 0 :
@@ -3792,7 +3856,7 @@ function App45({ modoTab = "iruna45" }) {
   }) : [];
   const totalCompl = complementos45.reduce((s,c)=>s+c.total, 0);
 
-  const importeFestMes45 = p ? p.desglose.map((_,i)=>(festivosPorMes[i]||0)*salarioDia*1.75) : [];
+  const importeFestMes45 = p ? p.desglose.map((_,i)=>(festivosPorMes[i]||0)*valorFestivo45) : [];   // v150
   const totalFestDias45  = festivosPorMes.reduce((s,v)=>s+(v||0),0);
   const totalFestImport45= importeFestMes45.reduce((s,v)=>s+v,0);
 
@@ -3841,7 +3905,7 @@ function App45({ modoTab = "iruna45" }) {
     lines.push(["Salario / semana (€)", decimal(salarioDia * 7)].join(sep));
     lines.push(["Valor hora (€)", decimal(vHora)].join(sep));
     lines.push(["Hora extra ×1,5 (€)", decimal(vHoraEx)].join(sep));
-    lines.push(["Festivo ×1,75 (€)", decimal(salarioDia * 1.75)].join(sep));
+    lines.push([festPactadoAplica ? "Festivo pactado (€)" : "Festivo ×1,75 (€)", decimal(valorFestivo45)].join(sep));   // v150
     lines.push([""].join(sep));
 
     lines.push(["NÓMINA POR MES"].join(sep));
@@ -3895,6 +3959,7 @@ function App45({ modoTab = "iruna45" }) {
     lines.push([`H.Extra totales (${horasPorMes.reduce((s,v)=>s+(v||0),0)}h) €`, decimal(totHx)].join(sep));
     if (totPlus > 0 && !es40h) lines.push(["Plus Actividad (€)", decimal(totPlus)].join(sep));
     if (totVd > 0)   lines.push([`− Vac. disfrutadas (${totalVdDias}d) €`, decimal(totVd)].join(sep));
+    if (totOver45Horas > 0) lines.push([`+ Horas extra over 45h (${totOver45Horas}h) €`, decimal(totOver45Importe)].join(sep));   // v150
     if (totalFestDias45 > 0) lines.push([`+ Festivos trabajados (${totalFestDias45}d) €`, decimal(totalFestImport45)].join(sep));
     if (totJEDias > 0)       lines.push([`+ Jornadas especiales (${totJEDias}d) €`, decimal(totJEImporte)].join(sep));
     if (totalCompl > 0)      lines.push(["+ Complementos (€)", decimal(totalCompl)].join(sep));
@@ -4306,6 +4371,9 @@ ${docHTML}
               proyecto, productora, nombre, puesto, codigoContable, departamento, esFijoDiscontinuo, hxPorRodaje40, salario45, horasRef, modoInverso45, objetivoSemanal45,
               fechaInicio, fechaFin, fechasPendientes, vacAcumulada, indemAcumulada, finiquitoAparte,
               horasPorMes, vacDiasPorMes, festivosPorMes, jornadasEspecialesPorMes, festivosActivos, comidaDiasPorMes,
+              // v150: horas over 45h y festivo pactado
+              over45Activo, over45PrecioManual, over45PorMes,
+              festPactadoActivo, festPactadoPrecioManual,
               plusHerramienta, plusCoche, plusVivienda, plusSeguroVida, plusComida,
               // Snapshot de resultados calculados (para Coste Empresa)
               _calculado: {
@@ -4316,6 +4384,7 @@ ${docHTML}
                 totBase, totVac, totIndem, totHx, totPlus, totVd,
                 totFinal, totalCompl,
                 totalVac45, totalIndem45, totalFestDias45, totalFestImport45,
+                totOver45Horas, totOver45Importe, over45Precio, valorFestivo45, // v150
                 // v77: festivos e importes JE por mes (Coste Empresa los necesita)
                 importeFestMes45: importeFestMes45 || [],
                 festivosPorMesSnapshot: festivosPorMes || [],
@@ -4376,6 +4445,13 @@ ${docHTML}
               if (d.vacDiasPorMes !== undefined) setVacDiasPorMes(d.vacDiasPorMes);
               if (d.festivosPorMes !== undefined) setFestivosPorMes(d.festivosPorMes);
               if (d.jornadasEspecialesPorMes !== undefined) setJornadasEspecialesPorMes(d.jornadasEspecialesPorMes);
+              // v150: horas over 45h y festivo pactado. Los perfiles antiguos no
+              // los llevan, así que se quedan desactivados y calculan como siempre.
+              setOver45Activo(!!d.over45Activo);
+              setOver45PrecioManual(d.over45PrecioManual ?? "");
+              setOver45PorMes(d.over45PorMes || []);
+              setFestPactadoActivo(!!d.festPactadoActivo);
+              setFestPactadoPrecioManual(d.festPactadoPrecioManual ?? "");
               if (d.festivosActivos !== undefined) setFestivosActivos(d.festivosActivos);
               if (d.comidaDiasPorMes !== undefined) setComidaDiasPorMes(d.comidaDiasPorMes);
               if (d.plusHerramienta !== undefined) setPlusHerramienta(d.plusHerramienta);
@@ -4617,13 +4693,83 @@ ${docHTML}
 
           {p && (
             <div style={P}>
-              <div style={ST}>▸ Horas Extra, Jornadas Especiales, Vacaciones, Festivos</div>
+              <div style={ST}>▸ Horas Extra{over45Aplica ? ", Over 45" : ""}, Jornadas Especiales, Vacaciones, Festivos</div>
+
+              {/* v150: horas extra "over 45h" — solo en la pestaña 45H */}
+              {!es40h && (
+                <div style={{ marginBottom:14, padding:"12px 14px", background:"#f2f5f7", border:`1px solid ${over45Activo ? "#c8963a" : "#d5d9dc"}`, borderRadius:6 }}>
+                  <label style={{ display:"flex", alignItems:"center", gap:10, cursor:"pointer" }}>
+                    <input type="checkbox" checked={over45Activo} onChange={e=>setOver45Activo(e.target.checked)}
+                      style={{ width:16, height:16, accentColor:"#c8963a", cursor:"pointer" }} />
+                    <span>
+                      <span style={{ fontSize:12, fontWeight:700, color:"#1a1a1a" }}>Horas extra over 45h a precio pactado</span>
+                      <span style={{ display:"block", fontSize:10.5, color:"#666", marginTop:2 }}>
+                        Solo para las horas por encima de las que marca el calendario. Las del calendario no cambian.
+                      </span>
+                    </span>
+                  </label>
+                  {over45Activo && (
+                    <div style={{ marginTop:12, display:"flex", gap:12, alignItems:"flex-end", flexWrap:"wrap" }}>
+                      <div>
+                        <label style={{ display:"block", fontSize:10, fontWeight:600, letterSpacing:"0.08em", textTransform:"uppercase", color:"#666", marginBottom:5 }}>Precio hora over 45</label>
+                        <input type="number" min="0" step="0.01"
+                          value={over45PrecioManual}
+                          placeholder={fmt(over45PrecioCalc)}
+                          onChange={e=>setOver45PrecioManual(e.target.value)}
+                          onWheel={e=>e.target.blur()}
+                          style={{ width:130, padding:"9px 12px", fontSize:13, fontWeight:700, border:"1px solid #c8963a", borderRadius:6, background:"#fff", color:"#b07030", outline:"none", colorScheme:"light" }} />
+                      </div>
+                      <div style={{ fontSize:10.5, color:"#666", lineHeight:1.5, flex:1, minWidth:220 }}>
+                        Calculado: <strong style={{ color:"#b07030" }}>{fmtE(over45PrecioCalc)}</strong> ·
+                        salario pactado ÷ 30 × 7 ÷ 45 × 1,5.<br />
+                        Hora extra ordinaria: {fmtE(vHoraEx)}. Déjalo vacío para usar el calculado.
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* v150: festivo trabajado a precio pactado — interruptor propio */}
+              {!es40h && (
+                <div style={{ marginBottom:14, padding:"12px 14px", background:"#f2f5f7", border:`1px solid ${festPactadoActivo ? "#c8963a" : "#d5d9dc"}`, borderRadius:6 }}>
+                  <label style={{ display:"flex", alignItems:"center", gap:10, cursor:"pointer" }}>
+                    <input type="checkbox" checked={festPactadoActivo} onChange={e=>setFestPactadoActivo(e.target.checked)}
+                      style={{ width:16, height:16, accentColor:"#c8963a", cursor:"pointer" }} />
+                    <span>
+                      <span style={{ fontSize:12, fontWeight:700, color:"#1a1a1a" }}>Festivo trabajado a precio pactado</span>
+                      <span style={{ display:"block", fontSize:10.5, color:"#666", marginTop:2 }}>
+                        Afecta a todos los festivos trabajados. Las jornadas especiales no cambian.
+                      </span>
+                    </span>
+                  </label>
+                  {festPactadoActivo && (
+                    <div style={{ marginTop:12, display:"flex", gap:12, alignItems:"flex-end", flexWrap:"wrap" }}>
+                      <div>
+                        <label style={{ display:"block", fontSize:10, fontWeight:600, letterSpacing:"0.08em", textTransform:"uppercase", color:"#666", marginBottom:5 }}>Precio festivo</label>
+                        <input type="number" min="0" step="0.01"
+                          value={festPactadoPrecioManual}
+                          placeholder={fmt(festPactadoPrecioCalc)}
+                          onChange={e=>setFestPactadoPrecioManual(e.target.value)}
+                          onWheel={e=>e.target.blur()}
+                          style={{ width:130, padding:"9px 12px", fontSize:13, fontWeight:700, border:"1px solid #c8963a", borderRadius:6, background:"#fff", color:"#6a3a9a", outline:"none", colorScheme:"light" }} />
+                      </div>
+                      <div style={{ fontSize:10.5, color:"#666", lineHeight:1.5, flex:1, minWidth:220 }}>
+                        Calculado: <strong style={{ color:"#6a3a9a" }}>{fmtE(festPactadoPrecioCalc)}</strong> ·
+                        salario pactado ÷ 30 × 1,75.<br />
+                        Festivo ordinario: {fmtE(valorFestivoOrdinario)}. Déjalo vacío para usar el calculado.
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <InputsPorMes
                 desglose={p.desglose}
                 horasPorMes={horasPorMes}       setHorasPorMes={setHorasPorMes}
                 vacDiasPorMes={vacDiasPorMes}   setVacDiasPorMes={setVacDiasPorMes}
                 festivosPorMes={festivosPorMes} setFestivosPorMes={setFestivosPorMes}
                 jornadasEspecialesPorMes={jornadasEspecialesPorMes} setJornadasEspecialesPorMes={setJornadasEspecialesPorMes}
+                over45PorMes={over45Aplica ? over45PorMes : undefined} setOver45PorMes={over45Aplica ? setOver45PorMes : undefined}
               />
             </div>
           )}
@@ -4910,7 +5056,7 @@ ${docHTML}
                     { l:"Salario / Semana", v: salarioDia * 7,      s:"Día × 7" },
                     { l:"Valor Hora",       v: vHora,               s:"Hora Extra" },
                     { l:"Hora Extra",       v: vHoraEx,             s:"Hora × 1,5" },
-                    { l:"Festivo",          v: salarioDia * 1.75,   s:"Día × 1,75" },
+                    { l:"Festivo",          v: valorFestivo45,      s: festPactadoAplica ? "Pactado · Día × 1,75" : "Día × 1,75" },   // v150
                   ].map(it=>(
                     <div key={it.l} style={{ background:"#fff", borderRadius:8, padding:"14px 10px", border:"1px solid #d5d9dc", display:"flex", flexDirection:"column", justifyContent:"space-between", minHeight:110 }}>
                       <div style={{ fontSize:9, color:"#666", letterSpacing:"0.06em", textTransform:"uppercase", fontFamily:"'Inter', -apple-system, sans-serif", fontWeight: 600, textAlign:"center", minHeight:26, display:"flex", alignItems:"center", justifyContent:"center", whiteSpace:"nowrap" }}>{it.l}</div>
@@ -5458,6 +5604,8 @@ ${docHTML}
               totFinal={totFinal}
               totalVac45={totalVac45} totalIndem45={totalIndem45}
               totalFestDias45={totalFestDias45} totalFestImport45={totalFestImport45} totJEDias={totJEDias} totJEImporte={totJEImporte}
+              totOver45Horas={totOver45Horas} totOver45Importe={totOver45Importe} over45Precio={over45Precio} over45Aplica={over45Aplica}
+              valorFestivo45={valorFestivo45} festPactadoAplica={festPactadoAplica}
               plusHerramienta={plusHerramienta} plusCoche={plusCoche}
               plusVivienda={plusVivienda} plusSeguroVida={plusSeguroVida}
               plusComida={plusComida}
@@ -5490,6 +5638,8 @@ ${docHTML}
             totFinal={totFinal}
             totalVac45={totalVac45} totalIndem45={totalIndem45}
             totalFestDias45={totalFestDias45} totalFestImport45={totalFestImport45} totJEDias={totJEDias} totJEImporte={totJEImporte}
+              totOver45Horas={totOver45Horas} totOver45Importe={totOver45Importe} over45Precio={over45Precio} over45Aplica={over45Aplica}
+              valorFestivo45={valorFestivo45} festPactadoAplica={festPactadoAplica}
             plusHerramienta={plusHerramienta} plusCoche={plusCoche}
             plusVivienda={plusVivienda} plusSeguroVida={plusSeguroVida}
             plusComida={plusComida}
