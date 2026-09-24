@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v162";
+const APP_VERSION = "v163";
 
 // v97: Departamentos de un rodaje audiovisual (obligatorio en cada perfil)
 const DEPARTAMENTOS = [
@@ -2838,7 +2838,12 @@ function DocumentoImprimible({
   };
 
   const tieneCompl = totalCompl > 0;
-  const totalConExtras = totFinal + totalFestImport45 + totalCompl;
+  // v163: el PDF es lo que el trabajador tiene asegurado. Las horas over 45 no
+  // están garantizadas, así que NO entran en ningún importe de este documento:
+  // ni en el total, ni en la tabla mes a mes, ni en el resumen. Solo se informa
+  // de su precio por hora en el bloque de Cálculo de Horas.
+  const totFinalPdf = totFinal - (totOver45Importe || 0);
+  const totalConExtras = totFinalPdf + totalFestImport45 + totalCompl;
 
   return (
     <div style={{ fontFamily: "'Courier Prime', 'Courier New', monospace", color: "#1a1a1a", fontSize: 10, position: "relative" }}>
@@ -3032,9 +3037,18 @@ function DocumentoImprimible({
           </tr>
           <tr>
             <td style={tdLabel}><strong>Hora Extra ×1,5:</strong> <span style={{ color: "#1a1a1a" }}>{fmtE(vHoraEx)}</span></td>
-            <td style={tdLabel}><strong>{festivo45Aplica ? "Festivo pactado:" : "Festivo ×1,75:"}</strong> <span style={{ color: "#6a3a9a" }}>{fmtE(valorFestivo45 || salarioDia * 1.75)}</span></td>
+            <td style={tdLabel}><strong>{festivo45Aplica ? "Festivo 45h ×1,75:" : "Festivo ×1,75:"}</strong> <span style={{ color: "#6a3a9a" }}>{fmtE(valorFestivo45 || salarioDia * 1.75)}</span></td>
             <td style={tdLabel}><strong>Total H.Extra:</strong> {fmtE(totHx)} ({horasPorMes.reduce((s,v)=>s+(v||0),0)}h)</td>
           </tr>
+          {/* v163: solo el precio, a título informativo. Estas horas no están
+              garantizadas, así que no suman en ningún importe del documento. */}
+          {over45Aplica && (
+            <tr>
+              <td style={tdLabel}><strong>Hora over 45h ×1,5:</strong> <span style={{ color: "#4a5157" }}>{fmtE(over45Precio)}</span></td>
+              <td style={tdLabel}>&nbsp;</td>
+              <td style={tdLabel}>&nbsp;</td>
+            </tr>
+          )}
         </tbody>
       </table>
 
@@ -3079,7 +3093,8 @@ function DocumentoImprimible({
             const comida = c.comida || 0;
             // TOTAL = totalMes (que incluye base+vac+indem+h.extra+plusAct−vd) + festivos + complementos
             // En 40H restamos el plusAct del totalMes porque esa columna se elimina
-            const totalRow = (es40h ? (d.totalMes - (d.plusAct || 0)) : d.totalMes) + fest + (c.total || 0);
+            const totalMesPdf = (d.totalMes || 0) - (d.over45Importe || 0);   // v163
+            const totalRow = (es40h ? (totalMesPdf - (d.plusAct || 0)) : totalMesPdf) + fest + (c.total || 0);
             return (
               <tr key={i} style={{ background: i % 2 === 0 ? "#ffffff" : "#f2f5f7" }}>
                 <td style={tdCell({ textTransform: "capitalize", fontWeight: 700 })}>
@@ -3181,15 +3196,9 @@ function DocumentoImprimible({
               <td style={{ ...tdValue, textAlign: "right", color: "#8a2a20", fontWeight: 700 }}>− {fmtE(totVd)}</td>
             </tr>
           )}
-          {totOver45Horas > 0 && (
-            <tr>
-              <td style={tdLabel}>+ Horas extra over 45h ({totOver45Horas}h × {fmtE(over45Precio)})</td>
-              <td style={{ ...tdValue, textAlign: "right", color: "#4a5157", fontWeight: 700 }}>+ {fmtE(totOver45Importe)}</td>
-            </tr>
-          )}
           {totalFestDias45 > 0 && (
             <tr>
-              <td style={tdLabel}>+ Festivos trabajados ({totalFestDias45}d){festivo45Aplica ? " · pactado" : ""}</td>
+              <td style={tdLabel}>+ Festivos trabajados ({totalFestDias45}d)</td>
               <td style={{ ...tdValue, textAlign: "right", color: "#6a3a9a", fontWeight: 700 }}>+ {fmtE(totalFestImport45)}</td>
             </tr>
           )}
@@ -3204,16 +3213,16 @@ function DocumentoImprimible({
               TOTAL A PERCIBIR ({es40h ? "40h" : "45h"}) {tieneCompl ? "(sin extras)" : ""} <span style={{ display: "inline-block", background: "#1a1a1a", color: "#f2f5f7", fontSize: 8, fontWeight: 700, letterSpacing: "0.12em", padding: "1px 6px", borderRadius: 3, marginLeft: 6, verticalAlign: "middle", textTransform: "uppercase" }}>Importe Bruto</span>
             </td>
             <td style={{ ...tdValue, background: PDF_AZUL, border: `1px solid ${PDF_AZUL_B}`, textAlign: "right", fontSize: 13, fontWeight: 700, color: "#1a1a1a", padding: "8px 8px" }}>
-              {fmtE((es40h ? (totFinal - (totPlus || 0)) : totFinal) + (totalFestImport45 || 0))}
+              {fmtE((es40h ? (totFinalPdf - (totPlus || 0)) : totFinalPdf) + (totalFestImport45 || 0))}
             </td>
           </tr>
           <tr>
             <td style={{ ...tdLabel, paddingLeft: 18, color: "#444", fontWeight: 400 }}>· Promedio mensual ({fmtM(p?.mesesTotales || 0)} meses)</td>
-            <td style={{ ...tdValue, textAlign: "right", color: "#1a7a58", fontWeight: 700 }}>{p && p.mesesTotales > 0 ? fmtE((es40h ? (totFinal - (totPlus || 0)) : totFinal) / p.mesesTotales) : "—"}</td>
+            <td style={{ ...tdValue, textAlign: "right", color: "#1a7a58", fontWeight: 700 }}>{p && p.mesesTotales > 0 ? fmtE((es40h ? (totFinalPdf - (totPlus || 0)) : totFinalPdf) / p.mesesTotales) : "—"}</td>
           </tr>
           <tr>
             <td style={{ ...tdLabel, paddingLeft: 18, color: "#444", fontWeight: 400 }}>· Promedio semanal ({fmt(p?.semanasTotales || 0, 1)} sem L-V)</td>
-            <td style={{ ...tdValue, textAlign: "right", color: "#1a7a58" }}>{p && p.semanasTotales > 0 ? fmtE((es40h ? (totFinal - (totPlus || 0)) : totFinal) / p.semanasTotales) : "—"}</td>
+            <td style={{ ...tdValue, textAlign: "right", color: "#1a7a58" }}>{p && p.semanasTotales > 0 ? fmtE((es40h ? (totFinalPdf - (totPlus || 0)) : totFinalPdf) / p.semanasTotales) : "—"}</td>
           </tr>
 
           {/* EXTRAS DEL PERÍODO */}
