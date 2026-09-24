@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v150";
+const APP_VERSION = "v151";
 
 // v97: Departamentos de un rodaje audiovisual (obligatorio en cada perfil)
 const DEPARTAMENTOS = [
@@ -9628,7 +9628,11 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
       "Total Plus Actividad", "Total Festivos", "Total Jornadas Especiales", "Total Complementos", // T-W
       "BRUTO TRABAJADOR", "Total SS Empresa", "COSTE TOTAL",                                    // X-Y-Z
       "BRUTO MMB", "FRINGES MMB", "TOTAL MMB", "DIFERENCIA (Z - AC)",                           // AA-AB-AC-AD (v96)
-      "Autor perfil", "Fecha creación", "Última modificación",                                  // AE-AF-AG
+      // v151: over 45h y festivo pactado. Van DESPUÉS de AD a propósito: los índices
+      // fijos de arriba (23-29) y sus fórmulas no se desplazan.
+      "H.Extra over 45 (h)", "Precio hora over 45 (€)", "Total H.Extra over 45 (€)",             // AE-AF-AG
+      "Valor festivo aplicado (€)", "Festivo pactado",                                           // AH-AI
+      "Autor perfil", "Fecha creación", "Última modificación",                                  // AJ-AK-AL
     ];
     const headersMeses = [];
     mesesRango.forEach(ym => {
@@ -9708,6 +9712,12 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
           null, null,
           { f: `${colLetter(IDX_BRUTO_MMB)}${excelRow}+${colLetter(IDX_FRINGES_MMB)}${excelRow}` },
           { f: `${colLetter(IDX_COSTE_TOTAL)}${excelRow}-${colLetter(IDX_TOTAL_MMB)}${excelRow}` },
+          // v151: over 45h y festivo pactado (0 en los perfiles que no lo usan)
+          c.totOver45Horas || 0,
+          c.over45Precio || 0,
+          c.totOver45Importe || 0,
+          c.valorFestivo45 || (salarioDia * 1.75),
+          d.festPactadoActivo ? "Sí" : "No",
           p.autor || "",
           p.created_at ? new Date(p.created_at).toLocaleDateString("es-ES") : "",
           p.updated_at ? new Date(p.updated_at).toLocaleDateString("es-ES") : "",
@@ -9725,6 +9735,9 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
       const colsEUR = new Set();
       colsEUR.add(9);
       for (let i = 15; i <= 29; i++) colsEUR.add(i);
+      // v151: precio hora over 45 (31), total over 45 (32) y valor festivo (33).
+      // La 30 son horas y la 34 es Sí/No, así que no llevan formato de euro.
+      colsEUR.add(31); colsEUR.add(32); colsEUR.add(33);
       for (let i = idxInicioMeses; i < idxFinMeses; i++) colsEUR.add(i);
       for (let i = idxFinMeses; i < idxFinMeses + 3; i++) colsEUR.add(i);
       const totalRows = aoa.length;
@@ -9748,6 +9761,7 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
         else if (i === 4 || i === 5) w = 14;
         else if (i >= 6 && i <= 8) w = 11;
         else if (i >= 15 && i <= 29) w = 15;
+        else if (i >= 30 && i <= 34) w = 16;   // v151
         else if (i >= idxInicioMeses && i < idxFinMeses) w = 11;
         else if (i >= idxFinMeses) w = 14;
         wscols.push({ wch: w });
