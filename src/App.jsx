@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v160";
+const APP_VERSION = "v161";
 
 // v97: Departamentos de un rodaje audiovisual (obligatorio en cada perfil)
 const DEPARTAMENTOS = [
@@ -1006,7 +1006,7 @@ const BadgeBrutos = ({ size = "normal" }) => {
 };
 const LS = { display: "block", fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "#666", marginBottom: 6, fontFamily: "'Inter', -apple-system, sans-serif" };
 
-function Field({ label, value, onChange, onBlur, type = "number", prefix, hint, small, readOnly, lockHint, min, max }) {
+function Field({ label, value, onChange, onBlur, type = "number", prefix, hint, small, readOnly, lockHint, aviso, min, max }) {
   return (
     <div style={{ marginBottom: small ? 8 : 14, minWidth: 0 }}>
       {label && (
@@ -1050,6 +1050,8 @@ function Field({ label, value, onChange, onBlur, type = "number", prefix, hint, 
         />
       </div>
       {hint && <p style={{ margin: "4px 0 0", fontSize: 10, color: "#1a1a1a", fontFamily: "'Inter', -apple-system, sans-serif", fontWeight: 500 }}>{hint}</p>}
+      {/* v161: aviso destacado bajo el hint, para valores que no se deben tocar a mano */}
+      {aviso && <p style={{ margin: "6px 0 0", fontSize: 10, color: "#7a5a2a", fontFamily: "'Inter', -apple-system, sans-serif", fontWeight: 600, background: "#fdf4ea", border: "1px solid #e0c090", borderRadius: 4, padding: "6px 8px", lineHeight: 1.4 }}>⚠ {aviso}</p>}
       {readOnly && lockHint && <p style={{ margin: "4px 0 0", fontSize: 10, color: "#1a1a1a", fontFamily: "'Inter', -apple-system, sans-serif", fontStyle: "italic", fontWeight: 500 }}>{lockHint}</p>}
     </div>
   );
@@ -4661,7 +4663,7 @@ ${docHTML}
               </div>
             )}
 
-            {!es40h && <Field label="Horas de referencia / mes" value={horasRef} onChange={setHorasRef} hint="Nº horas extra del mes tipo (ej. 22)" />}
+            {!es40h && <Field label="Horas de referencia / mes" value={horasRef} onChange={setHorasRef} hint="Nº horas extra del mes tipo (ej. 22)" aviso="No tocar este valor de referencia, sale del calendario." />}
 
             <div style={{ padding:12, background:"#dfe4e8", borderRadius:6, border:"1px solid #d5d9dc" }}>
               <div style={{ fontSize:9, color:"#666", letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:8 }}>Desglose mensual referencia</div>
