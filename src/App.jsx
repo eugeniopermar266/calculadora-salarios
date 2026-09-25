@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v171";
+const APP_VERSION = "v172";
 
 // v167: jornadas especiales y festivos trabajados NO suman en el PDF del
 // trabajador: dependen de que ese día se decida trabajar, así que no están
@@ -12116,6 +12116,7 @@ function BannerSesion({ usuario, proyectoActivo, onLogout, onAdmin, onLogs, onPu
           )}
         </div>
 
+        <a href="https://bdprodtools.site" style={{ color: "#fff", border: "1px solid rgba(255,255,255,0.2)", padding: "9px 18px", borderRadius: 6, fontSize: 12, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", textDecoration: "none", marginRight: 8 }}>← Portal</a>
         {/* Cerrar sesión a la derecha */}
         <button
           onClick={onLogout}
@@ -12214,6 +12215,34 @@ export default function App() {
           comunidad: f.comunidad || "bilbao",
         }));
       }
+    })();
+  }, []);
+
+  // ── Acceso directo desde el portal bdprodtools.site (#portal_token=...)
+  useEffect(() => {
+    const m = window.location.hash.match(/portal_token=([^&]+)/);
+    if (!m) return;
+    window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    (async () => {
+      try {
+        const r = await fetch("https://shuejlzogsisjtilfbhv.supabase.co/auth/v1/verify", {
+          method: "POST",
+          headers: { apikey: "sb_publishable_Sw4UMK1F9cLrLyCHefNESg__L7OAbTZ", "Content-Type": "application/json" },
+          body: JSON.stringify({ type: "magiclink", token_hash: decodeURIComponent(m[1]) }),
+        });
+        const j = await r.json();
+        const portalUsuario = ((j && j.user && j.user.email) || "").split("@")[0];
+        if (!portalUsuario) return;
+        const data = await supabaseFetch(`usuarios?${new URLSearchParams({ portal_usuario: `eq.${portalUsuario}`, activo: "eq.true", select: "id,nombre,es_admin,rol,pin" })}`);
+        const u = Array.isArray(data) && data.length === 1 ? data[0] : null;
+        if (!u) { alert("Tu usuario del portal no está vinculado en Nóminas. Pide al admin que lo vincule."); return; }
+        localStorage.setItem(AUTH_KEY, JSON.stringify({
+          id: u.id, nombre: u.nombre, es_admin: u.es_admin, rol: u.rol || (u.es_admin ? "admin" : "user"), pin: u.pin,
+          ultima_actividad: Date.now(),
+        }));
+        registrarLog(u.nombre, "login portal");
+        window.location.reload();
+      } catch (e) { console.warn("Acceso desde portal fallido:", e); }
     })();
   }, []);
 
