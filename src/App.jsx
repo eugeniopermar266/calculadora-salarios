@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v163";
+const APP_VERSION = "v164";
 
 // v97: Departamentos de un rodaje audiovisual (obligatorio en cada perfil)
 const DEPARTAMENTOS = [
@@ -9732,7 +9732,7 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
       // v151: over 45h y festivo pactado. Van DESPUÉS de AD a propósito: los índices
       // fijos de arriba (23-29) y sus fórmulas no se desplazan.
       "H.Extra over 45 (h)", "Precio hora over 45 (€)", "Total H.Extra over 45 (€)",             // AE-AF-AG
-      "Valor festivo aplicado (€)", "Festivo pactado",                                           // AH-AI
+      "Valor festivo aplicado (€)", "Festivo 45h",                                             // AH-AI (v164)
       "Autor perfil", "Fecha creación", "Última modificación",                                  // AJ-AK-AL
     ];
     const headersMeses = [];
