@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v167";
+const APP_VERSION = "v168";
 
 // v167: jornadas especiales y festivos trabajados NO suman en el PDF del
 // trabajador: dependen de que ese día se decida trabajar, así que no están
@@ -3429,9 +3429,10 @@ function App45({ modoTab = "iruna45" }) {
     const nuevasHoras = mapearContadoresADesglose(p.desglose, contadoresHoras);
 
     // Jornadas especiales (aparte)
-    let contadoresJE;
-    if (es40h && !hxPorRodaje40) contadoresJE = {};
-    else contadoresJE = contarDiasCalendarioPorMes(cal, "especial", fechaInicio, fechaFin, festivosComunidadCal);
+    // v168: las jornadas especiales salen del calendario SIEMPRE, también en 40H.
+    // Antes se saltaban en 40H sin "HX por rodaje" y nunca se actualizaban:
+    // ni para añadirlas ni para quitarlas.
+    const contadoresJE = contarDiasCalendarioPorMes(cal, "especial", fechaInicio, fechaFin, festivosComunidadCal);
     const nuevasJE = mapearContadoresADesglose(p.desglose, contadoresJE);
 
     // Festivos trabajados
@@ -3454,12 +3455,10 @@ function App45({ modoTab = "iruna45" }) {
     }
     const nuevasVac = mapearContadoresADesglose(p.desglose, vacacionesPorMes);
 
-    if (es40h && !hxPorRodaje40) {
-      // no cambiar horas ni JE
-    } else {
-      setHorasPorMes(nuevasHoras);
-      setJornadasEspecialesPorMes(nuevasJE);
-    }
+    // v168: en 40H sin "HX por rodaje" las horas siguen protegidas (no salen del
+    // calendario), pero las jornadas especiales se aplican igual que en 45H.
+    if (!(es40h && !hxPorRodaje40)) setHorasPorMes(nuevasHoras);
+    setJornadasEspecialesPorMes(nuevasJE);
     setFestivosPorMes(nuevosFestivos);
     setVacDiasPorMes(nuevasVac);
 
@@ -3511,9 +3510,7 @@ function App45({ modoTab = "iruna45" }) {
     }
 
     // JE (aparte)
-    let contadoresJEEsperados;
-    if (es40h && !hxPorRodaje40) contadoresJEEsperados = null;
-    else contadoresJEEsperados = contarDiasCalendarioPorMes(cal, "especial", fechaInicio, fechaFin, festivosComunidadCal);
+    const contadoresJEEsperados = contarDiasCalendarioPorMes(cal, "especial", fechaInicio, fechaFin, festivosComunidadCal);   // v168
     if (contadoresJEEsperados !== null) {
       const jeEsperadas = mapearContadoresADesglose(p.desglose, contadoresJEEsperados);
       for (let i = 0; i < jeEsperadas.length; i++) {
@@ -3614,12 +3611,7 @@ function App45({ modoTab = "iruna45" }) {
         const nuevasHoras = mapearContadoresADesglose(p.desglose, contadoresHoras);
 
         // v73: Jornadas especiales aparte (aplican a 45H siempre y a 40H si el checkbox está activo)
-        let contadoresJE;
-        if (es40h && !hxPorRodaje40) {
-          contadoresJE = {}; // en 40H sin checkbox, no auto-rellenar JE
-        } else {
-          contadoresJE = contarDiasCalendarioPorMes(cal, "especial", fechaInicio, fechaFin, festivosComunidadCal);
-        }
+        const contadoresJE = contarDiasCalendarioPorMes(cal, "especial", fechaInicio, fechaFin, festivosComunidadCal);   // v168
         const nuevasJE = mapearContadoresADesglose(p.desglose, contadoresJE);
 
         // Festivos trabajados por mes (aplica siempre)
@@ -3643,13 +3635,13 @@ function App45({ modoTab = "iruna45" }) {
         const nuevasVac = mapearContadoresADesglose(p.desglose, vacacionesPorMes);
 
         // En 40H sin checkbox: no tocamos horas (deja lo que había o vacío)
+        // v168: solo las horas quedan protegidas en 40H; las JE vienen del calendario
         if (es40h && !hxPorRodaje40) {
           setHorasPorMes(prev => Array.from({ length: n }, (_, i) => prev[i] ?? 0));
-          setJornadasEspecialesPorMes(prev => Array.from({ length: n }, (_, i) => prev[i] ?? 0));
         } else {
           setHorasPorMes(nuevasHoras);
-          setJornadasEspecialesPorMes(nuevasJE);
         }
+        setJornadasEspecialesPorMes(nuevasJE);
         setFestivosPorMes(nuevosFestivos);
         setVacDiasPorMes(nuevasVac);
         setComidaDiasPorMes(prev => Array.from({ length: n }, (_, i) => prev[i] ?? null));
