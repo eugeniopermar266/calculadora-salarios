@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v164";
+const APP_VERSION = "v165";
 
 // v97: Departamentos de un rodaje audiovisual (obligatorio en cada perfil)
 const DEPARTAMENTOS = [
@@ -2793,6 +2793,7 @@ function DocumentoImprimible({
   totOver45Horas = 0, totOver45Importe = 0, over45Precio = 0, over45Aplica = false, // v150
   valorFestivo45 = 0, festivo45Aplica = false, // v150
   plusHerramienta, plusCoche, plusVivienda, plusSeguroVida, plusComida,
+  plusVarActivo = false, plusVarNombre = "", totalPlusVar = 0,   // v165
   es40h = false,
   codigoContable = "",
   esFijoDiscontinuo = false, // v47: solo 40H
@@ -3089,7 +3090,7 @@ function DocumentoImprimible({
             const fest = importeFestMes45[i] || 0;
             const vd   = importeVdMes[i] || 0;
             // PLUSES = total de complementos SIN comida
-            const plusesSinComida = (c.herramienta || 0) + (c.coche || 0) + (c.vivienda || 0) + (c.seguroVida || 0);
+            const plusesSinComida = (c.herramienta || 0) + (c.coche || 0) + (c.vivienda || 0) + (c.seguroVida || 0) + (c.plusVar || 0);   // v165
             const comida = c.comida || 0;
             // TOTAL = totalMes (que incluye base+vac+indem+h.extra+plusAct−vd) + festivos + complementos
             // En 40H restamos el plusAct del totalMes porque esa columna se elimina
@@ -3239,7 +3240,7 @@ function DocumentoImprimible({
                 </td>
               </tr>
               <tr>
-                <td style={tdLabel}>+ Complementos (pluses)</td>
+                <td style={tdLabel}>+ Complementos (pluses){plusVarActivo && totalPlusVar > 0 ? ` · incluye ${plusVarNombre || "plus variable"}` : ""}</td>
                 <td style={{ ...tdValue, textAlign: "right", color: "#5a8a5a", fontWeight: 700 }}>+ {fmtE(totalCompl)}</td>
               </tr>
               <tr style={{ background: "#1a1a1a" }}>
@@ -3554,6 +3555,12 @@ function App45({ modoTab = "iruna45" }) {
   const [plusSeguroVida,   setPlusSeguroVida]  = useState({ importe: 0 });
   const [plusComida,       setPlusComida]      = useState({ importeDia: 0 });
   const [comidaDiasPorMes, setComidaDiasPorMes]= useState([]);
+  // v165: plus variable mes a mes (p.ej. un plus de dirección que cambia según
+  // la fase de producción). Importe propio por mes, sin prorratear: el mes que
+  // no se cobra se deja vacío.
+  const [plusVarActivo,   setPlusVarActivo]   = useState(false);
+  const [plusVarNombre,   setPlusVarNombre]   = useState("");
+  const [plusVarPorMes,   setPlusVarPorMes]   = useState([]);
 
   // === Estados para los modales de exportación ===
   const [modalCSV, setModalCSV]   = useState(null);  // { contenido, filename } o null
@@ -3935,10 +3942,13 @@ function App45({ modoTab = "iruna45" }) {
     const diasLV      = Math.round(d.semanasLaborables * 5);
     const diasComida  = (comidaDiasPorMes[i] !== null && comidaDiasPorMes[i] !== undefined) ? (comidaDiasPorMes[i]||0) : diasLV;
     const comida      = (plusComida.importeDia||0) * diasComida;
-    const total       = herramienta + coche + vivienda + seguroVida + comida;
-    return { herramienta, coche, vivienda, seguroVida, comida, diasComida, diasLV, total };
+    // v165: el plus variable NO se prorratea — es el importe que decides para ese mes
+    const plusVar     = plusVarActivo ? (Number(plusVarPorMes[i]) || 0) : 0;
+    const total       = herramienta + coche + vivienda + seguroVida + comida + plusVar;
+    return { herramienta, coche, vivienda, seguroVida, comida, plusVar, diasComida, diasLV, total };
   }) : [];
   const totalCompl = complementos45.reduce((s,c)=>s+c.total, 0);
+  const totalPlusVar = complementos45.reduce((s,c)=>s+(c.plusVar||0), 0);   // v165
 
   const importeFestMes45 = p ? p.desglose.map((_,i)=>(festivosPorMes[i]||0)*valorFestivo45) : [];   // v150
   const totalFestDias45  = festivosPorMes.reduce((s,v)=>s+(v||0),0);
@@ -4002,6 +4012,7 @@ function App45({ modoTab = "iruna45" }) {
       "Jorn. Especiales (días)","Jorn. Especiales €",
       "Plus Herramienta €","Plus Coche €","Plus Vivienda €",
       "Plus Seguro Vida €","Días comida","Plus Comida €",
+      ...(plusVarActivo ? [`${plusVarNombre || "Plus variable"} €`] : []),   // v165
       "Total mes (€)","Complementos mes (€)","Total mes + complementos (€)"
     ];
     lines.push(headers.join(sep));
@@ -4029,6 +4040,7 @@ function App45({ modoTab = "iruna45" }) {
         decimal(c.seguroVida || 0),
         c.diasComida || 0,
         decimal(c.comida || 0),
+        ...(plusVarActivo ? [decimal(c.plusVar || 0)] : []),   // v165
         decimal(totalMesAjustado - (d.importeJE || 0)),
         decimal(c.total || 0),
         decimal(totalMesAjustado + (c.total || 0)),
@@ -4459,6 +4471,7 @@ ${docHTML}
               over45Activo, over45PrecioManual, over45PorMes,
               festivo45Activo, festivo45PrecioManual,
               plusHerramienta, plusCoche, plusVivienda, plusSeguroVida, plusComida,
+              plusVarActivo, plusVarNombre, plusVarPorMes,   // v165
               // Snapshot de resultados calculados (para Coste Empresa)
               _calculado: {
                 desglose45: desglose45 || [],
@@ -4469,6 +4482,7 @@ ${docHTML}
                 totFinal, totalCompl,
                 totalVac45, totalIndem45, totalFestDias45, totalFestImport45,
                 totOver45Horas, totOver45Importe, over45Precio, valorFestivo45, // v150
+                totalPlusVar, plusVarNombre, // v165
                 // v77: festivos e importes JE por mes (Coste Empresa los necesita)
                 importeFestMes45: importeFestMes45 || [],
                 festivosPorMesSnapshot: festivosPorMes || [],
@@ -4540,6 +4554,10 @@ ${docHTML}
               if (d.comidaDiasPorMes !== undefined) setComidaDiasPorMes(d.comidaDiasPorMes);
               if (d.plusHerramienta !== undefined) setPlusHerramienta(d.plusHerramienta);
               if (d.plusCoche !== undefined) setPlusCoche(d.plusCoche);
+              // v165: plus variable (los perfiles antiguos no lo llevan)
+              setPlusVarActivo(!!d.plusVarActivo);
+              setPlusVarNombre(d.plusVarNombre || "");
+              setPlusVarPorMes(d.plusVarPorMes || []);
               if (d.plusVivienda !== undefined) setPlusVivienda(d.plusVivienda);
               if (d.plusSeguroVida !== undefined) setPlusSeguroVida(d.plusSeguroVida);
               if (d.plusComida !== undefined) setPlusComida(d.plusComida);
@@ -5051,6 +5069,60 @@ ${docHTML}
             <div>
               <label style={LS}>Plus Comida (€/día L-V)</label>
               <Field value={plusComida.importeDia} onChange={v=>setPlusComida({importeDia:v})} prefix="€" hint="Calculado automáticamente por días laborables de cada mes" />
+            </div>
+
+            {/* v165: plus variable mes a mes */}
+            <div style={{ marginTop:16, padding:"12px 14px", background:"#f2f5f7", border:`1px solid ${plusVarActivo ? "#c8963a" : "#d5d9dc"}`, borderRadius:6 }}>
+              <label style={{ display:"flex", alignItems:"center", gap:10, cursor:"pointer" }}>
+                <input type="checkbox" checked={plusVarActivo} onChange={e=>setPlusVarActivo(e.target.checked)}
+                  style={{ width:16, height:16, accentColor:"#c8963a", cursor:"pointer" }} />
+                <span>
+                  <span style={{ fontSize:12, fontWeight:700, color:"#1a1a1a" }}>Plus variable mes a mes</span>
+                  <span style={{ display:"block", fontSize:10.5, color:"#666", marginTop:2 }}>
+                    Importe distinto en cada mes, según la fase de producción
+                  </span>
+                </span>
+              </label>
+
+              {plusVarActivo && (
+                <div style={{ marginTop:12 }}>
+                  <label style={LS}>Nombre del plus</label>
+                  <input type="text" value={plusVarNombre} onChange={e=>setPlusVarNombre(e.target.value)}
+                    placeholder="Ej. Plus Dirección"
+                    style={{ width:"100%", background:"#dfe4e8", border:"1px solid #c8963a", borderRadius:4, color:"#1a1a1a", fontFamily:"'Inter', -apple-system, sans-serif", fontSize:14, padding:"9px 12px", boxSizing:"border-box", outline:"none" }} />
+                  <p style={{ margin:"4px 0 0", fontSize:10, color:"#1a1a1a", fontFamily:"'Inter', -apple-system, sans-serif", fontWeight:500 }}>
+                    Así aparecerá en el PDF y en el Excel
+                  </p>
+
+                  {p && p.desglose.length > 0 && (
+                    <div style={{ marginTop:14, background:"#f2f5f7", border:"1px solid #e0c090", borderRadius:6, padding:"12px 14px" }}>
+                      <div style={{ fontSize:10, fontWeight:700, letterSpacing:"0.1em", textTransform:"uppercase", color:"#b07030", marginBottom:4, fontFamily:"'Inter', -apple-system, sans-serif" }}>Importe por mes</div>
+                      <div style={{ fontSize:10.5, color:"#666", marginBottom:8, fontFamily:"'Inter', -apple-system, sans-serif", lineHeight:1.5 }}>
+                        Déjalo vacío en los meses que no lo cobre.
+                      </div>
+                      {p.desglose.map((d,i)=>(
+                        <div key={i} style={{ display:"grid", gridTemplateColumns:"1fr 120px", gap:10, alignItems:"center", padding:"7px 0", borderBottom:"1px solid #eef1f3" }}>
+                          <div style={{ fontSize:12, color:"#1a1a1a", fontFamily:"'Inter', -apple-system, sans-serif", textTransform:"capitalize" }}>
+                            {d.mes}{!d.esCompleto && <span style={{ color:"#4ec9b8", marginLeft:4 }}>({d.desde}–{d.hasta})</span>}
+                          </div>
+                          <div style={{ position:"relative" }}>
+                            <span style={{ position:"absolute", left:8, top:"50%", transform:"translateY(-50%)", fontSize:11, color:"#888" }}>€</span>
+                            <input type="number" min="0" step="0.01" value={plusVarPorMes[i] ?? ""} placeholder="0"
+                              onChange={e=>{ const v=e.target.value; setPlusVarPorMes(prev=>{ const a=[...prev]; a[i]= v===""?"":(parseFloat(v)||0); return a; }); }}
+                              onFocus={e=>e.target.select()}
+                              onWheel={e=>{ if (e.target === document.activeElement) e.target.blur(); }}
+                              style={{ width:"100%", background:"#fdf4ea", border:"1px solid #e0c090", borderRadius:4, color:"#b07030", fontFamily:"'Inter', -apple-system, sans-serif", fontSize:13, fontWeight:700, padding:"7px 8px 7px 22px", boxSizing:"border-box", textAlign:"right", outline:"none", colorScheme:"light" }} />
+                          </div>
+                        </div>
+                      ))}
+                      <div style={{ display:"grid", gridTemplateColumns:"1fr 120px", gap:10, alignItems:"center", paddingTop:10, marginTop:4, borderTop:"2px solid #d5d9dc" }}>
+                        <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.08em", textTransform:"uppercase", color:"#1a1a1a", fontFamily:"'Inter', -apple-system, sans-serif" }}>Total</div>
+                        <div style={{ textAlign:"right", fontSize:14, fontWeight:700, color:"#b07030", fontFamily:"'Inter', -apple-system, sans-serif" }}>{fmtE(totalPlusVar)}</div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
@@ -5695,6 +5767,7 @@ ${docHTML}
               totalVac45={totalVac45} totalIndem45={totalIndem45}
               totalFestDias45={totalFestDias45} totalFestImport45={totalFestImport45} totJEDias={totJEDias} totJEImporte={totJEImporte}
               totOver45Horas={totOver45Horas} totOver45Importe={totOver45Importe} over45Precio={over45Precio} over45Aplica={over45Aplica}
+              plusVarActivo={plusVarActivo} plusVarNombre={plusVarNombre} totalPlusVar={totalPlusVar}
               valorFestivo45={valorFestivo45} festivo45Aplica={festivo45Aplica}
               plusHerramienta={plusHerramienta} plusCoche={plusCoche}
               plusVivienda={plusVivienda} plusSeguroVida={plusSeguroVida}
@@ -5729,6 +5802,7 @@ ${docHTML}
             totalVac45={totalVac45} totalIndem45={totalIndem45}
             totalFestDias45={totalFestDias45} totalFestImport45={totalFestImport45} totJEDias={totJEDias} totJEImporte={totJEImporte}
               totOver45Horas={totOver45Horas} totOver45Importe={totOver45Importe} over45Precio={over45Precio} over45Aplica={over45Aplica}
+              plusVarActivo={plusVarActivo} plusVarNombre={plusVarNombre} totalPlusVar={totalPlusVar}
               valorFestivo45={valorFestivo45} festivo45Aplica={festivo45Aplica}
             plusHerramienta={plusHerramienta} plusCoche={plusCoche}
             plusVivienda={plusVivienda} plusSeguroVida={plusSeguroVida}
@@ -9733,6 +9807,7 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
       // fijos de arriba (23-29) y sus fórmulas no se desplazan.
       "H.Extra over 45 (h)", "Precio hora over 45 (€)", "Total H.Extra over 45 (€)",             // AE-AF-AG
       "Valor festivo aplicado (€)", "Festivo 45h",                                             // AH-AI (v164)
+      "Nombre plus variable", "Total plus variable (€)",                                       // AJ-AK (v165)
       "Autor perfil", "Fecha creación", "Última modificación",                                  // AJ-AK-AL
     ];
     const headersMeses = [];
@@ -9819,6 +9894,9 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
           c.totOver45Importe || 0,
           c.valorFestivo45 || (salarioDia * 1.75),
           d.festivo45Activo ? "Sí" : "No",
+          // v165: plus variable
+          d.plusVarActivo ? (d.plusVarNombre || "Plus variable") : "",
+          c.totalPlusVar || 0,
           p.autor || "",
           p.created_at ? new Date(p.created_at).toLocaleDateString("es-ES") : "",
           p.updated_at ? new Date(p.updated_at).toLocaleDateString("es-ES") : "",
@@ -9839,6 +9917,7 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
       // v151: precio hora over 45 (31), total over 45 (32) y valor festivo (33).
       // La 30 son horas y la 34 es Sí/No, así que no llevan formato de euro.
       colsEUR.add(31); colsEUR.add(32); colsEUR.add(33);
+      colsEUR.add(36);   // v165: total plus variable
       for (let i = idxInicioMeses; i < idxFinMeses; i++) colsEUR.add(i);
       for (let i = idxFinMeses; i < idxFinMeses + 3; i++) colsEUR.add(i);
       const totalRows = aoa.length;
@@ -9862,7 +9941,7 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
         else if (i === 4 || i === 5) w = 14;
         else if (i >= 6 && i <= 8) w = 11;
         else if (i >= 15 && i <= 29) w = 15;
-        else if (i >= 30 && i <= 34) w = 16;   // v151
+        else if (i >= 30 && i <= 36) w = 16;   // v151 · v165
         else if (i >= idxInicioMeses && i < idxFinMeses) w = 11;
         else if (i >= idxFinMeses) w = 14;
         wscols.push({ wch: w });
