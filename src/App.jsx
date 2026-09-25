@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v170";
+const APP_VERSION = "v171";
 
 // v167: jornadas especiales y festivos trabajados NO suman en el PDF del
 // trabajador: dependen de que ese día se decida trabajar, así que no están
@@ -4233,6 +4233,12 @@ ${docHTML}
   // v89: forzar document.title al cargar y antes de imprimir
   // (el navegador usa document.title como sugerencia de nombre al guardar como PDF)
   document.title = ${JSON.stringify(tituloPDF)};
+  // v171: esta ventana se abre sin dirección (about:blank) y Chrome entonces
+  // ignora el título y deja vacío el nombre al "Guardar como PDF".
+  // Le damos una dirección falsa con el nombre del archivo; no navega ni recarga.
+  try {
+    history.replaceState(null, "", "/" + ${JSON.stringify(tituloPDF)} + ".html");
+  } catch (e) { /* si el navegador no lo permite, todo sigue igual */ }
   window.addEventListener("beforeprint", function() {
     document.title = ${JSON.stringify(tituloPDF)};
   });
