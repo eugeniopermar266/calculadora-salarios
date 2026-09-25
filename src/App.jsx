@@ -4233,12 +4233,6 @@ ${docHTML}
   // v89: forzar document.title al cargar y antes de imprimir
   // (el navegador usa document.title como sugerencia de nombre al guardar como PDF)
   document.title = ${JSON.stringify(tituloPDF)};
-  // v171: esta ventana se abre sin dirección (about:blank) y Chrome entonces
-  // ignora el título y deja vacío el nombre al "Guardar como PDF".
-  // Le damos una dirección falsa con el nombre del archivo; no navega ni recarga.
-  try {
-    history.replaceState(null, "", "/" + ${JSON.stringify(tituloPDF)} + ".html");
-  } catch (e) { /* si el navegador no lo permite, todo sigue igual */ }
   window.addEventListener("beforeprint", function() {
     document.title = ${JSON.stringify(tituloPDF)};
   });
@@ -4306,8 +4300,117 @@ ${docHTML}
     }
   };
 
+  // ── v171: IMPRIMIR PDF DESDE LA PROPIA PÁGINA ──────────────────────────
+  // Chrome dejó de usar el título como nombre de archivo en las ventanas que
+  // se abren en blanco (about:blank), y por eso el diálogo "Guardar como PDF"
+  // salía sin nombre. Imprimiendo desde la página de la app —que sí tiene
+  // dirección propia— Chrome vuelve a proponer el nombre correcto.
+  // Se clona el documento ya montado (#doc-imprimible-oculto) en un contenedor
+  // suelto; no se toca el original, así que React no se entera de nada.
+  const imprimirPDF45 = () => {
+    setExportError(null);
+    try {
+      if (!p || desglose45.length === 0) {
+        setExportError("Introduce primero las fechas y datos para generar el documento.");
+        return;
+      }
+      const docElement = document.getElementById("doc-imprimible-oculto");
+      if (!docElement || docElement.innerHTML.length < 100) {
+        setExportError("El documento aún no se ha renderizado completamente. Espera 1 segundo y vuelve a intentarlo.");
+        return;
+      }
+
+      const partes = [proyecto, productora, nombre].filter(Boolean).map(s => s.replace(/[^a-zA-Z0-9]/g, "_"));
+      const baseFilename = partes.length ? partes.join("_") : "calculadora";
+      const tituloPDF = baseFilename + (es40h ? "_40h" : "_45h");
+
+      // Limpiar restos de una impresión anterior que se hubiera quedado a medias
+      const previo = document.getElementById("nomina-print-root");
+      if (previo && previo.parentNode) previo.parentNode.removeChild(previo);
+
+      const cont = document.createElement("div");
+      cont.id = "nomina-print-root";
+      cont.innerHTML = docElement.innerHTML;
+      document.body.appendChild(cont);
+      document.body.classList.add("nomina-imprimiendo");
+
+      const tituloOriginal = document.title;
+      document.title = tituloPDF;
+
+      let limpiado = false;
+      const limpiar = () => {
+        if (limpiado) return;
+        limpiado = true;
+        document.body.classList.remove("nomina-imprimiendo");
+        const n = document.getElementById("nomina-print-root");
+        if (n && n.parentNode) n.parentNode.removeChild(n);
+        window.removeEventListener("afterprint", limpiar);
+        // El título se devuelve más tarde: Chrome lo consulta después de cerrar
+        // el diálogo de impresión, al abrir el "Guardar como".
+        setTimeout(() => { document.title = tituloOriginal; }, 6000);
+      };
+
+      window.addEventListener("afterprint", limpiar);
+      setTimeout(limpiar, 60000); // red de seguridad por si afterprint no llega
+
+      window.print();
+
+      if (usuarioSesion) {
+        const detalle = [proyecto, productora, nombre].filter(Boolean).join(" | ") || "(sin datos)";
+        registrarLog(usuarioSesion.nombre, "export_pdf", `[${modoTab === "tab40" ? "40H" : "45H"}] ${tituloPDF}.pdf · ${detalle}`);
+      }
+    } catch (e) {
+      console.error("Error al imprimir:", e);
+      document.body.classList.remove("nomina-imprimiendo");
+      const n = document.getElementById("nomina-print-root");
+      if (n && n.parentNode) n.parentNode.removeChild(n);
+      setExportError("Error al preparar la impresión: " + (e?.message || String(e)));
+    }
+  };
+
   return (
     <div style={{ color:"#1a1a1a", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif", padding:"32px 32px" }}>
+
+      {/* v171: reglas de impresión — al imprimir sólo se ve la nómina clonada */}
+      <style>{`
+        #nomina-print-root { display: none; }
+        @media print {
+          @page { size: A4 portrait; margin: 8mm 10mm; }
+          body.nomina-imprimiendo > *:not(#nomina-print-root) { display: none !important; }
+          body.nomina-imprimiendo {
+            background: #fff !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            font-family: 'Courier Prime', 'Courier New', monospace;
+            color: #1a1a1a;
+            font-size: 10px;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+          body.nomina-imprimiendo #nomina-print-root {
+            display: block !important;
+            position: static !important;
+            left: auto !important; top: auto !important;
+            width: 100% !important;
+            visibility: visible !important;
+          }
+          body.nomina-imprimiendo #nomina-print-root table {
+            border-collapse: collapse !important;
+            width: 100%;
+          }
+          body.nomina-imprimiendo #nomina-print-root table,
+          body.nomina-imprimiendo #nomina-print-root table th,
+          body.nomina-imprimiendo #nomina-print-root table td {
+            border: 1px solid #888 !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+          body.nomina-imprimiendo #nomina-print-root table th,
+          body.nomina-imprimiendo #nomina-print-root table td {
+            padding: 5px 7px !important;
+          }
+        }
+      `}</style>
 
       {/* v113: Header rediseñado con logo Bdprodtools + Payroll cost calculator + botones nueva estética */}
       <div style={{ maxWidth:2100, margin:"0 auto 24px" }}>
@@ -4446,6 +4549,28 @@ ${docHTML}
               >
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="14" y2="17"/></svg>
                 PDF
+              </button>
+              {/* v171: IMPRIMIR — imprime desde la propia página para que Chrome proponga el nombre */}
+              <button
+                onClick={imprimirPDF45}
+                disabled={!p || desglose45.length === 0}
+                style={{
+                  padding: "8px 14px", fontSize: 11, fontFamily: "'Inter', sans-serif",
+                  letterSpacing: "0.03em", borderRadius: 6,
+                  cursor: (p && desglose45.length) ? "pointer" : "not-allowed", fontWeight: 600,
+                  border: "none",
+                  background: (p && desglose45.length) ? "#455a64" : "rgba(69,90,100,0.2)",
+                  color: (p && desglose45.length) ? "#fff" : "#666",
+                  opacity: (p && desglose45.length) ? 1 : 0.5,
+                  display: "flex", alignItems: "center", gap: 5,
+                  transition: "background 0.15s",
+                }}
+                onMouseEnter={e => { if (p && desglose45.length) e.currentTarget.style.background = "#607d8b"; }}
+                onMouseLeave={e => { if (p && desglose45.length) e.currentTarget.style.background = "#455a64"; }}
+                title="Imprimir / Guardar como PDF con el nombre del archivo ya puesto"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                IMPRIMIR
               </button>
               {/* Listado (turquesa sólido — acción especial admin) */}
               {(esAdmin || esCoordinadorApp45) && (
@@ -5646,6 +5771,22 @@ ${docHTML}
           }}
           title="Abrir vista de PDF (Guardar HTML / Imprimir / Cerrar)"
         >🖨 Abrir PDF</button>
+        {/* v171: IMPRIMIR — imprime desde la propia página para que Chrome proponga el nombre */}
+        <button
+          onClick={imprimirPDF45}
+          disabled={!p || desglose45.length === 0}
+          style={{
+            padding: "10px 24px", fontSize: 11, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+            letterSpacing: "0.15em", textTransform: "uppercase", borderRadius: 4,
+            cursor: (p && desglose45.length) ? "pointer" : "not-allowed", fontWeight: 700,
+            border: "1px solid #455a64",
+            background: (p && desglose45.length) ? "#455a64" : "transparent",
+            color: (p && desglose45.length) ? "#f2f5f7" : "#666",
+            opacity: (p && desglose45.length) ? 1 : 0.5,
+            transition: "all 0.15s",
+          }}
+          title="Imprimir / Guardar como PDF con el nombre del archivo ya puesto"
+        >🖨 Imprimir PDF</button>
         {/* v93: Exportar Listado (solo admin/coordinador) */}
         {(esAdmin || esCoordinadorApp45) && (
           <button
