@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v165";
+const APP_VERSION = "v166";
 
 // v97: Departamentos de un rodaje audiovisual (obligatorio en cada perfil)
 const DEPARTAMENTOS = [
@@ -10527,6 +10527,7 @@ function PanelCalendarioProyecto({ proyecto, usuarioActual, onCerrar }) {
     { key: "gran_canaria", label: "Gran Canaria" },
     { key: "tenerife", label: "Tenerife" },
     { key: "bilbao", label: "Bilbao" },
+    { key: "barcelona", label: "Barcelona" },   // v166
   ];
 
   // ── Colores por estado (v106: fosforitos alto contraste sobre fondo oscuro)
@@ -10593,20 +10594,24 @@ function PanelCalendarioProyecto({ proyecto, usuarioActual, onCerrar }) {
 
   // v156: horas de referencia sugeridas = días laborables del mes que más tiene.
   // Cuenta lo mismo que la ficha: laborales sin festivos no trabajados ni vacaciones.
-  const horasRefSugeridas = (() => {
-    if (!form.fechaInicio || !form.fechaFin || !dias) return 0;
+  // v166: además del máximo, devuelve el recuento de cada mes para poder
+  // comprobar de un vistazo que la referencia sale del mes más largo.
+  const laborablesPorMes = (() => {
+    if (!form.fechaInicio || !form.fechaFin || !dias) return [];
     const fechasFest = (festivosComunidad || []).map(f => f.fecha);
     const porMes = {};
     for (const [fecha, info] of Object.entries(dias)) {
       if (fecha < form.fechaInicio || fecha > form.fechaFin) continue;
       if (!info?.laboral) continue;
-      if (info?.vacaciones) continue;
-      if (fechasFest.includes(fecha) && !info?.festivo_trabajado) continue;
+      if (info?.vacaciones) continue;                                      // las vacaciones no cuentan
+      if (fechasFest.includes(fecha) && !info?.festivo_trabajado) continue; // el festivo no trabajado tampoco
       const ym = fecha.slice(0, 7);
       porMes[ym] = (porMes[ym] || 0) + 1;
     }
-    return Object.values(porMes).reduce((m, v) => Math.max(m, v), 0);
+    return Object.entries(porMes).sort((a, b) => a[0].localeCompare(b[0])).map(([ym, n]) => ({ ym, n }));
   })();
+  const horasRefSugeridas = laborablesPorMes.reduce((m, x) => Math.max(m, x.n), 0);
+  const mesHorasRef = (laborablesPorMes.find(x => x.n === horasRefSugeridas) || {}).ym || null;
 
   // ── Cargar festivos de la comunidad
   useEffect(() => {
@@ -11021,6 +11026,36 @@ function PanelCalendarioProyecto({ proyecto, usuarioActual, onCerrar }) {
                   Las horas extra incluidas en el bruto de 45H. Se toma el mes del calendario con más días laborables.
                   Todos los trabajadores de 45H de este proyecto usarán este mismo valor.
                 </div>
+
+                {/* v166: días laborables de cada mes, para comprobar de dónde sale la referencia */}
+                {laborablesPorMes.length > 0 && (
+                  <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+                    <div style={{ fontSize: 10, color: "#888", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 600, marginBottom: 8, fontFamily: "'Inter', sans-serif" }}>
+                      Días laborables por mes
+                    </div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                      {laborablesPorMes.map(({ ym, n }) => {
+                        const esRef = ym === mesHorasRef;
+                        return (
+                          <div key={ym} style={{
+                            padding: "5px 10px", borderRadius: 6, fontSize: 11, fontFamily: "'Inter', sans-serif",
+                            background: esRef ? "rgba(200,150,58,0.18)" : "rgba(0,0,0,0.3)",
+                            border: `1px solid ${esRef ? "rgba(200,150,58,0.6)" : "rgba(255,255,255,0.08)"}`,
+                            color: esRef ? "#f0c070" : "#aaa", fontWeight: esRef ? 700 : 400,
+                          }} title={esRef ? "Mes de referencia" : ""}>
+                            <span style={{ textTransform: "capitalize" }}>{labelMesLargo(ym)}</span>
+                            <strong style={{ marginLeft: 6 }}>{n}d</strong>
+                            {esRef && <span style={{ marginLeft: 5 }}>◄</span>}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div style={{ marginTop: 8, fontSize: 10.5, color: "#777", fontFamily: "'Inter', sans-serif", lineHeight: 1.5 }}>
+                      No cuentan los festivos que no se trabajan ni los días de vacaciones.
+                      El mes marcado es el que fija la referencia.
+                    </div>
+                  </div>
+                )}
               </div>
 
               <label style={{ display: "flex", alignItems: "center", gap: 10, padding: 10, borderRadius: 8, background: form.over45Activo ? "rgba(200,150,58,0.10)" : "rgba(20,20,20,0.6)", border: "1px solid rgba(255,255,255,0.08)", marginBottom: 10, cursor: "pointer", fontFamily: "'Inter', sans-serif" }}>
@@ -11348,6 +11383,7 @@ function PanelFestivos({ usuarioActual, onCerrar, onCambios }) {
     { key: "gran_canaria", label: "Gran Canaria" },
     { key: "tenerife", label: "Tenerife" },
     { key: "bilbao", label: "Bilbao" },
+    { key: "barcelona", label: "Barcelona" },   // v166
   ];
 
   const recargar = async () => {
