@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v169";
+const APP_VERSION = "v170";
 
 // v167: jornadas especiales y festivos trabajados NO suman en el PDF del
 // trabajador: dependen de que ese día se decida trabajar, así que no están
@@ -2630,9 +2630,18 @@ function ModalPDF({ contenidoPrint, onClose, filename = "calculadora_45h.pdf" })
   // Plan B: imprimir directamente con window.print() (puede que el sandbox lo permita ahora)
   const imprimirNavegador = () => {
     log("Intento window.print() directo");
+    // v170: Chrome propone como nombre de archivo el título de la página.
+    // Lo fijamos con el nombre del PDF y lo devolvemos a su sitio al terminar,
+    // para no tener que escribirlo a mano en cada exportación.
+    const tituloOriginal = document.title;
+    const nombreLimpio = String(filename || "nomina").replace(/\.pdf$/i, "");
     try {
+      document.title = nombreLimpio;
+      // el navegador lee el título al abrir el diálogo; lo restauramos después
+      setTimeout(() => { document.title = tituloOriginal; }, 1500);
       window.print();
     } catch (e) {
+      document.title = tituloOriginal;
       log("window.print falló: " + e.message);
       alert("La impresión nativa también está bloqueada. Solución: copia el contenido del modal y pégalo en un editor.");
     }
