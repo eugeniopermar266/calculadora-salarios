@@ -15,7 +15,13 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v166";
+const APP_VERSION = "v167";
+
+// v167: jornadas especiales y festivos trabajados NO suman en el PDF del
+// trabajador: dependen de que ese día se decida trabajar, así que no están
+// garantizados. Las columnas siguen en el documento, pero vacías.
+// Poner en true para devolverlos al PDF; no hace falta tocar nada más.
+const PDF_INCLUYE_EVENTUALES = false;
 
 // v97: Departamentos de un rodaje audiovisual (obligatorio en cada perfil)
 const DEPARTAMENTOS = [
@@ -2844,7 +2850,11 @@ function DocumentoImprimible({
   // ni en el total, ni en la tabla mes a mes, ni en el resumen. Solo se informa
   // de su precio por hora en el bloque de Cálculo de Horas.
   const totFinalPdf = totFinal - (totOver45Importe || 0);
-  const totalConExtras = totFinalPdf + totalFestImport45 + totalCompl;
+  // v167: festivos trabajados y jornadas especiales tampoco están garantizados
+  // (depende de que ese día se trabaje), así que no suman en el documento.
+  const festPdf = PDF_INCLUYE_EVENTUALES ? (totalFestImport45 || 0) : 0;
+  const jePdf   = PDF_INCLUYE_EVENTUALES ? (totJEImporte || 0) : 0;
+  const totalConExtras = totFinalPdf + festPdf + totalCompl - (PDF_INCLUYE_EVENTUALES ? 0 : (totJEImporte || 0));
 
   return (
     <div style={{ fontFamily: "'Courier Prime', 'Courier New', monospace", color: "#1a1a1a", fontSize: 10, position: "relative" }}>
@@ -3094,8 +3104,11 @@ function DocumentoImprimible({
             const comida = c.comida || 0;
             // TOTAL = totalMes (que incluye base+vac+indem+h.extra+plusAct−vd) + festivos + complementos
             // En 40H restamos el plusAct del totalMes porque esa columna se elimina
-            const totalMesPdf = (d.totalMes || 0) - (d.over45Importe || 0);   // v163
-            const totalRow = (es40h ? (totalMesPdf - (d.plusAct || 0)) : totalMesPdf) + fest + (c.total || 0);
+            // v167: fuera del total del mes lo no garantizado (over 45, festivos y JE)
+            const festFila = PDF_INCLUYE_EVENTUALES ? fest : 0;
+            const jeFila   = PDF_INCLUYE_EVENTUALES ? (d.importeJE || 0) : 0;
+            const totalMesPdf = (d.totalMes || 0) - (d.over45Importe || 0) - ((d.importeJE || 0) - jeFila);   // v163 · v167
+            const totalRow = (es40h ? (totalMesPdf - (d.plusAct || 0)) : totalMesPdf) + festFila + (c.total || 0);
             return (
               <tr key={i} style={{ background: i % 2 === 0 ? "#ffffff" : "#f2f5f7" }}>
                 <td style={tdCell({ textTransform: "capitalize", fontWeight: 700 })}>
@@ -3110,8 +3123,8 @@ function DocumentoImprimible({
                 <td style={tdCell({ textAlign: "right", color: "#1a1a1a" })}>{fmt(d.cobroHx)}</td>
                 {!es40h && <td style={tdCell({ textAlign: "right", color: d.plusAct > 0 ? "#4a5157" : "#999", fontWeight: d.plusAct > 0 ? 600 : 400 })}>{d.plusAct > 0 ? fmt(d.plusAct) : "—"}</td>}
                 <td style={tdCell({ textAlign: "right", color: vd > 0 ? "#8a2a20" : "#999" })}>{vd > 0 ? `−${fmt(vd)}` : "—"}</td>
-                <td style={tdCell({ textAlign: "right", color: fest > 0 ? "#6a3a9a" : "#999" })}>{fest > 0 ? fmt(fest) : "—"}</td>
-                <td style={tdCell({ textAlign: "right", color: (d.importeJE || 0) > 0 ? "#8a1e4a" : "#999" })}>{(d.importeJE || 0) > 0 ? fmt(d.importeJE) : "—"}</td>
+                <td style={tdCell({ textAlign: "right", color: fest > 0 ? "#6a3a9a" : "#999" })}>{festFila > 0 ? fmt(festFila) : "—"}</td>
+                <td style={tdCell({ textAlign: "right", color: jeFila > 0 ? "#8a1e4a" : "#999" })}>{jeFila > 0 ? fmt(jeFila) : "—"}</td>
                 <td style={tdCell({ textAlign: "right", color: plusesSinComida > 0 ? "#5a8a5a" : "#999" })}>{plusesSinComida > 0 ? fmt(plusesSinComida) : "—"}</td>
                 <td style={tdCell({ textAlign: "right", color: comida > 0 ? "#5a8a5a" : "#999" })}>{comida > 0 ? fmt(comida) : "—"}</td>
                 <td style={tdCell({ textAlign: "right", color: "#1a1a1a", fontWeight: 700 })}>{fmt(totalRow)}</td>
@@ -3134,8 +3147,8 @@ function DocumentoImprimible({
             <td style={tdCell({ background: PDF_AZUL, textAlign: "right", color: "#1a1a1a" })}>{fmt(totHx)}</td>
             {!es40h && <td style={tdCell({ background: PDF_AZUL, textAlign: "right", color: totPlus > 0 ? "#4a5157" : "#999" })}>{totPlus > 0 ? fmt(totPlus) : "—"}</td>}
             <td style={tdCell({ background: PDF_AZUL, textAlign: "right", color: totVd > 0 ? "#8a2a20" : "#999" })}>{totVd > 0 ? `−${fmt(totVd)}` : "—"}</td>
-            <td style={tdCell({ background: PDF_AZUL, textAlign: "right", color: totalFestImport45 > 0 ? "#6a3a9a" : "#999" })}>{totalFestImport45 > 0 ? fmt(totalFestImport45) : "—"}</td>
-            <td style={tdCell({ background: PDF_AZUL, textAlign: "right", color: totJEImporte > 0 ? "#8a1e4a" : "#999" })} title={totJEDias > 0 ? `${totJEDias} JE` : ""}>{totJEImporte > 0 ? fmt(totJEImporte) : "—"}</td>
+            <td style={tdCell({ background: PDF_AZUL, textAlign: "right", color: festPdf > 0 ? "#6a3a9a" : "#999" })}>{festPdf > 0 ? fmt(festPdf) : "—"}</td>
+            <td style={tdCell({ background: PDF_AZUL, textAlign: "right", color: jePdf > 0 ? "#8a1e4a" : "#999" })}>{jePdf > 0 ? fmt(jePdf) : "—"}</td>
             <td style={tdCell({ background: PDF_AZUL, textAlign: "right", color: "#5a8a5a" })}>
               {fmt(complementos45.reduce((s,c)=>s+(c.herramienta||0)+(c.coche||0)+(c.vivienda||0)+(c.seguroVida||0), 0))}
             </td>
@@ -3197,13 +3210,14 @@ function DocumentoImprimible({
               <td style={{ ...tdValue, textAlign: "right", color: "#8a2a20", fontWeight: 700 }}>− {fmtE(totVd)}</td>
             </tr>
           )}
-          {totalFestDias45 > 0 && (
+          {/* v167: solo si se decide incluir lo no garantizado */}
+          {PDF_INCLUYE_EVENTUALES && totalFestDias45 > 0 && (
             <tr>
               <td style={tdLabel}>+ Festivos trabajados ({totalFestDias45}d)</td>
               <td style={{ ...tdValue, textAlign: "right", color: "#6a3a9a", fontWeight: 700 }}>+ {fmtE(totalFestImport45)}</td>
             </tr>
           )}
-          {totJEDias > 0 && (
+          {PDF_INCLUYE_EVENTUALES && totJEDias > 0 && (
             <tr>
               <td style={tdLabel}>+ Jornadas especiales ({totJEDias}d)</td>
               <td style={{ ...tdValue, textAlign: "right", color: "#8a1e4a", fontWeight: 700 }}>+ {fmtE(totJEImporte)}</td>
@@ -3214,7 +3228,7 @@ function DocumentoImprimible({
               TOTAL A PERCIBIR ({es40h ? "40h" : "45h"}) {tieneCompl ? "(sin extras)" : ""} <span style={{ display: "inline-block", background: "#1a1a1a", color: "#f2f5f7", fontSize: 8, fontWeight: 700, letterSpacing: "0.12em", padding: "1px 6px", borderRadius: 3, marginLeft: 6, verticalAlign: "middle", textTransform: "uppercase" }}>Importe Bruto</span>
             </td>
             <td style={{ ...tdValue, background: PDF_AZUL, border: `1px solid ${PDF_AZUL_B}`, textAlign: "right", fontSize: 13, fontWeight: 700, color: "#1a1a1a", padding: "8px 8px" }}>
-              {fmtE((es40h ? (totFinalPdf - (totPlus || 0)) : totFinalPdf) + (totalFestImport45 || 0))}
+              {fmtE((es40h ? (totFinalPdf - (totPlus || 0)) : totFinalPdf) + festPdf - (PDF_INCLUYE_EVENTUALES ? 0 : (totJEImporte || 0)))}
             </td>
           </tr>
           <tr>
@@ -5247,9 +5261,12 @@ ${docHTML}
                         {!es40h && <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",borderBottom:"1px solid #d5d9dc",color:"#b07030"}}>Plus Act. €</th>}
                         <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",borderBottom:"1px solid #d5d9dc",color:"#1a1a1a"}}>TOTAL MES €</th>
                         {over45Aplica && <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",borderBottom:"1px solid #d5d9dc",color:"#4a5157"}} title="Horas extra over 45h (por encima del salario pactado)">Over45 €</th>}
-                        <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",borderBottom:"1px solid #d5d9dc",color:"#8a1e4a"}} title="Jornadas especiales (por encima del salario pactado)">Jorn.Esp €</th>
+                        {/* v167: primero lo garantizado, al final lo eventual */}
                         <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",borderBottom:"1px solid #d5d9dc",color:"#5a8a5a"}}>Compl. €</th>
                         <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",borderBottom:"1px solid #d5d9dc",color:"#1a1a1a"}}>TOTAL MES + Compl. €</th>
+                        <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",borderBottom:"1px solid #d5d9dc",color:"#8a1e4a"}} title="Jornadas especiales — no garantizadas, no van al PDF">Jorn.Esp €</th>
+                        <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",borderBottom:"1px solid #d5d9dc",color:"#6a3a9a"}} title="Festivos trabajados — no garantizados, no van al PDF">Fest. €</th>
+                        <th style={{padding:"6px 6px",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",fontWeight:700,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",borderBottom:"1px solid #d5d9dc",color:"#1a1a1a",background:"#f2f5f7"}} title="Incluye lo eventual">TOTAL + J.Esp + Fest. €</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -5278,9 +5295,11 @@ ${docHTML}
                           {!es40h && <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:d.plusAct>0?"#b07030":"#ccc",fontWeight:d.plusAct>0?600:400,borderBottom:"1px solid #eae7e2"}}>{d.plusAct>0?fmt(d.plusAct):"—"}</td>}
                           <td style={{padding:"6px 6px",fontSize:13,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:"#1a1a1a",fontWeight:700,borderBottom:"1px solid #eae7e2"}}>{fmt(es40h ? (d.totalMes - (d.plusAct || 0) - (d.importeJE || 0) - (d.over45Importe || 0)) : (d.totalMes - (d.importeJE || 0) - (d.over45Importe || 0)))}</td>
                           {over45Aplica && <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:(d.over45Importe || 0) > 0 ? "#4a5157" : "#ccc",fontWeight:(d.over45Importe || 0) > 0 ? 600 : 400,borderBottom:"1px solid #eae7e2"}} title={(d.over45Horas || 0) > 0 ? `${d.over45Horas}h × ${fmt(over45Precio)}€` : ""}>{(d.over45Importe || 0) > 0 ? fmt(d.over45Importe) : "—"}</td>}
-                          <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:(d.importeJE || 0) > 0 ? "#8a1e4a" : "#ccc",fontWeight:(d.importeJE || 0) > 0 ? 600 : 400,borderBottom:"1px solid #eae7e2"}} title={(d.totalJEDias || 0) > 0 ? `${d.totalJEDias} JE × (1 HX + ${IMPORTE_JORNADA_ESPECIAL}€)` : ""}>{(d.importeJE || 0) > 0 ? fmt(d.importeJE) : "—"}</td>
                           <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:(complementos45[i]?.total || 0) > 0 ? "#5a8a5a" : "#ccc",fontWeight:(complementos45[i]?.total || 0) > 0 ? 600 : 400,borderBottom:"1px solid #eae7e2"}}>{(complementos45[i]?.total || 0) > 0 ? fmt(complementos45[i].total) : "—"}</td>
-                          <td style={{padding:"6px 6px",fontSize:13,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:"#1a1a1a",fontWeight:800,borderBottom:"1px solid #eae7e2"}}>{fmt((es40h ? (d.totalMes - (d.plusAct || 0)) : d.totalMes) + (complementos45[i]?.total || 0))}</td>
+                          <td style={{padding:"6px 6px",fontSize:13,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:"#1a1a1a",fontWeight:800,borderBottom:"1px solid #eae7e2"}}>{fmt((es40h ? (d.totalMes - (d.plusAct || 0)) : d.totalMes) - (d.importeJE || 0) - (d.over45Importe || 0) + (complementos45[i]?.total || 0))}</td>
+                          <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:(d.importeJE || 0) > 0 ? "#8a1e4a" : "#ccc",fontWeight:(d.importeJE || 0) > 0 ? 600 : 400,borderBottom:"1px solid #eae7e2"}} title={(d.totalJEDias || 0) > 0 ? `${d.totalJEDias} JE × (1 HX + ${IMPORTE_JORNADA_ESPECIAL}€)` : ""}>{(d.importeJE || 0) > 0 ? fmt(d.importeJE) : "—"}</td>
+                          <td style={{padding:"6px 6px",fontSize:11,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:(importeFestMes45[i] || 0) > 0 ? "#6a3a9a" : "#ccc",fontWeight:(importeFestMes45[i] || 0) > 0 ? 600 : 400,borderBottom:"1px solid #eae7e2"}}>{(importeFestMes45[i] || 0) > 0 ? fmt(importeFestMes45[i]) : "—"}</td>
+                          <td style={{padding:"6px 6px",fontSize:13,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:"#1a1a1a",fontWeight:800,background:"#f2f5f7",borderBottom:"1px solid #eae7e2"}}>{fmt((es40h ? (d.totalMes - (d.plusAct || 0)) : d.totalMes) - (d.over45Importe || 0) + (complementos45[i]?.total || 0) + (importeFestMes45[i] || 0))}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -5295,9 +5314,11 @@ ${docHTML}
                         {!es40h && <td style={{padding:"8px",fontSize:11,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:totPlus>0?"#b07030":"#ccc",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{totPlus>0?fmt(totPlus):"—"}</td>}
                         <td style={{padding:"8px",fontSize:13,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:"#1a1a1a",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{fmt(es40h ? (totFinal - (totPlus || 0) - totJEImporte - totOver45Importe) : (totFinal - totJEImporte - totOver45Importe))}</td>
                         {over45Aplica && <td style={{padding:"8px",fontSize:11,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:totOver45Importe > 0 ? "#4a5157" : "#ccc",fontWeight:700,borderTop:"1px solid #d8d4ce"}} title={totOver45Horas > 0 ? `${totOver45Horas}h over 45` : ""}>{totOver45Importe > 0 ? fmt(totOver45Importe) : "—"}</td>}
-                        <td style={{padding:"8px",fontSize:11,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:totJEImporte > 0 ? "#8a1e4a" : "#ccc",fontWeight:700,borderTop:"1px solid #d8d4ce"}} title={totJEDias > 0 ? `${totJEDias} JE totales` : ""}>{totJEImporte > 0 ? fmt(totJEImporte) : "—"}</td>
                         <td style={{padding:"8px",fontSize:11,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:totalCompl > 0 ? "#5a8a5a" : "#ccc",fontWeight:700,borderTop:"1px solid #d8d4ce"}}>{totalCompl > 0 ? fmt(totalCompl) : "—"}</td>
-                        <td style={{padding:"8px",fontSize:13,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:"#1a1a1a",fontWeight:800,borderTop:"1px solid #d8d4ce"}}>{fmt((es40h ? (totFinal - (totPlus || 0)) : totFinal) + totalCompl)}</td>
+                        <td style={{padding:"8px",fontSize:13,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:"#1a1a1a",fontWeight:800,borderTop:"1px solid #d8d4ce"}}>{fmt((es40h ? (totFinal - (totPlus || 0)) : totFinal) - totJEImporte - totOver45Importe + totalCompl)}</td>
+                        <td style={{padding:"8px",fontSize:11,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:totJEImporte > 0 ? "#8a1e4a" : "#ccc",fontWeight:700,borderTop:"1px solid #d8d4ce"}} title={totJEDias > 0 ? `${totJEDias} JE totales` : ""}>{totJEImporte > 0 ? fmt(totJEImporte) : "—"}</td>
+                        <td style={{padding:"8px",fontSize:11,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:totalFestImport45 > 0 ? "#6a3a9a" : "#ccc",fontWeight:700,borderTop:"1px solid #d8d4ce"}} title={totalFestDias45 > 0 ? `${totalFestDias45} festivos` : ""}>{totalFestImport45 > 0 ? fmt(totalFestImport45) : "—"}</td>
+                        <td style={{padding:"8px",fontSize:13,textAlign:"right",fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif",color:"#1a1a1a",fontWeight:800,background:"#f2f5f7",borderTop:"1px solid #d8d4ce"}}>{fmt((es40h ? (totFinal - (totPlus || 0)) : totFinal) - totOver45Importe + totalCompl + totalFestImport45)}</td>
                       </tr>
                     </tfoot>
                   </table>
@@ -5398,22 +5419,38 @@ ${docHTML}
                     <Div />
                     <div style={{ padding:"10px 12px", background:"#f8f5ff", borderRadius:6, border:"1px solid #d8c8e8" }}>
                       <div style={{ fontSize:9, color:"#6a3a9a", letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:6 }}>Extras del período</div>
-                      {totalFestDias45 > 0 && (
-                        <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
-                          <span style={{ fontSize:11, color:"#6a3a9a", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>{totalFestDias45} festivo{totalFestDias45>1?"s":""} (incluido en total)</span>
-                          <span style={{ fontSize:12, fontWeight:700, color:"#6a3a9a", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>+ {fmtE(totalFestImport45)}</span>
+                      {/* v167: cada concepto en su línea, y lo no garantizado separado abajo */}
+                      {[
+                        { l:"Plus Herramienta", v: complementos45.reduce((s,c)=>s+(c.herramienta||0),0), c:"#5a8a5a" },
+                        { l:"Plus Coche",       v: complementos45.reduce((s,c)=>s+(c.coche||0),0),       c:"#5a8a5a" },
+                        { l:"Plus Vivienda",    v: complementos45.reduce((s,c)=>s+(c.vivienda||0),0),    c:"#5a8a5a" },
+                        { l:"Plus Seguro Vida", v: complementos45.reduce((s,c)=>s+(c.seguroVida||0),0),  c:"#5a8a5a" },
+                        { l:"Plus Comida",      v: complementos45.reduce((s,c)=>s+(c.comida||0),0),      c:"#5a8a5a" },
+                        { l: plusVarNombre || "Plus variable", v: totalPlusVar, c:"#b07030" },
+                      ].filter(x=>x.v > 0).map(x=>(
+                        <div key={x.l} style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
+                          <span style={{ fontSize:11, color:x.c, fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>{x.l}</span>
+                          <span style={{ fontSize:12, fontWeight:700, color:x.c, fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>+ {fmtE(x.v)}</span>
                         </div>
+                      ))}
+                      {(totJEDias > 0 || totalFestDias45 > 0) && totalCompl > 0 && (
+                        <div style={{ height:1, background:"#d8c8e8", margin:"8px 0" }} />
                       )}
                       {totJEDias > 0 && (
                         <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
-                          <span style={{ fontSize:11, color:"#8a1e4a", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>{totJEDias} jornada{totJEDias>1?"s":""} especial{totJEDias>1?"es":""} (incluido en total)</span>
+                          <span style={{ fontSize:11, color:"#8a1e4a", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>Jornadas especiales ({totJEDias})</span>
                           <span style={{ fontSize:12, fontWeight:700, color:"#8a1e4a", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>+ {fmtE(totJEImporte)}</span>
                         </div>
                       )}
-                      {totalCompl > 0 && (
+                      {totalFestDias45 > 0 && (
                         <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
-                          <span style={{ fontSize:11, color:"#5a8a5a", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>Complementos</span>
-                          <span style={{ fontSize:12, fontWeight:700, color:"#5a8a5a", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>+ {fmtE(totalCompl)}</span>
+                          <span style={{ fontSize:11, color:"#6a3a9a", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>Festivos trabajados ({totalFestDias45})</span>
+                          <span style={{ fontSize:12, fontWeight:700, color:"#6a3a9a", fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>+ {fmtE(totalFestImport45)}</span>
+                        </div>
+                      )}
+                      {(totJEDias > 0 || totalFestDias45 > 0) && (
+                        <div style={{ fontSize:10, color:"#777", marginTop:6, lineHeight:1.4, fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>
+                          No van al PDF del trabajador: dependen de que ese día se trabaje.
                         </div>
                       )}
                     </div>
