@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v168";
+const APP_VERSION = "v169";
 
 // v167: jornadas especiales y festivos trabajados NO suman en el PDF del
 // trabajador: dependen de que ese día se decida trabajar, así que no están
@@ -5857,6 +5857,25 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "";
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
 const AUTH_KEY = "calc_user_v2";
 
+// v169: filtros del modal Cargar Perfil, para que no haya que repetirlos.
+const FILTROS_PERFILES_KEY = "calc_filtros_perfiles_v1";
+function leerFiltrosPerfiles() {
+  const porDefecto = { tipo: "todos", depto: "__todos__", orden: "recientes" };
+  try {
+    const raw = localStorage.getItem(FILTROS_PERFILES_KEY);
+    if (!raw) return porDefecto;
+    const f = JSON.parse(raw);
+    return {
+      tipo:  f.tipo  || porDefecto.tipo,
+      depto: f.depto || porDefecto.depto,
+      orden: f.orden || porDefecto.orden,
+    };
+  } catch { return porDefecto; }
+}
+function guardarFiltrosPerfiles(f) {
+  try { localStorage.setItem(FILTROS_PERFILES_KEY, JSON.stringify(f)); } catch {}
+}
+
 // Duración máxima de sesión sin actividad (en milisegundos).
 // El contador se resetea cada vez que el usuario interactúa con la app.
 // Cambia este valor si quieres más/menos tiempo:
@@ -9297,9 +9316,13 @@ function CosteEmpresa() {
 
 function ModalCargarPerfil({ perfiles, cargando, onCerrar, onCargar, onBorrarSeleccionados, onRenombrar, onDuplicar, tabActivo, perfilEnEdicion, onModificar, onModificarEspecifico }) {
   const [seleccionados, setSeleccionados] = useState(new Set());
-  const [filtroTipo, setFiltroTipo] = useState("todos"); // todos | 45h | 40h
-  const [filtroDepto, setFiltroDepto] = useState("__todos__");
-  const [orden, setOrden] = useState("recientes"); // v134: criterio de ordenación
+  // v169: los filtros se recuerdan al cerrar y volver a abrir el modal.
+  // Antes vivían solo dentro del modal y se perdían al cerrarlo, así que había
+  // que volver a filtrar por departamento cada vez.
+  const [filtroTipo, setFiltroTipo] = useState(() => leerFiltrosPerfiles().tipo);
+  const [filtroDepto, setFiltroDepto] = useState(() => leerFiltrosPerfiles().depto);
+  const [orden, setOrden] = useState(() => leerFiltrosPerfiles().orden); // v134: criterio de ordenación
+  useEffect(() => { guardarFiltrosPerfiles({ tipo: filtroTipo, depto: filtroDepto, orden }); }, [filtroTipo, filtroDepto, orden]);
   const [borrando, setBorrando] = useState(false);
   // v148: copiar perfiles seleccionados a otro proyecto (solo admin)
   const usuarioCtxModal = useContext(UsuarioContext);
