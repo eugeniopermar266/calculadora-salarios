@@ -1362,6 +1362,10 @@ function GestorPerfiles({ tabId, datosActuales, onCargarPerfil, onRegistrarAccio
             timestamp: new Date(p.created_at).getTime(),
             autor: p.autor,
             datos: p.datos,
+            // v172: control de PDF enviado al trabajador. Campos propios, separados
+            // de exportado_el / exportado_por, que son del listado Excel de perfiles.
+            pdfEnviadoEl: p.pdf_enviado_el || null,
+            pdfEnviadoPor: p.pdf_enviado_por || null,
             fuente: "supabase",
           }));
           setHuboFallbackSupabase(false);
@@ -5357,7 +5361,7 @@ ${docHTML}
                   {[
                     { l:"Salario / Día",    v: salarioDia,          s:"Base ÷ 30" },
                     { l:"Salario / Semana", v: salarioDia * 7,      s:"Día × 7" },
-                    { l:"Valor Hora",       v: vHora,               s:"Hora Extra" },
+                    { l:"Valor Hora",       v: vHora,               s:"Hora ordinaria" },   // v172: antes ponía "Hora Extra" por error
                     { l:"Hora Extra",       v: vHoraEx,             s:"Hora × 1,5" },
                     ...(over45Aplica ? [{ l:"H.Extra Over 45", v: over45Precio, s:"Todo incluido · Hora × 1,5", destaca:true }] : []),   // v162
                     { l:"Festivo",          v: valorFestivo45,      s: festivo45Aplica ? "Todo incluido · Día × 1,75" : "Día × 1,75", destaca: festivo45Aplica },   // v150 · v162
@@ -5822,6 +5826,10 @@ ${docHTML}
               await accionesPerfiles.borrarPerfilesSeleccionados(ids);
             }
           }}
+          onRecargar={async () => {
+            // v172: refrescar la lista tras marcar o desmarcar el PDF enviado
+            if (accionesPerfiles.recargar) await accionesPerfiles.recargar();
+          }}
           onRenombrar={async (perfil, nuevoNombre) => {
             if (accionesPerfiles.renombrarPerfil) {
               return await accionesPerfiles.renombrarPerfil(perfil, nuevoNombre);
@@ -6016,7 +6024,8 @@ const AUTH_KEY = "calc_user_v2";
 // v169: filtros del modal Cargar Perfil, para que no haya que repetirlos.
 const FILTROS_PERFILES_KEY = "calc_filtros_perfiles_v1";
 function leerFiltrosPerfiles() {
-  const porDefecto = { tipo: "todos", depto: "__todos__", orden: "recientes" };
+  // v172: "estado" filtra por PDF enviado — todos | sin_enviar | enviados
+  const porDefecto = { tipo: "todos", depto: "__todos__", orden: "recientes", estado: "todos" };
   try {
     const raw = localStorage.getItem(FILTROS_PERFILES_KEY);
     if (!raw) return porDefecto;
@@ -6025,6 +6034,7 @@ function leerFiltrosPerfiles() {
       tipo:  f.tipo  || porDefecto.tipo,
       depto: f.depto || porDefecto.depto,
       orden: f.orden || porDefecto.orden,
+      estado: f.estado || porDefecto.estado,
     };
   } catch { return porDefecto; }
 }
@@ -9470,7 +9480,7 @@ function CosteEmpresa() {
 // v98: MODAL CARGAR PERFIL (tarjetas grandes)
 // ═══════════════════════════════════════════════════════════════════════
 
-function ModalCargarPerfil({ perfiles, cargando, onCerrar, onCargar, onBorrarSeleccionados, onRenombrar, onDuplicar, tabActivo, perfilEnEdicion, onModificar, onModificarEspecifico }) {
+function ModalCargarPerfil({ perfiles, cargando, onCerrar, onCargar, onBorrarSeleccionados, onRenombrar, onDuplicar, tabActivo, perfilEnEdicion, onModificar, onModificarEspecifico, onRecargar }) {
   const [seleccionados, setSeleccionados] = useState(new Set());
   // v169: los filtros se recuerdan al cerrar y volver a abrir el modal.
   // Antes vivían solo dentro del modal y se perdían al cerrarlo, así que había
@@ -9478,11 +9488,16 @@ function ModalCargarPerfil({ perfiles, cargando, onCerrar, onCargar, onBorrarSel
   const [filtroTipo, setFiltroTipo] = useState(() => leerFiltrosPerfiles().tipo);
   const [filtroDepto, setFiltroDepto] = useState(() => leerFiltrosPerfiles().depto);
   const [orden, setOrden] = useState(() => leerFiltrosPerfiles().orden); // v134: criterio de ordenación
-  useEffect(() => { guardarFiltrosPerfiles({ tipo: filtroTipo, depto: filtroDepto, orden }); }, [filtroTipo, filtroDepto, orden]);
+  // v172: filtro por estado de envío del PDF — todos | sin_enviar | enviados
+  const [filtroEstado, setFiltroEstado] = useState(() => leerFiltrosPerfiles().estado);
+  const [marcando, setMarcando] = useState(false);
+  useEffect(() => { guardarFiltrosPerfiles({ tipo: filtroTipo, depto: filtroDepto, orden, estado: filtroEstado }); }, [filtroTipo, filtroDepto, orden, filtroEstado]);
   const [borrando, setBorrando] = useState(false);
   // v148: copiar perfiles seleccionados a otro proyecto (solo admin)
   const usuarioCtxModal = useContext(UsuarioContext);
   const esAdminModal = !!usuarioCtxModal?.es_admin;
+  // v172: marcar el PDF como enviado queda en manos de admin y coordinador
+  const puedeMarcarPdf = esAdminModal || usuarioCtxModal?.rol === "coordinador";
   const [mostrarCopiar, setMostrarCopiar] = useState(false);
   const [proyectosDestino, setProyectosDestino] = useState([]);
   const [destinoId, setDestinoId] = useState("");
@@ -9501,6 +9516,9 @@ function ModalCargarPerfil({ perfiles, cargando, onCerrar, onCargar, onBorrarSel
 
   const perfilesFiltrados = perfiles.filter(p => {
     if (filtroTipo !== "todos" && p.tabId !== filtroTipo) return false;
+    // v172: estado de envío del PDF
+    if (filtroEstado === "sin_enviar" && p.pdfEnviadoEl) return false;
+    if (filtroEstado === "enviados" && !p.pdfEnviadoEl) return false;
     if (filtroDepto === "__todos__") return true;
     if (filtroDepto === "__sin__") return !p.datos?.departamento;
     return (p.datos?.departamento || "") === filtroDepto;
@@ -9537,6 +9555,39 @@ function ModalCargarPerfil({ perfiles, cargando, onCerrar, onCargar, onBorrarSel
     await onBorrarSeleccionados([...seleccionados]);
     setSeleccionados(new Set());
     setBorrando(false);
+  };
+
+  // v172: marcar / desmarcar los seleccionados como "PDF enviado al trabajador".
+  // Solo admin y coordinador. No borra ni mueve nada: escribe dos campos.
+  const marcarPdfEnviado = async (marcar) => {
+    if (seleccionados.size === 0 || !puedeMarcarPdf) return;
+    const aMarcar = perfiles.filter(p => seleccionados.has(p.supabaseId || p.key) && p.fuente === "supabase");
+    if (aMarcar.length === 0) { alert("No hay perfiles de Supabase entre los seleccionados."); return; }
+    const verbo = marcar ? "Marcar" : "Quitar la marca de";
+    if (!confirm(`¿${verbo} ${aMarcar.length} perfil${aMarcar.length !== 1 ? "es" : ""} como PDF enviado?\n\nNo se borra ningún perfil.`)) return;
+    setMarcando(true);
+    try {
+      const r = await marcarPerfilesPdfEnviado({
+        ids: aMarcar.map(p => p.supabaseId),
+        nombreUsuario: usuarioCtxModal?.nombre || "—",
+        marcar,
+        auth: { adminPin: esAdminModal ? usuarioCtxModal?.pin : null, userPin: usuarioCtxModal?.pin },
+      });
+      registrarLog(
+        usuarioCtxModal?.nombre,
+        marcar ? "pdf_enviado_marcar" : "pdf_enviado_desmarcar",
+        `${r.hechos} perfil(es)${r.errores.length ? ` · ${r.errores.length} con error` : ""}`
+      );
+      if (r.errores.length) {
+        alert(`Hechos ${r.hechos} de ${aMarcar.length}.\n\nFallaron ${r.errores.length}:\n\n${r.errores.join("\n")}`);
+      }
+      setSeleccionados(new Set());
+      if (onRecargar) await onRecargar();
+      else alert("✓ Listo. Cierra y vuelve a abrir Cargar Perfil para ver las marcas actualizadas.");
+    } catch (e) {
+      alert("Error al marcar: " + (e.message || e));
+    }
+    setMarcando(false);
   };
 
   // v148: copia los seleccionados al proyecto elegido. No mueve: los originales quedan.
@@ -9609,6 +9660,16 @@ function ModalCargarPerfil({ perfiles, cargando, onCerrar, onCargar, onBorrarSel
               {DEPARTAMENTOS.map(d => conteoDeptos[d] > 0 ? <option key={d} value={d}>{d} ({conteoDeptos[d]})</option> : null)}
             </select>
           </div>
+          {/* v172: filtro por PDF enviado. No borra nada: solo decide qué se ve. */}
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <span style={{ fontSize: 10, color: "#666", letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 700 }}>Estado:</span>
+            {[["todos", "Todos"], ["sin_enviar", "Sin enviar"], ["enviados", "Enviados"]].map(([v, etiqueta]) => (
+              <button key={v} onClick={() => setFiltroEstado(v)}
+                style={{ padding: "6px 14px", fontSize: 10, border: `1px solid ${filtroEstado === v ? "#2e7d5b" : "#ccc"}`, borderRadius: 4, background: filtroEstado === v ? "#2e7d5b" : "#fff", color: filtroEstado === v ? "#fff" : "#666", cursor: "pointer", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>
+                {etiqueta}
+              </button>
+            ))}
+          </div>
           {/* v134: Ordenar */}
           <div style={{ display: "flex", gap: 6, alignItems: "center", marginLeft: "auto" }}>
             <span style={{ fontSize: 10, color: "#4ec9b8", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 700 }}>⇅ Ordenar:</span>
@@ -9634,6 +9695,21 @@ function ModalCargarPerfil({ perfiles, cargando, onCerrar, onCargar, onBorrarSel
               <span style={{ fontSize: 10, color: "#999", marginRight: "auto", fontFamily: "'Inter', sans-serif" }}>{perfilesFiltrados.length} perfil{perfilesFiltrados.length !== 1 ? "es" : ""}</span>
               <button onClick={seleccionarTodos} style={{ fontSize: 10, padding: "5px 12px", border: "1px solid #4ec9b8", borderRadius: 4, background: "#f2f5f7", cursor: "pointer", color: "#4ec9b8", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontWeight: 700 }}>Seleccionar todos</button>
               <button onClick={deseleccionarTodos} style={{ fontSize: 10, padding: "5px 12px", border: "1px solid #ccc", borderRadius: 4, background: "#f2f5f7", cursor: "pointer", color: "#666", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontWeight: 700 }}>Ninguno</button>
+            </>
+          )}
+          {/* v172: marcar / quitar la marca de PDF enviado (admin y coordinador) */}
+          {seleccionados.size > 0 && puedeMarcarPdf && (
+            <>
+              <button onClick={() => marcarPdfEnviado(true)} disabled={marcando}
+                style={{ padding: "8px 14px", fontSize: 10, border: "1px solid #2e7d5b", borderRadius: 4, background: "#2e7d5b", color: "#fff", cursor: marcando ? "wait" : "pointer", fontWeight: 700, letterSpacing: "0.08em", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}
+                title="Marcar los perfiles seleccionados como PDF enviado al trabajador">
+                ✓ Marcar PDF enviado
+              </button>
+              <button onClick={() => marcarPdfEnviado(false)} disabled={marcando}
+                style={{ padding: "8px 14px", fontSize: 10, border: "1px solid #ccc", borderRadius: 4, background: "#fff", color: "#666", cursor: marcando ? "wait" : "pointer", fontWeight: 700, letterSpacing: "0.08em", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}
+                title="Quitar la marca de PDF enviado">
+                Quitar marca
+              </button>
             </>
           )}
           {seleccionados.size > 0 && esAdminModal && (
@@ -9777,7 +9853,17 @@ function ModalCargarPerfil({ perfiles, cargando, onCerrar, onCargar, onBorrarSel
                       title="Cargar este perfil en el formulario"
                     >📂 Cargar</button>
                   </div>
-                  {fecha && <div style={{ fontSize: 8, color: "#999", marginTop: 6, letterSpacing: "0.03em", textAlign: "center" }}>{fecha}{p.autor ? ` · por ${p.autor}` : ""}</div>}
+                  {/* v172: pie con la trazabilidad — creación y, si la hay, envío del PDF */}
+                  {(fecha || p.pdfEnviadoEl) && (
+                    <div style={{ fontSize: 8, color: "#999", marginTop: 6, letterSpacing: "0.03em", textAlign: "center", lineHeight: 1.5 }}>
+                      {fecha && <div>Creado {fecha}{p.autor ? ` · ${p.autor}` : ""}</div>}
+                      {p.pdfEnviadoEl && (
+                        <div style={{ color: "#2e7d5b", fontWeight: 700 }}>
+                          ✓ PDF enviado {new Date(p.pdfEnviadoEl).toLocaleDateString("es-ES")}{p.pdfEnviadoPor ? ` · ${p.pdfEnviadoPor}` : ""}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -9804,6 +9890,33 @@ async function marcarPerfilExportado(perfilId, nombreUsuario, auth) {
       exportado_por: nombreUsuario,
     }),
   });
+}
+
+// v172: marcar o desmarcar perfiles como "PDF enviado al trabajador".
+// Usa sus propias columnas (pdf_enviado_el / pdf_enviado_por) para no pisar el
+// control del listado Excel, que vive en exportado_el / exportado_por.
+// Va de uno en uno porque son pocos perfiles por tanda; si algún día se marcan
+// decenas a la vez, convendría agrupar la petición.
+async function marcarPerfilesPdfEnviado({ ids, nombreUsuario, marcar, auth }) {
+  const headers = { "Prefer": "return=minimal" };
+  if (auth?.adminPin) headers["x-admin-pin"] = auth.adminPin;
+  if (auth?.userPin) headers["x-user-pin"] = auth.userPin;
+  const body = JSON.stringify(
+    marcar
+      ? { pdf_enviado_el: new Date().toISOString(), pdf_enviado_por: nombreUsuario }
+      : { pdf_enviado_el: null, pdf_enviado_por: null }
+  );
+  let hechos = 0;
+  const errores = [];
+  for (const id of ids) {
+    try {
+      await supabaseFetch(`perfiles?id=eq.${id}`, { method: "PATCH", headers, body });
+      hechos++;
+    } catch (e) {
+      errores.push(`${id}: ${e.message || e}`);
+    }
+  }
+  return { hechos, errores };
 }
 
 // Generar meses YYYY-MM entre 2 fechas
@@ -12116,7 +12229,6 @@ function BannerSesion({ usuario, proyectoActivo, onLogout, onAdmin, onLogs, onPu
           )}
         </div>
 
-        <a href="https://bdprodtools.site" style={{ color: "#fff", border: "1px solid rgba(255,255,255,0.2)", padding: "9px 18px", borderRadius: 6, fontSize: 12, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", textDecoration: "none", marginRight: 8 }}>← Portal</a>
         {/* Cerrar sesión a la derecha */}
         <button
           onClick={onLogout}
@@ -12215,34 +12327,6 @@ export default function App() {
           comunidad: f.comunidad || "bilbao",
         }));
       }
-    })();
-  }, []);
-
-  // ── Acceso directo desde el portal bdprodtools.site (#portal_token=...)
-  useEffect(() => {
-    const m = window.location.hash.match(/portal_token=([^&]+)/);
-    if (!m) return;
-    window.history.replaceState(null, "", window.location.pathname + window.location.search);
-    (async () => {
-      try {
-        const r = await fetch("https://shuejlzogsisjtilfbhv.supabase.co/auth/v1/verify", {
-          method: "POST",
-          headers: { apikey: "sb_publishable_Sw4UMK1F9cLrLyCHefNESg__L7OAbTZ", "Content-Type": "application/json" },
-          body: JSON.stringify({ type: "magiclink", token_hash: decodeURIComponent(m[1]) }),
-        });
-        const j = await r.json();
-        const portalUsuario = ((j && j.user && j.user.email) || "").split("@")[0];
-        if (!portalUsuario) return;
-        const data = await supabaseFetch(`usuarios?${new URLSearchParams({ portal_usuario: `eq.${portalUsuario}`, activo: "eq.true", select: "id,nombre,es_admin,rol,pin" })}`);
-        const u = Array.isArray(data) && data.length === 1 ? data[0] : null;
-        if (!u) { alert("Tu usuario del portal no está vinculado en Nóminas. Pide al admin que lo vincule."); return; }
-        localStorage.setItem(AUTH_KEY, JSON.stringify({
-          id: u.id, nombre: u.nombre, es_admin: u.es_admin, rol: u.rol || (u.es_admin ? "admin" : "user"), pin: u.pin,
-          ultima_actividad: Date.now(),
-        }));
-        registrarLog(u.nombre, "login portal");
-        window.location.reload();
-      } catch (e) { console.warn("Acceso desde portal fallido:", e); }
     })();
   }, []);
 
