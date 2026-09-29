@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v172";
+const APP_VERSION = "v173";
 
 // v167: jornadas especiales y festivos trabajados NO suman en el PDF del
 // trabajador: dependen de que ese día se decida trabajar, así que no están
@@ -9498,6 +9498,8 @@ function ModalCargarPerfil({ perfiles, cargando, onCerrar, onCargar, onBorrarSel
   const esAdminModal = !!usuarioCtxModal?.es_admin;
   // v172: marcar el PDF como enviado queda en manos de admin y coordinador
   const puedeMarcarPdf = esAdminModal || usuarioCtxModal?.rol === "coordinador";
+  // v173: proyecto activo, solo para nombrar el archivo de copia de seguridad
+  const proyectoCtxModal = useContext(ProyectoContext);
   const [mostrarCopiar, setMostrarCopiar] = useState(false);
   const [proyectosDestino, setProyectosDestino] = useState([]);
   const [destinoId, setDestinoId] = useState("");
@@ -9555,6 +9557,50 @@ function ModalCargarPerfil({ perfiles, cargando, onCerrar, onCargar, onBorrarSel
     await onBorrarSeleccionados([...seleccionados]);
     setSeleccionados(new Set());
     setBorrando(false);
+  };
+
+  // v173: descargar los perfiles seleccionados en un único archivo .json.
+  // Es una copia de seguridad: no toca la base de datos ni marca nada.
+  // El botón JSON de la barra superior sigue siendo otra cosa: exporta solo el
+  // perfil que se tiene abierto en el formulario.
+  const exportarSeleccionadosJSON = () => {
+    if (seleccionados.size === 0) return;
+    const aExportar = perfiles.filter(p => seleccionados.has(p.supabaseId || p.key));
+    if (aExportar.length === 0) return;
+    try {
+      const limpio = (s) => String(s || "").replace(/[^a-zA-Z0-9]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "");
+      const contenido = {
+        formato: "calculadora-salarios/perfiles",
+        version: 1,
+        exportado: new Date().toISOString(),
+        exportado_por: usuarioCtxModal?.nombre || null,
+        proyecto_origen: proyectoCtxModal?.nombre || null,
+        productora_origen: proyectoCtxModal?.productora || null,
+        total: aExportar.length,
+        perfiles: aExportar.map(p => ({
+          nombre: p.nombre,
+          // la BD guarda "45h"/"40h"; ver DECISIONS D-14
+          tab_id: p.tabId === "iruna45" ? "45h" : p.tabId === "tab40" ? "40h" : p.tabId,
+          autor: p.autor || null,
+          creado: p.timestamp ? new Date(p.timestamp).toISOString() : null,
+          datos: p.datos,
+        })),
+      };
+      const partes = [limpio(proyectoCtxModal?.nombre), limpio(filtroDepto !== "__todos__" && filtroDepto !== "__sin__" ? filtroDepto : "")].filter(Boolean);
+      const nombreArchivo = `${partes.join("_") || "perfiles"}_${aExportar.length}_perfiles.json`;
+      const blob = new Blob([JSON.stringify(contenido, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = nombreArchivo;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+      registrarLog(usuarioCtxModal?.nombre, "export_perfiles_json", `${aExportar.length} perfiles · ${nombreArchivo}`);
+    } catch (e) {
+      alert("No se pudo generar el archivo: " + (e.message || e));
+    }
   };
 
   // v172: marcar / desmarcar los seleccionados como "PDF enviado al trabajador".
@@ -9696,6 +9742,14 @@ function ModalCargarPerfil({ perfiles, cargando, onCerrar, onCargar, onBorrarSel
               <button onClick={seleccionarTodos} style={{ fontSize: 10, padding: "5px 12px", border: "1px solid #4ec9b8", borderRadius: 4, background: "#f2f5f7", cursor: "pointer", color: "#4ec9b8", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontWeight: 700 }}>Seleccionar todos</button>
               <button onClick={deseleccionarTodos} style={{ fontSize: 10, padding: "5px 12px", border: "1px solid #ccc", borderRadius: 4, background: "#f2f5f7", cursor: "pointer", color: "#666", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontWeight: 700 }}>Ninguno</button>
             </>
+          )}
+          {/* v173: copia de seguridad de los perfiles seleccionados */}
+          {seleccionados.size > 0 && (
+            <button onClick={exportarSeleccionadosJSON}
+              style={{ padding: "8px 14px", fontSize: 10, border: "1px solid #888", borderRadius: 4, background: "#fff", color: "#444", cursor: "pointer", fontWeight: 700, letterSpacing: "0.08em", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}
+              title="Descargar los perfiles seleccionados en un archivo JSON (copia de seguridad)">
+              ⬇ JSON {seleccionados.size}
+            </button>
           )}
           {/* v172: marcar / quitar la marca de PDF enviado (admin y coordinador) */}
           {seleccionados.size > 0 && puedeMarcarPdf && (
