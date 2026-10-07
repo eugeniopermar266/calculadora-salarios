@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v174";
+const APP_VERSION = "v175";
 
 // v167: jornadas especiales y festivos trabajados NO suman en el PDF del
 // trabajador: dependen de que ese día se decida trabajar, así que no están
@@ -10173,17 +10173,22 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
       "Nombre trabajador", "Puesto", "Código contable", "Departamento",                          // A-D (v97: nuevo)
       "Proyecto", "Productora",                                                                   // E-F
       "Fecha inicio", "Fecha fin", "Días totales", "Salario pactado (€/mes)",                   // G-J
-      "Modalidad", "Fijo discontinuo", "Vacaciones", "Indemnización", "Finiquito aparte",       // K-O
-      "Total Salario Base", "Total Vacaciones", "Total Indemnización", "Total H.Extra",         // P-S
-      "Total Plus Actividad", "Total Festivos", "Total Jornadas Especiales", "Total Complementos", // T-W
-      "BRUTO TRABAJADOR", "Total SS Empresa", "COSTE TOTAL",                                    // X-Y-Z
-      "BRUTO MMB", "FRINGES MMB", "TOTAL MMB", "DIFERENCIA (Z - AC)",                           // AA-AB-AC-AD (v96)
-      // v151: over 45h y festivo pactado. Van DESPUÉS de AD a propósito: los índices
-      // fijos de arriba (23-29) y sus fórmulas no se desplazan.
-      "H.Extra over 45 (h)", "Precio hora over 45 (€)", "Total H.Extra over 45 (€)",             // AE-AF-AG
-      "Valor festivo aplicado (€)", "Festivo 45h",                                             // AH-AI (v164)
-      "Nombre plus variable", "Total plus variable (€)",                                       // AJ-AK (v165)
-      "Autor perfil", "Fecha creación", "Última modificación",                                  // AJ-AK-AL
+      "Modalidad",                                                                               // K
+      // v175: desglose MENSUAL del salario pactado, los mismos cuatro valores que
+      // se ven en pantalla. Van aquí a propósito; todo lo de detrás se desplaza
+      // cuatro columnas y los índices de más abajo ya están ajustados.
+      "Base 40H (€/mes)", "Vacaciones (€/mes)", "Indemnización (€/mes)", "H.Extra incorporadas (€/mes)",  // L-M-N-O
+      "Fijo discontinuo", "Vacaciones", "Indemnización", "Finiquito aparte",                   // P-S
+      "Total Salario Base", "Total Vacaciones", "Total Indemnización", "Total H.Extra",         // T-W
+      "Total Plus Actividad", "Total Festivos", "Total Jornadas Especiales", "Total Complementos", // X-AA
+      "BRUTO TRABAJADOR", "Total SS Empresa", "COSTE TOTAL",                                    // AB-AC-AD
+      "BRUTO MMB", "FRINGES MMB", "TOTAL MMB", "DIFERENCIA (AD - AG)",                          // AE-AF-AG-AH (v96)
+      // v151: over 45h y festivo pactado. Van al final a propósito, detrás de los
+      // índices fijos usados por las fórmulas.
+      "H.Extra over 45 (h)", "Precio hora over 45 (€)", "Total H.Extra over 45 (€)",             // AI-AJ-AK
+      "Valor festivo aplicado (€)", "Festivo 45h",                                             // AL-AM (v164)
+      "Nombre plus variable", "Total plus variable (€)",                                       // AN-AO (v165)
+      "Autor perfil", "Fecha creación", "Última modificación",                                  // AP-AQ-AR
     ];
     const headersMeses = [];
     mesesRango.forEach(ym => {
@@ -10207,13 +10212,14 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
     };
 
     // Índices de columnas (0-indexed) — v97: +1 desde D en adelante por columna Departamento
-    const IDX_BRUTO_TRAB = 23;   // X (antes W)
-    const IDX_SS = 24;           // Y (antes X)
-    const IDX_COSTE_TOTAL = 25;  // Z (antes Y)
-    const IDX_BRUTO_MMB = 26;    // AA (antes Z)
-    const IDX_FRINGES_MMB = 27;  // AB (antes AA)
-    const IDX_TOTAL_MMB = 28;    // AC (fórmula = AA + AB)
-    const IDX_DIFERENCIA = 29;   // AD (fórmula = Z - AC)
+    // v175: +4 respecto a la v174, por las cuatro columnas nuevas metidas tras Modalidad
+    const IDX_BRUTO_TRAB = 27;   // AB (antes X)
+    const IDX_SS = 28;           // AC (antes Y)
+    const IDX_COSTE_TOTAL = 29;  // AD (antes Z)
+    const IDX_BRUTO_MMB = 30;    // AE (antes AA)
+    const IDX_FRINGES_MMB = 31;  // AF (antes AB)
+    const IDX_TOTAL_MMB = 32;    // AG (fórmula = AE + AF)
+    const IDX_DIFERENCIA = 33;   // AH (fórmula = AD - AG)
 
     // v97: función que construye un worksheet a partir de un array de perfiles
     const construirHoja = (perfilesHoja) => {
@@ -10254,6 +10260,11 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
           diasTot || 0,
           Number(d.salario45) || 0,
           p.tab_id === "40h" ? "40H" : "45H",
+          // v175: desglose mensual del salario pactado (los cuatro recuadros de pantalla)
+          c.baseRef || 0,
+          c.vacRef || 0,
+          c.indemRef || 0,
+          c.hxRef || 0,
           d.esFijoDiscontinuo ? "Sí" : "No",
           d.vacAcumulada ? "Al final" : "Prorrateadas",
           d.indemAcumulada ? "Al final" : "Prorrateadas",
@@ -10288,11 +10299,14 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
       const FMT_EUR = '_-* #,##0.00 [$€-C0A]_-;-* #,##0.00 [$€-C0A]_-;_-* "-"?? [$€-C0A]_-;_-@_-';
       const colsEUR = new Set();
       colsEUR.add(9);
-      for (let i = 15; i <= 29; i++) colsEUR.add(i);
-      // v151: precio hora over 45 (31), total over 45 (32) y valor festivo (33).
-      // La 30 son horas y la 34 es Sí/No, así que no llevan formato de euro.
-      colsEUR.add(31); colsEUR.add(32); colsEUR.add(33);
-      colsEUR.add(36);   // v165: total plus variable
+      // v175: las cuatro columnas nuevas del desglose mensual (11 a 14).
+      // Todo lo que venía detrás sube 4 posiciones respecto a la v174.
+      for (let i = 11; i <= 14; i++) colsEUR.add(i);
+      for (let i = 19; i <= 33; i++) colsEUR.add(i);
+      // v151: precio hora over 45 (35), total over 45 (36) y valor festivo (37).
+      // La 34 son horas y la 38 es Sí/No, así que no llevan formato de euro.
+      colsEUR.add(35); colsEUR.add(36); colsEUR.add(37);
+      colsEUR.add(40);   // v165: total plus variable
       for (let i = idxInicioMeses; i < idxFinMeses; i++) colsEUR.add(i);
       for (let i = idxFinMeses; i < idxFinMeses + 3; i++) colsEUR.add(i);
       const totalRows = aoa.length;
@@ -10315,8 +10329,9 @@ function PanelExportarListado({ usuarioActual, onCerrar }) {
         else if (i === 3) w = 16;
         else if (i === 4 || i === 5) w = 14;
         else if (i >= 6 && i <= 8) w = 11;
-        else if (i >= 15 && i <= 29) w = 15;
-        else if (i >= 30 && i <= 36) w = 16;   // v151 · v165
+        else if (i >= 11 && i <= 14) w = 16;   // v175: desglose mensual
+        else if (i >= 19 && i <= 33) w = 15;
+        else if (i >= 34 && i <= 40) w = 16;   // v151 · v165
         else if (i >= idxInicioMeses && i < idxFinMeses) w = 11;
         else if (i >= idxFinMeses) w = 14;
         wscols.push({ wch: w });
