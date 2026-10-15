@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v176";
+const APP_VERSION = "v177";
 
 // v167: jornadas especiales y festivos trabajados NO suman en el PDF del
 // trabajador: dependen de que ese día se decida trabajar, así que no están
@@ -3024,11 +3024,11 @@ function DocumentoImprimible({
               </tr>
             </tbody>
           </table>
-          {!vacAcumulada && (
-            <div style={{ marginTop: 8, padding: "7px 10px", background: PDF_FONDO, border: `1px solid ${PDF_BORDE}`, borderRadius: 3, fontSize: 9, color: "#444", lineHeight: 1.5 }}>
-              <strong style={{ color: "#1a1a1a", fontStyle: "normal" }}>Nota:</strong> Salario en contrato es la suma del salario base + las vacaciones.
-            </div>
-          )}
+          {/* v176: la nota sale siempre, también con vacaciones al final, porque
+              ahora informa de cuándo se liquidan vacaciones e indemnización. */}
+          <div style={{ marginTop: 8, padding: "7px 10px", background: PDF_FONDO, border: `1px solid ${PDF_BORDE}`, borderRadius: 3, fontSize: 9, color: "#444", lineHeight: 1.5 }}>
+            <strong style={{ color: "#1a1a1a", fontStyle: "normal" }}>Nota:</strong>{!vacAcumulada ? " Salario en contrato es la suma del salario base + las vacaciones." : ""} {frasePagoVacIndem(vacAcumulada, indemAcumulada)}
+          </div>
         </>
       ) : (
         <>
@@ -3045,7 +3045,7 @@ function DocumentoImprimible({
             </tbody>
           </table>
           <div style={{ marginTop: 8, padding: "7px 10px", background: PDF_FONDO, border: `1px solid ${PDF_BORDE}`, borderRadius: 3, fontSize: 9, color: "#444", lineHeight: 1.5 }}>
-            <strong style={{ color: "#1a1a1a", fontStyle: "normal" }}>Nota:</strong> El salario que figura en contrato es la suma del salario base 40h más las vacaciones.
+            <strong style={{ color: "#1a1a1a", fontStyle: "normal" }}>Nota:</strong> El salario que figura en contrato es la suma del salario base 40h más las vacaciones. {frasePagoVacIndem(vacAcumulada, indemAcumulada)}
           </div>
         </>
       )}
@@ -3973,187 +3973,329 @@ function App45({ modoTab = "iruna45" }) {
   const totalFestDias45  = festivosPorMes.reduce((s,v)=>s+(v||0),0);
   const totalFestImport45= importeFestMes45.reduce((s,v)=>s+v,0);
 
-  // ── v176: EXPORTAR NÓMINA A EXCEL — misma estructura que el PDF ──────
-  // Replica el documento del trabajador sección a sección. Sigue el mismo
-  // criterio que el PDF (ver CURRENT_STATUS, sección "Criterio del PDF"):
+  // ── v176: EXPORTAR NÓMINA A EXCEL — réplica maquetada del PDF ────────
+  // Usa ExcelJS (y no SheetJS) porque la versión gratuita de SheetJS no sabe
+  // escribir colores, bordes ni negritas. Solo afecta a este botón.
+  // Sigue el mismo criterio que el PDF (ver CURRENT_STATUS, "Criterio del PDF"):
   // las horas over 45, las jornadas especiales y los festivos trabajados NO
   // suman en ningún importe, porque no están garantizados.
-  // No toca el CSV ni el PDF: es una salida más.
   const exportarNominaExcel = async () => {
     if (!p || desglose45.length === 0) return;
-    let XLSX;
-    try { XLSX = await cargarXLSX(); }
-    catch (e) { alert("Error cargando la librería de Excel: " + (e.message || e)); return; }
+    let ExcelJS;
+    try { ExcelJS = await cargarExcelJS(); }
+    catch (e) { alert("No se pudo cargar la librería de Excel: " + (e.message || e) + "\n\nComprueba la conexión y vuelve a intentarlo."); return; }
 
-    const FMT_EUR = '_-* #,##0.00 [$€-C0A]_-;-* #,##0.00 [$€-C0A]_-;_-* "-"?? [$€-C0A]_-;_-@_-';
-    const aoa = [];
-    const celdasEuro = [];        // posiciones {r,c} a las que poner formato euro
-    const celdasTitulo = [];      // filas de título de sección
-    const celdasTotal = [];       // filas resaltadas
+    // Paleta: la misma del PDF
+    const C_BORDE = "FFA8B0B6", C_FONDO = "FFE8ECEF", C_AZUL = "FFE3EEFA",
+          C_AZUL_B = "FFB4CDE6", C_NEGRO = "FF1A1A1A", C_TURQ = "FF4EC9B8",
+          C_DEST = "FFDCE9F5", C_GRIS = "FF6B7278", C_BLANCO = "FFFFFFFF";
+    const MONO = "Courier New", SANS = "Calibri";
+    const EUR = '#,##0.00\\ "€"';
+    const NUM = '#,##0.00';
 
-    // Añade una fila y devuelve su índice
-    const fila = (arr) => { aoa.push(arr); return aoa.length - 1; };
-    const vacia = () => fila([]);
-    const titulo = (txt) => { const r = fila([txt]); celdasTitulo.push(r); return r; };
-    const eur = (r, ...cols) => cols.forEach(c => celdasEuro.push({ r, c }));
+    const NCOL = es40h ? 13 : 14;
+    const borde = (c = C_BORDE) => ({
+      top: { style: "thin", color: { argb: c } }, left: { style: "thin", color: { argb: c } },
+      bottom: { style: "thin", color: { argb: c } }, right: { style: "thin", color: { argb: c } },
+    });
+    // Reparte NCOL columnas en n bloques lo más iguales posible
+    const repartir = (total, n) => {
+      const base = Math.floor(total / n), resto = total % n, out = [];
+      let c = 1;
+      for (let i = 0; i < n; i++) { const w = base + (i < resto ? 1 : 0); out.push([c, c + w - 1]); c += w; }
+      return out;
+    };
 
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet(es40h ? "Nómina 40H" : "Nómina 45H", {
+      views: [{ showGridLines: false }],
+      pageSetup: { orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 1, margins: { left: 0.3, right: 0.3, top: 0.4, bottom: 0.4, header: 0.2, footer: 0.2 } },
+    });
+
+    let r = 1;
+    // Pinta un rango de una fila: fusiona y aplica fondo y borde a todas sus celdas
+    const rango = (fila, c1, c2, { fill, bord } = {}) => {
+      if (c2 > c1) ws.mergeCells(fila, c1, fila, c2);
+      for (let c = c1; c <= c2; c++) {
+        const cel = ws.getCell(fila, c);
+        if (fill) cel.fill = { type: "pattern", pattern: "solid", fgColor: { argb: fill } };
+        if (bord) cel.border = bord;
+      }
+    };
+    // Escribe en la celda superior izquierda de un rango
+    const texto = (fila, c1, c2, v, o = {}) => {
+      const cel = ws.getCell(fila, c1);
+      cel.value = v;
+      cel.font = { name: o.font || MONO, size: o.size || 9, bold: !!o.bold, italic: !!o.italic, color: { argb: o.color || C_NEGRO } };
+      cel.alignment = { horizontal: o.align || "left", vertical: "middle", wrapText: !!o.wrap };
+      if (o.numfmt) cel.numFmt = o.numfmt;
+      rango(fila, c1, c2, { fill: o.fill, bord: o.bord === null ? undefined : (o.bord || borde()) });
+      return cel;
+    };
+    const seccion = (txt, etiqueta) => {
+      texto(r, 1, etiqueta ? NCOL - 3 : NCOL, "▸ " + txt, { font: SANS, size: 8, bold: true, bord: null });
+      if (etiqueta) texto(r, NCOL - 2, NCOL, etiqueta, { font: SANS, size: 8, bold: true, color: "FFF2F5F7", fill: C_NEGRO, align: "center", bord: null });
+      r++;
+    };
+
+    // Cifras que el documento muestra (mismo criterio que el PDF)
     const totHorasPdf = horasPorMes.reduce((s, v) => s + (v || 0), 0);
-    // Mismos ajustes que DocumentoImprimible
     const totFinalPdf = totFinal - (totOver45Importe || 0);
     const festPdf = PDF_INCLUYE_EVENTUALES ? (totalFestImport45 || 0) : 0;
-    const jePdf   = PDF_INCLUYE_EVENTUALES ? (totJEImporte || 0) : 0;
+    const jePdf = PDF_INCLUYE_EVENTUALES ? (totJEImporte || 0) : 0;
     const totalConExtras = totFinalPdf + festPdf + totalCompl - (PDF_INCLUYE_EVENTUALES ? 0 : (totJEImporte || 0));
     const totalAPercibir = (es40h ? (totFinalPdf - (totPlus || 0)) : totFinalPdf) + festPdf - (PDF_INCLUYE_EVENTUALES ? 0 : (totJEImporte || 0));
 
-    // ── Cabecera
-    fila([`CALCULADORA DE SALARIOS · DESGLOSE SALARIAL · ${es40h ? "40 HORAS" : "45 HORAS"}`]);
-    fila([`Generado por ${usuarioSesion?.nombre || "—"} · ${new Date().toLocaleString("es-ES")}`]);
-    fila(["SIMULACRO DE NÓMINA"]);
-    vacia();
+    // ═══ Línea de generación
+    texto(r, 1, NCOL, `Generado por ${usuarioSesion?.nombre || "—"} · ${new Date().toLocaleString("es-ES")}`,
+      { font: SANS, size: 8, color: C_GRIS, align: "right", bord: null });
+    r += 2;
 
-    // ── Trabajador
-    titulo("TRABAJADOR");
-    fila(["Proyecto", proyecto || "", "", "Productora", productora || ""]);
-    fila(["Nombre", nombre || "", "", "Puesto", [puesto, codigoContable].filter(Boolean).join(" · ")]);
-    let r = fila([`Salario pactado ${es40h ? "40h" : "45h"}`, Number(salario45efectivo) || 0, "", es40h ? "Fijo discontinuo" : "Horas referencia", es40h ? (esFijoDiscontinuo ? "Sí" : "No") : `${horasRef}h/mes`]);
-    eur(r, 1);
-    vacia();
+    // ═══ Banner negro
+    ws.getRow(r).height = 20; ws.getRow(r + 1).height = 26; ws.getRow(r + 2).height = 18;
+    texto(r, 1, NCOL, `DESGLOSE SALARIAL · ${es40h ? "40 HORAS" : "45 HORAS"}`,
+      { font: SANS, size: 8, bold: true, color: "FFBBBBBB", fill: C_NEGRO, align: "center", bord: null });
+    texto(r + 1, 1, NCOL, "CALCULADORA DE SALARIOS",
+      { font: MONO, size: 18, bold: true, color: C_BLANCO, fill: C_NEGRO, align: "center", bord: null });
+    texto(r + 2, 1, NCOL, [proyecto, productora].filter(Boolean).join(" · "),
+      { font: SANS, size: 8, color: "FFDDDDDD", fill: C_NEGRO, align: "center", bord: null });
+    r += 3;
+    ws.getRow(r).height = 4;
+    rango(r, 1, NCOL, { fill: C_TURQ });
+    r += 2;
 
-    // ── Referencia mes completo
-    titulo("REFERENCIA MES COMPLETO (40H BASE + HORAS EXTRA)");
+    // ═══ TRABAJADOR
+    seccion("TRABAJADOR");
+    const medio = Math.floor(NCOL / 2);
+    const paresTrab = [
+      [`Proyecto: ${proyecto || "—"}`, `Productora: ${productora || "—"}`],
+      [`Nombre: ${nombre || "—"}`, `Puesto: ${[puesto, codigoContable].filter(Boolean).join(" · ") || "—"}`],
+      [`Salario pactado ${es40h ? "40h" : "45h"}: ${fmtE(Number(salario45efectivo) || 0)}`,
+       es40h ? `Fijo discontinuo: ${esFijoDiscontinuo ? "Sí" : "No"}` : `Horas referencia: ${horasRef}h/mes`],
+    ];
+    paresTrab.forEach(([izq, der]) => {
+      ws.getRow(r).height = 16;
+      texto(r, 1, medio, izq, { bold: true, fill: C_FONDO });
+      texto(r, medio + 1, NCOL, der, { bold: true });
+      r++;
+    });
+    r++;
+
+    // ═══ REFERENCIA MES COMPLETO
+    seccion(`REFERENCIA MES COMPLETO (${es40h ? "40H BASE" : "40H BASE + HORAS EXTRA"})`);
     const refs = [
       { l: "BASE 40H", v: baseRef, s: (es40h && esFijoDiscontinuo) ? "Salario ÷ 1,14190" : "× 0,89286" },
       { l: "VACACIONES", v: vacRef, s: "Base ÷ 11,478452" },
       { l: "INDEMNIZACIÓN", v: indemRef, s: (es40h && esFijoDiscontinuo) ? "(Base/30) × 1,6433333" : "(Base/30) × 0,98632" },
       ...(es40h ? [] : [{ l: `H.EXTRA (${horasRef}H)`, v: hxRef, s: `${horasRef}h × ${fmt(vHoraEx)} €` }]),
     ];
-    fila(refs.map(x => x.l));
-    r = fila(refs.map(x => x.v || 0));
-    eur(r, ...refs.map((_, i) => i));
-    fila(refs.map(x => x.s));
-    r = fila([
-      es40h ? "TOTAL MES 40H" : "TOTAL MES 45H TODO INCLUIDO",
-      es40h ? (baseRef + vacRef + indemRef) : sumaRef,
-      "SALARIO EN CONTRATO",
-      es40h ? (vacAcumulada ? baseRef : (baseRef + vacRef)) : (baseRef + vacRef),
-    ]);
-    eur(r, 1, 3);
-    celdasTotal.push(r);
-    if (!es40h || !vacAcumulada) {
-      fila(["Nota: el salario que figura en contrato es la suma del salario base 40h más las vacaciones."]);
-    }
-    vacia();
+    const spansRef = repartir(NCOL, refs.length);
+    ws.getRow(r + 1).height = 22;
+    refs.forEach((it, i) => {
+      const [c1, c2] = spansRef[i];
+      texto(r, c1, c2, it.l, { font: SANS, size: 8, bold: true, color: "FF444444", fill: C_FONDO, align: "center" });
+      texto(r + 1, c1, c2, it.v || 0, { size: 13, bold: true, align: "center", numfmt: EUR });
+      texto(r + 2, c1, c2, it.s, { font: SANS, size: 8, color: "FF666666", fill: C_FONDO, align: "center" });
+    });
+    r += 3;
 
-    // ── Cálculo de horas
-    titulo("CÁLCULO DE HORAS");
-    r = fila(["Salario / Día", salarioDia || 0, "Salario / Semana", (salarioDia || 0) * 7, "Valor Hora", vHora || 0]);
-    eur(r, 1, 3, 5);
-    r = fila([
-      "Hora Extra ×1,5", vHoraEx || 0,
-      festivo45Aplica ? "Festivo 45h ×1,75" : "Festivo ×1,75", valorFestivo45 || (salarioDia * 1.75),
-      `Total H.Extra (${totHorasPdf}h)`, totHx || 0,
-    ]);
-    eur(r, 1, 3, 5);
-    if (over45Aplica) {
-      r = fila(["Hora over 45h ×1,5", over45Precio || 0, "", "", "", ""]);
-      eur(r, 1);
-      fila(["Precio informativo: estas horas no suman en los importes de este documento."]);
-    }
-    vacia();
+    // Fila destacada, cuadrada con los bloques de arriba
+    const [a1, a2] = spansRef[0], [b1, b2] = spansRef[1];
+    const [d1, d2] = spansRef[refs.length - 2], [e1, e2] = spansRef[refs.length - 1];
+    ws.getRow(r).height = 22;
+    texto(r, a1, a2, es40h ? "TOTAL MES 40H" : "TOTAL MES 45H TODO INCLUIDO",
+      { font: SANS, size: 10, bold: true, fill: C_DEST, align: "right", bord: borde(C_AZUL_B) });
+    texto(r, b1, b2, es40h ? (baseRef + vacRef + indemRef) : sumaRef,
+      { size: 13, bold: true, fill: C_DEST, align: "center", numfmt: EUR, bord: borde(C_AZUL_B) });
+    texto(r, d1, d2, "SALARIO EN CONTRATO",
+      { font: SANS, size: 10, bold: true, fill: C_DEST, align: "right", bord: borde(C_AZUL_B) });
+    texto(r, e1, e2, es40h ? (vacAcumulada ? baseRef : (baseRef + vacRef)) : (baseRef + vacRef),
+      { size: 13, bold: true, fill: C_DEST, align: "center", numfmt: EUR, bord: borde(C_AZUL_B) });
+    r++;
+    // v176: la nota sale siempre y arrastra la frase de liquidación, igual que el PDF
+    const notaBase = vacAcumulada && es40h
+      ? ""
+      : (es40h ? "Nota: salario en contrato es la suma del salario base más las vacaciones."
+               : "Nota: el salario que figura en contrato es la suma del salario base 40h más las vacaciones.");
+    texto(r, 1, NCOL, `${notaBase}${notaBase ? " " : "Nota: "}${frasePagoVacIndem(vacAcumulada, indemAcumulada)}`,
+      { font: SANS, size: 9, color: "FF444444", fill: C_FONDO });
+    r += 2;
 
-    // ── Nómina por mes
-    titulo(`NÓMINA ${es40h ? "40H" : "45H"} POR MES TRABAJADO · IMPORTES BRUTOS`);
-    const cabTabla = [
-      "MES", "FRAC.", "BASE 40H", "VAC.", "INDEM.", "H.EX H", "H.EX €",
-      ...(es40h ? [] : ["PLUS ACT."]),
-      "−VAC.D", "FEST. €", "J.ESP €", "PLUSES", "COMIDA", "TOTAL",
+    // ═══ CÁLCULOS DE REFERENCIA
+    seccion("CÁLCULOS DE REFERENCIA");
+    const lineasCalc = [
+      [["Salario / Día:", salarioDia || 0], ["Salario / Semana:", (salarioDia || 0) * 7], ["Valor Hora:", vHora || 0]],
+      [["Hora Extra ×1,5:", vHoraEx || 0],
+       [festivo45Aplica ? "Festivo 45h ×1,75:" : "Festivo ×1,75:", valorFestivo45 || (salarioDia * 1.75)],
+       [`Total H.Extra:`, totHx || 0]],
+      ...(over45Aplica ? [[["Hora over 45h ×1,5:", over45Precio || 0], ["", null], ["", null]]] : []),
     ];
-    const filaCabTabla = fila(cabTabla);
-    const colsEurTabla = es40h ? [2, 3, 4, 6, 7, 8, 9, 10, 11, 12] : [2, 3, 4, 6, 7, 8, 9, 10, 11, 12, 13];
+    const spans3 = repartir(NCOL, 3);
+    lineasCalc.forEach(linea => {
+      ws.getRow(r).height = 17;
+      linea.forEach(([lab, val], i) => {
+        const [c1, c2] = spans3[i];
+        if (val === null) { texto(r, c1, c2, "", {}); return; }
+        texto(r, c1, c2 - 2, lab, { bold: true, size: 9, color: "FF444444" });
+        texto(r, c2 - 1, c2, val, { bold: true, size: 10, align: "right", numfmt: EUR });
+      });
+      r++;
+    });
+    if (over45Aplica) {
+      texto(r, 1, NCOL, "El precio de la hora over 45h es informativo: estas horas no suman en los importes de este documento.",
+        { font: SANS, size: 8, color: "FF666666", italic: true, bord: null });
+      r++;
+    }
+    r++;
+
+    // ═══ NÓMINA POR MES
+    const filaMarcaAgua = r;
+    seccion(`NÓMINA ${es40h ? "40H" : "45H"} POR MES TRABAJADO`, "IMPORTES BRUTOS");
+    const cab = ["MES", "FRAC.", "BASE 40H", "VAC.", "INDEM.", "H.EX H", "H.EX €",
+      ...(es40h ? [] : ["PLUS ACT."]), "−VAC.D", "FEST. €", "J.ESP €", "PLUSES", "COMIDA", "TOTAL"];
+    ws.getRow(r).height = 24;
+    cab.forEach((h, i) => texto(r, i + 1, i + 1, h, {
+      font: SANS, size: 8, bold: true, color: "FF333333", fill: C_FONDO,
+      align: i === 0 ? "left" : "right", wrap: true,
+    }));
+    r++;
+
+    const iTotal = cab.length;                 // columna TOTAL
+    const iVacD = cab.indexOf("−VAC.D") + 1;   // columna de vacaciones disfrutadas
+    const iHoras = cab.indexOf("H.EX H") + 1;
+    const pintaFila = (vals, fondo, negritaTodo) => {
+      ws.getRow(r).height = negritaTodo ? 17 : 15;
+      vals.forEach((v, i) => {
+        const col = i + 1;
+        const esNum = typeof v === "number";
+        let color = C_NEGRO;
+        if (v === null) color = "FF999999";
+        else if (col === iVacD && esNum && v < 0) color = "FF8A2A20";
+        texto(r, col, col, v === null ? "—" : v, {
+          size: 9, bold: negritaTodo || col === iTotal || col === 1,
+          font: col === 1 ? MONO : MONO,
+          fill: fondo, align: col === 1 ? "left" : "right", color,
+          numfmt: (esNum && col > 2 && col !== iHoras) ? NUM : (col === 2 && esNum ? "0.0000" : undefined),
+          bord: borde(fondo === C_AZUL ? C_AZUL_B : C_BORDE),
+        });
+      });
+      r++;
+    };
+
     desglose45.forEach((d, i) => {
       const c = complementos45[i] || {};
-      const fest = importeFestMes45[i] || 0;
       const vd = importeVdMes[i] || 0;
-      const plusesSinComida = (c.herramienta || 0) + (c.coche || 0) + (c.vivienda || 0) + (c.seguroVida || 0) + (c.plusVar || 0);
-      const festFila = PDF_INCLUYE_EVENTUALES ? fest : 0;
+      const pluses = (c.herramienta || 0) + (c.coche || 0) + (c.vivienda || 0) + (c.seguroVida || 0) + (c.plusVar || 0);
+      const festFila = PDF_INCLUYE_EVENTUALES ? (importeFestMes45[i] || 0) : 0;
       const jeFila = PDF_INCLUYE_EVENTUALES ? (d.importeJE || 0) : 0;
       const totalMesPdf = (d.totalMes || 0) - (d.over45Importe || 0) - ((d.importeJE || 0) - jeFila);
       const totalRow = (es40h ? (totalMesPdf - (d.plusAct || 0)) : totalMesPdf) + festFila + (c.total || 0);
-      r = fila([
+      pintaFila([
         d.mes + (d.esCompleto ? "" : ` (${d.desde}-${d.hasta})`),
         Number(d.fraccion) || 0,
-        d.base40 || 0, d.vac40 || 0, d.indem40 || 0,
-        d.hMes || 0, d.cobroHx || 0,
-        ...(es40h ? [] : [d.plusAct || 0]),
-        vd > 0 ? -vd : 0,
-        festFila, jeFila,
-        plusesSinComida, c.comida || 0,
+        d.base40 || 0,
+        d.vac40 || null,
+        d.indem40 || null,
+        `${d.hMes || 0}h`,
+        d.cobroHx || 0,
+        ...(es40h ? [] : [d.plusAct > 0 ? d.plusAct : null]),
+        vd > 0 ? -vd : null,
+        festFila > 0 ? festFila : null,
+        jeFila > 0 ? jeFila : null,
+        pluses > 0 ? pluses : null,
+        c.comida > 0 ? c.comida : null,
         totalRow,
-      ]);
-      eur(r, ...colsEurTabla);
+      ], i % 2 === 0 ? C_BLANCO : "FFF2F5F7", false);
     });
+
     const plusesTot = complementos45.reduce((s, c) => s + (c.herramienta || 0) + (c.coche || 0) + (c.vivienda || 0) + (c.seguroVida || 0) + (c.plusVar || 0), 0);
     const comidaTot = complementos45.reduce((s, c) => s + (c.comida || 0), 0);
-    r = fila([
-      "TOTAL", "",
+    pintaFila([
+      "TOTAL", null,
       totBase || 0, totVac || 0, totIndem || 0,
-      totHorasPdf, totHx || 0,
-      ...(es40h ? [] : [totPlus || 0]),
-      totVd > 0 ? -totVd : 0,
-      festPdf, jePdf,
+      `${totHorasPdf}h`, totHx || 0,
+      ...(es40h ? [] : [totPlus > 0 ? totPlus : null]),
+      totVd > 0 ? -totVd : null,
+      festPdf > 0 ? festPdf : null,
+      jePdf > 0 ? jePdf : null,
       plusesTot, comidaTot,
       es40h ? (totalConExtras - (totPlus || 0)) : totalConExtras,
-    ]);
-    eur(r, ...colsEurTabla);
-    celdasTotal.push(r);
-    vacia();
+    ], C_AZUL, true);
+    r++;
 
-    // ── Período de contratación
-    titulo("PERÍODO DE CONTRATACIÓN");
-    fila(["Inicio", fechaInicio || "", "Fin", fechaFin || "", "Días", p.diasNormalizados, "Meses", fmtM(p.mesesTotales), "Sem. L-V", fmt(p.semanasTotales, 1)]);
-    vacia();
+    // ═══ PERÍODO DE CONTRATACIÓN
+    seccion("PERÍODO DE CONTRATACIÓN");
+    const per = [["Inicio:", fechaInicio || "—"], ["Fin:", fechaFin || "—"], ["Días:", String(p.diasNormalizados)],
+                 ["Meses:", fmtM(p.mesesTotales)], ["Sem. L-V:", fmt(p.semanasTotales, 1)]];
+    const spans5 = repartir(NCOL, 5);
+    ws.getRow(r).height = 18;
+    per.forEach(([l, v], i) => {
+      const [c1, c2] = spans5[i];
+      texto(r, c1, c2, `${l} ${v}`, { bold: true, size: 9, align: "center", fill: i % 2 === 0 ? C_FONDO : undefined });
+    });
+    r += 2;
 
-    // ── Resumen del período
-    titulo("RESUMEN DEL PERÍODO · IMPORTES BRUTOS");
-    r = fila(["Base 40h equivalente", totBase || 0]); eur(r, 1);
-    r = fila(["· Vacaciones", totalVac45 || 0]); eur(r, 1);
-    r = fila(["· Indemnización", totalIndem45 || 0]); eur(r, 1);
-    r = fila([`+ Horas extra (${totHorasPdf}h)`, totHx || 0]); eur(r, 1);
-    if (totPlus > 0 && !es40h) { r = fila(["+ Plus de Actividad", totPlus]); eur(r, 1); }
-    if (totVd > 0) { r = fila([`− Vacaciones disfrutadas (${totalVdDias}d)`, -totVd]); eur(r, 1); }
-    if (PDF_INCLUYE_EVENTUALES && totalFestDias45 > 0) { r = fila([`+ Festivos trabajados (${totalFestDias45}d)`, totalFestImport45]); eur(r, 1); }
-    if (PDF_INCLUYE_EVENTUALES && totJEDias > 0) { r = fila([`+ Jornadas especiales (${totJEDias}d)`, totJEImporte]); eur(r, 1); }
-    r = fila([`TOTAL A PERCIBIR (${es40h ? "40h" : "45h"})${totalCompl > 0 ? " (sin extras)" : ""}`, totalAPercibir]);
-    eur(r, 1); celdasTotal.push(r);
-    r = fila([`· Promedio mensual (${fmtM(p.mesesTotales)} meses)`, p.mesesTotales > 0 ? (es40h ? (totFinalPdf - (totPlus || 0)) : totFinalPdf) / p.mesesTotales : 0]); eur(r, 1);
-    r = fila([`· Promedio semanal (${fmt(p.semanasTotales, 1)} sem L-V)`, p.semanasTotales > 0 ? (es40h ? (totFinalPdf - (totPlus || 0)) : totFinalPdf) / p.semanasTotales : 0]); eur(r, 1);
+    // ═══ RESUMEN DEL PERÍODO
+    seccion("RESUMEN DEL PERÍODO", "IMPORTES BRUTOS");
+    const colVal = NCOL - 4;
+    const lineaResumen = (lab, val, { bold = false, color = C_NEGRO, grande = false } = {}) => {
+      ws.getRow(r).height = grande ? 24 : 15;
+      const fondo = grande ? C_AZUL : C_FONDO;
+      const bd = grande ? borde(C_AZUL_B) : borde();
+      texto(r, 1, colVal - 1, lab, { bold: bold || grande, size: grande ? 11 : 9, font: grande ? SANS : MONO, color, fill: fondo, bord: bd });
+      texto(r, colVal, NCOL, val, { bold: bold || grande, size: grande ? 14 : 9, align: "right", numfmt: EUR, color, fill: grande ? C_AZUL : undefined, bord: bd });
+      r++;
+    };
+    lineaResumen("Base 40h equivalente", totBase || 0, { bold: true });
+    lineaResumen("· Vacaciones", totalVac45 || 0, { color: "FF444444" });
+    lineaResumen("· Indemnización", totalIndem45 || 0, { color: "FF444444" });
+    lineaResumen(`+ Horas extra (${totHorasPdf}h)`, totHx || 0, { bold: true });
+    if (totPlus > 0 && !es40h) lineaResumen("+ Plus de Actividad", totPlus, { bold: true, color: "FF4A5157" });
+    if (totVd > 0) lineaResumen(`− Vacaciones disfrutadas (${totalVdDias}d)`, -totVd, { bold: true, color: "FF8A2A20" });
+    if (PDF_INCLUYE_EVENTUALES && totalFestDias45 > 0) lineaResumen(`+ Festivos trabajados (${totalFestDias45}d)`, totalFestImport45, { bold: true, color: "FF6A3A9A" });
+    if (PDF_INCLUYE_EVENTUALES && totJEDias > 0) lineaResumen(`+ Jornadas especiales (${totJEDias}d)`, totJEImporte, { bold: true, color: "FF8A1E4A" });
+    lineaResumen(`TOTAL A PERCIBIR (${es40h ? "40H" : "45H"})${totalCompl > 0 ? " · SIN EXTRAS" : ""}`, totalAPercibir, { grande: true });
+    lineaResumen(`· Promedio mensual (${fmtM(p.mesesTotales)} meses)`, p.mesesTotales > 0 ? (es40h ? (totFinalPdf - (totPlus || 0)) : totFinalPdf) / p.mesesTotales : 0, { bold: true, color: "FF1A7A58" });
+    lineaResumen(`· Promedio semanal (${fmt(p.semanasTotales, 1)} sem L-V)`, p.semanasTotales > 0 ? (es40h ? (totFinalPdf - (totPlus || 0)) : totFinalPdf) / p.semanasTotales : 0, { bold: true, color: "FF1A7A58" });
 
     if (totalCompl > 0) {
-      vacia();
-      titulo("EXTRAS DEL PERÍODO");
-      r = fila([`+ Complementos (pluses)${plusVarActivo && totalPlusVar > 0 ? ` · incluye ${plusVarNombre || "plus variable"}` : ""}`, totalCompl]); eur(r, 1);
-      r = fila(["TOTAL CON EXTRAS", es40h ? (totalConExtras - (totPlus || 0)) : totalConExtras]);
-      eur(r, 1); celdasTotal.push(r);
+      r++;
+      seccion("EXTRAS DEL PERÍODO");
+      lineaResumen(`+ Complementos (pluses)${plusVarActivo && totalPlusVar > 0 ? ` · incluye ${plusVarNombre || "plus variable"}` : ""}`, totalCompl, { bold: true, color: "FF5A8A5A" });
+      lineaResumen("TOTAL CON EXTRAS", es40h ? (totalConExtras - (totPlus || 0)) : totalConExtras, { grande: true });
     }
 
-    vacia();
-    fila([DISCLAIMER_PDF]);
+    r++;
+    ws.getRow(r).height = 18;
+    texto(r, 1, NCOL, "Cálculo orientativo del salario mensual bruto, que puede diferir ligeramente de la nómina real generada en cada periodo.",
+      { font: SANS, size: 9, color: "FF444444", fill: C_FONDO, align: "center" });
 
-    // ── Construir la hoja
-    const ws = XLSX.utils.aoa_to_sheet(aoa);
-    celdasEuro.forEach(({ r: rr, c: cc }) => {
-      const ref = XLSX.utils.encode_cell({ r: rr, c: cc });
-      if (ws[ref]) ws[ref].z = FMT_EUR;
-    });
-    const anchoCols = Math.max(...aoa.map(f => f.length), 10);
-    ws["!cols"] = Array.from({ length: anchoCols }, (_, i) => ({ wch: i === 0 ? 34 : 14 }));
+    // ═══ Anchos de columna
+    const anchos = es40h
+      ? [26, 8, 12, 10, 10, 8, 11, 11, 9, 9, 9, 9, 12]
+      : [26, 8, 12, 10, 10, 8, 11, 10, 11, 9, 9, 9, 9, 12];
+    anchos.forEach((w, i) => { ws.getColumn(i + 1).width = w; });
 
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, es40h ? "Nómina 40H" : "Nómina 45H");
+    // ═══ Marca de agua: imagen transparente sobre la tabla de meses
+    try {
+      const idImg = wb.addImage({ base64: MARCA_AGUA_B64, extension: "png" });
+      ws.addImage(idImg, {
+        tl: { col: 1.2, row: filaMarcaAgua - 0.5 },
+        ext: { width: 980, height: 370 },
+        editAs: "absolute",
+      });
+    } catch (e) { console.warn("Marca de agua no añadida:", e); }
 
+    // ═══ Descargar
+    const buf = await wb.xlsx.writeBuffer();
     const partes = [proyecto, productora, nombre].filter(Boolean).map(s => s.replace(/[^a-zA-Z0-9]/g, "_"));
     const nombreArchivo = (partes.length ? partes.join("_") : "calculadora") + (es40h ? "_40h.xlsx" : "_45h.xlsx");
-    XLSX.writeFile(wb, nombreArchivo);
+    const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = nombreArchivo;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
 
     if (usuarioSesion) {
       const detalle = [proyecto, productora, nombre].filter(Boolean).join(" | ") || "(sin datos)";
@@ -6684,6 +6826,44 @@ async function reemplazarTodosPuestos(adminPin, nuevosPuestos) {
 }
 
 // --- SheetJS (xlsx) cargado dinámicamente desde CDN solo cuando se necesite ---
+// v176: frase de la nota que explica CUÁNDO se liquidan vacaciones e
+// indemnización. Vive aquí, en un solo sitio, para que el PDF y el Excel digan
+// exactamente lo mismo. Sigue los dos interruptores del perfil.
+function frasePagoVacIndem(vacAlFinal, indemAlFinal) {
+  if (vacAlFinal && indemAlFinal) {
+    return "Las vacaciones y la indemnización que correspondan se liquidarán a final de contrato.";
+  }
+  if (!vacAlFinal && !indemAlFinal) {
+    return "Las vacaciones y la indemnización que correspondan se liquidarán mes a mes.";
+  }
+  if (!vacAlFinal && indemAlFinal) {
+    return "Las vacaciones se liquidarán mes a mes. La indemnización que corresponda, a final de contrato.";
+  }
+  return "Las vacaciones se liquidarán a final de contrato. La indemnización que corresponda, mes a mes.";
+}
+
+// v176: ExcelJS — necesaria para escribir colores, bordes y negritas en el
+// Excel de nómina. SheetJS (la de abajo) no sabe hacerlo en su versión gratuita,
+// así que conviven: SheetJS para los listados, ExcelJS para la nómina maquetada.
+let _exceljsPromise = null;
+function cargarExcelJS() {
+  if (typeof window === "undefined") return Promise.reject(new Error("No window"));
+  if (window.ExcelJS) return Promise.resolve(window.ExcelJS);
+  if (_exceljsPromise) return _exceljsPromise;
+  _exceljsPromise = new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = "https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js";
+    s.onload = () => { if (window.ExcelJS) resolve(window.ExcelJS); else reject(new Error("ExcelJS no se cargó")); };
+    s.onerror = () => reject(new Error("No se pudo cargar ExcelJS desde el CDN"));
+    document.head.appendChild(s);
+  });
+  return _exceljsPromise;
+}
+
+// v176: marca de agua "SIMULACRO DE NOMINA" en diagonal, empotrada en el código
+// para que el Excel no dependa de descargar ninguna imagen.
+const MARCA_AGUA_B64 = "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";
+
 let _xlsxPromise = null;
 function cargarXLSX() {
   if (typeof window === "undefined") return Promise.reject(new Error("No window"));
