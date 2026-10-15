@@ -15,7 +15,7 @@ const ProyectoContext = createContext(null); // v45: proyecto activo (id, nombre
 // 2027: pendiente de publicación oficial — añadir aquí cuando se publique.
 
 // v57: versión visible de la app (banner, login, selector de proyecto)
-const APP_VERSION = "v175";
+const APP_VERSION = "v176";
 
 // v167: jornadas especiales y festivos trabajados NO suman en el PDF del
 // trabajador: dependen de que ese día se decida trabajar, así que no están
@@ -3973,6 +3973,194 @@ function App45({ modoTab = "iruna45" }) {
   const totalFestDias45  = festivosPorMes.reduce((s,v)=>s+(v||0),0);
   const totalFestImport45= importeFestMes45.reduce((s,v)=>s+v,0);
 
+  // ── v176: EXPORTAR NÓMINA A EXCEL — misma estructura que el PDF ──────
+  // Replica el documento del trabajador sección a sección. Sigue el mismo
+  // criterio que el PDF (ver CURRENT_STATUS, sección "Criterio del PDF"):
+  // las horas over 45, las jornadas especiales y los festivos trabajados NO
+  // suman en ningún importe, porque no están garantizados.
+  // No toca el CSV ni el PDF: es una salida más.
+  const exportarNominaExcel = async () => {
+    if (!p || desglose45.length === 0) return;
+    let XLSX;
+    try { XLSX = await cargarXLSX(); }
+    catch (e) { alert("Error cargando la librería de Excel: " + (e.message || e)); return; }
+
+    const FMT_EUR = '_-* #,##0.00 [$€-C0A]_-;-* #,##0.00 [$€-C0A]_-;_-* "-"?? [$€-C0A]_-;_-@_-';
+    const aoa = [];
+    const celdasEuro = [];        // posiciones {r,c} a las que poner formato euro
+    const celdasTitulo = [];      // filas de título de sección
+    const celdasTotal = [];       // filas resaltadas
+
+    // Añade una fila y devuelve su índice
+    const fila = (arr) => { aoa.push(arr); return aoa.length - 1; };
+    const vacia = () => fila([]);
+    const titulo = (txt) => { const r = fila([txt]); celdasTitulo.push(r); return r; };
+    const eur = (r, ...cols) => cols.forEach(c => celdasEuro.push({ r, c }));
+
+    const totHorasPdf = horasPorMes.reduce((s, v) => s + (v || 0), 0);
+    // Mismos ajustes que DocumentoImprimible
+    const totFinalPdf = totFinal - (totOver45Importe || 0);
+    const festPdf = PDF_INCLUYE_EVENTUALES ? (totalFestImport45 || 0) : 0;
+    const jePdf   = PDF_INCLUYE_EVENTUALES ? (totJEImporte || 0) : 0;
+    const totalConExtras = totFinalPdf + festPdf + totalCompl - (PDF_INCLUYE_EVENTUALES ? 0 : (totJEImporte || 0));
+    const totalAPercibir = (es40h ? (totFinalPdf - (totPlus || 0)) : totFinalPdf) + festPdf - (PDF_INCLUYE_EVENTUALES ? 0 : (totJEImporte || 0));
+
+    // ── Cabecera
+    fila([`CALCULADORA DE SALARIOS · DESGLOSE SALARIAL · ${es40h ? "40 HORAS" : "45 HORAS"}`]);
+    fila([`Generado por ${usuarioSesion?.nombre || "—"} · ${new Date().toLocaleString("es-ES")}`]);
+    fila(["SIMULACRO DE NÓMINA"]);
+    vacia();
+
+    // ── Trabajador
+    titulo("TRABAJADOR");
+    fila(["Proyecto", proyecto || "", "", "Productora", productora || ""]);
+    fila(["Nombre", nombre || "", "", "Puesto", [puesto, codigoContable].filter(Boolean).join(" · ")]);
+    let r = fila([`Salario pactado ${es40h ? "40h" : "45h"}`, Number(salario45efectivo) || 0, "", es40h ? "Fijo discontinuo" : "Horas referencia", es40h ? (esFijoDiscontinuo ? "Sí" : "No") : `${horasRef}h/mes`]);
+    eur(r, 1);
+    vacia();
+
+    // ── Referencia mes completo
+    titulo("REFERENCIA MES COMPLETO (40H BASE + HORAS EXTRA)");
+    const refs = [
+      { l: "BASE 40H", v: baseRef, s: (es40h && esFijoDiscontinuo) ? "Salario ÷ 1,14190" : "× 0,89286" },
+      { l: "VACACIONES", v: vacRef, s: "Base ÷ 11,478452" },
+      { l: "INDEMNIZACIÓN", v: indemRef, s: (es40h && esFijoDiscontinuo) ? "(Base/30) × 1,6433333" : "(Base/30) × 0,98632" },
+      ...(es40h ? [] : [{ l: `H.EXTRA (${horasRef}H)`, v: hxRef, s: `${horasRef}h × ${fmt(vHoraEx)} €` }]),
+    ];
+    fila(refs.map(x => x.l));
+    r = fila(refs.map(x => x.v || 0));
+    eur(r, ...refs.map((_, i) => i));
+    fila(refs.map(x => x.s));
+    r = fila([
+      es40h ? "TOTAL MES 40H" : "TOTAL MES 45H TODO INCLUIDO",
+      es40h ? (baseRef + vacRef + indemRef) : sumaRef,
+      "SALARIO EN CONTRATO",
+      es40h ? (vacAcumulada ? baseRef : (baseRef + vacRef)) : (baseRef + vacRef),
+    ]);
+    eur(r, 1, 3);
+    celdasTotal.push(r);
+    if (!es40h || !vacAcumulada) {
+      fila(["Nota: el salario que figura en contrato es la suma del salario base 40h más las vacaciones."]);
+    }
+    vacia();
+
+    // ── Cálculo de horas
+    titulo("CÁLCULO DE HORAS");
+    r = fila(["Salario / Día", salarioDia || 0, "Salario / Semana", (salarioDia || 0) * 7, "Valor Hora", vHora || 0]);
+    eur(r, 1, 3, 5);
+    r = fila([
+      "Hora Extra ×1,5", vHoraEx || 0,
+      festivo45Aplica ? "Festivo 45h ×1,75" : "Festivo ×1,75", valorFestivo45 || (salarioDia * 1.75),
+      `Total H.Extra (${totHorasPdf}h)`, totHx || 0,
+    ]);
+    eur(r, 1, 3, 5);
+    if (over45Aplica) {
+      r = fila(["Hora over 45h ×1,5", over45Precio || 0, "", "", "", ""]);
+      eur(r, 1);
+      fila(["Precio informativo: estas horas no suman en los importes de este documento."]);
+    }
+    vacia();
+
+    // ── Nómina por mes
+    titulo(`NÓMINA ${es40h ? "40H" : "45H"} POR MES TRABAJADO · IMPORTES BRUTOS`);
+    const cabTabla = [
+      "MES", "FRAC.", "BASE 40H", "VAC.", "INDEM.", "H.EX H", "H.EX €",
+      ...(es40h ? [] : ["PLUS ACT."]),
+      "−VAC.D", "FEST. €", "J.ESP €", "PLUSES", "COMIDA", "TOTAL",
+    ];
+    const filaCabTabla = fila(cabTabla);
+    const colsEurTabla = es40h ? [2, 3, 4, 6, 7, 8, 9, 10, 11, 12] : [2, 3, 4, 6, 7, 8, 9, 10, 11, 12, 13];
+    desglose45.forEach((d, i) => {
+      const c = complementos45[i] || {};
+      const fest = importeFestMes45[i] || 0;
+      const vd = importeVdMes[i] || 0;
+      const plusesSinComida = (c.herramienta || 0) + (c.coche || 0) + (c.vivienda || 0) + (c.seguroVida || 0) + (c.plusVar || 0);
+      const festFila = PDF_INCLUYE_EVENTUALES ? fest : 0;
+      const jeFila = PDF_INCLUYE_EVENTUALES ? (d.importeJE || 0) : 0;
+      const totalMesPdf = (d.totalMes || 0) - (d.over45Importe || 0) - ((d.importeJE || 0) - jeFila);
+      const totalRow = (es40h ? (totalMesPdf - (d.plusAct || 0)) : totalMesPdf) + festFila + (c.total || 0);
+      r = fila([
+        d.mes + (d.esCompleto ? "" : ` (${d.desde}-${d.hasta})`),
+        Number(d.fraccion) || 0,
+        d.base40 || 0, d.vac40 || 0, d.indem40 || 0,
+        d.hMes || 0, d.cobroHx || 0,
+        ...(es40h ? [] : [d.plusAct || 0]),
+        vd > 0 ? -vd : 0,
+        festFila, jeFila,
+        plusesSinComida, c.comida || 0,
+        totalRow,
+      ]);
+      eur(r, ...colsEurTabla);
+    });
+    const plusesTot = complementos45.reduce((s, c) => s + (c.herramienta || 0) + (c.coche || 0) + (c.vivienda || 0) + (c.seguroVida || 0) + (c.plusVar || 0), 0);
+    const comidaTot = complementos45.reduce((s, c) => s + (c.comida || 0), 0);
+    r = fila([
+      "TOTAL", "",
+      totBase || 0, totVac || 0, totIndem || 0,
+      totHorasPdf, totHx || 0,
+      ...(es40h ? [] : [totPlus || 0]),
+      totVd > 0 ? -totVd : 0,
+      festPdf, jePdf,
+      plusesTot, comidaTot,
+      es40h ? (totalConExtras - (totPlus || 0)) : totalConExtras,
+    ]);
+    eur(r, ...colsEurTabla);
+    celdasTotal.push(r);
+    vacia();
+
+    // ── Período de contratación
+    titulo("PERÍODO DE CONTRATACIÓN");
+    fila(["Inicio", fechaInicio || "", "Fin", fechaFin || "", "Días", p.diasNormalizados, "Meses", fmtM(p.mesesTotales), "Sem. L-V", fmt(p.semanasTotales, 1)]);
+    vacia();
+
+    // ── Resumen del período
+    titulo("RESUMEN DEL PERÍODO · IMPORTES BRUTOS");
+    r = fila(["Base 40h equivalente", totBase || 0]); eur(r, 1);
+    r = fila(["· Vacaciones", totalVac45 || 0]); eur(r, 1);
+    r = fila(["· Indemnización", totalIndem45 || 0]); eur(r, 1);
+    r = fila([`+ Horas extra (${totHorasPdf}h)`, totHx || 0]); eur(r, 1);
+    if (totPlus > 0 && !es40h) { r = fila(["+ Plus de Actividad", totPlus]); eur(r, 1); }
+    if (totVd > 0) { r = fila([`− Vacaciones disfrutadas (${totalVdDias}d)`, -totVd]); eur(r, 1); }
+    if (PDF_INCLUYE_EVENTUALES && totalFestDias45 > 0) { r = fila([`+ Festivos trabajados (${totalFestDias45}d)`, totalFestImport45]); eur(r, 1); }
+    if (PDF_INCLUYE_EVENTUALES && totJEDias > 0) { r = fila([`+ Jornadas especiales (${totJEDias}d)`, totJEImporte]); eur(r, 1); }
+    r = fila([`TOTAL A PERCIBIR (${es40h ? "40h" : "45h"})${totalCompl > 0 ? " (sin extras)" : ""}`, totalAPercibir]);
+    eur(r, 1); celdasTotal.push(r);
+    r = fila([`· Promedio mensual (${fmtM(p.mesesTotales)} meses)`, p.mesesTotales > 0 ? (es40h ? (totFinalPdf - (totPlus || 0)) : totFinalPdf) / p.mesesTotales : 0]); eur(r, 1);
+    r = fila([`· Promedio semanal (${fmt(p.semanasTotales, 1)} sem L-V)`, p.semanasTotales > 0 ? (es40h ? (totFinalPdf - (totPlus || 0)) : totFinalPdf) / p.semanasTotales : 0]); eur(r, 1);
+
+    if (totalCompl > 0) {
+      vacia();
+      titulo("EXTRAS DEL PERÍODO");
+      r = fila([`+ Complementos (pluses)${plusVarActivo && totalPlusVar > 0 ? ` · incluye ${plusVarNombre || "plus variable"}` : ""}`, totalCompl]); eur(r, 1);
+      r = fila(["TOTAL CON EXTRAS", es40h ? (totalConExtras - (totPlus || 0)) : totalConExtras]);
+      eur(r, 1); celdasTotal.push(r);
+    }
+
+    vacia();
+    fila([DISCLAIMER_PDF]);
+
+    // ── Construir la hoja
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    celdasEuro.forEach(({ r: rr, c: cc }) => {
+      const ref = XLSX.utils.encode_cell({ r: rr, c: cc });
+      if (ws[ref]) ws[ref].z = FMT_EUR;
+    });
+    const anchoCols = Math.max(...aoa.map(f => f.length), 10);
+    ws["!cols"] = Array.from({ length: anchoCols }, (_, i) => ({ wch: i === 0 ? 34 : 14 }));
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, es40h ? "Nómina 40H" : "Nómina 45H");
+
+    const partes = [proyecto, productora, nombre].filter(Boolean).map(s => s.replace(/[^a-zA-Z0-9]/g, "_"));
+    const nombreArchivo = (partes.length ? partes.join("_") : "calculadora") + (es40h ? "_40h.xlsx" : "_45h.xlsx");
+    XLSX.writeFile(wb, nombreArchivo);
+
+    if (usuarioSesion) {
+      const detalle = [proyecto, productora, nombre].filter(Boolean).join(" | ") || "(sin datos)";
+      registrarLog(usuarioSesion.nombre, "export_nomina_xlsx", `[${modoTab === "tab40" ? "40H" : "45H"}] ${nombreArchivo} · ${detalle}`);
+    }
+  };
+
   // ── EXPORTAR CSV (45h) - genera contenido y abre modal ───────────────
   const exportarCSV45 = () => {
     if (!p || desglose45.length === 0) return;
@@ -4531,6 +4719,28 @@ ${docHTML}
               >
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                 CSV
+              </button>
+              {/* v176: EXCEL — la misma nómina del PDF, en .xlsx */}
+              <button
+                onClick={exportarNominaExcel}
+                disabled={!p || desglose45.length === 0}
+                style={{
+                  padding: "8px 14px", fontSize: 11, fontFamily: "'Inter', sans-serif",
+                  letterSpacing: "0.03em", borderRadius: 6,
+                  cursor: (p && desglose45.length) ? "pointer" : "not-allowed", fontWeight: 600,
+                  border: "none",
+                  background: (p && desglose45.length) ? "#1d7044" : "rgba(29,112,68,0.2)",
+                  color: (p && desglose45.length) ? "#fff" : "#666",
+                  opacity: (p && desglose45.length) ? 1 : 0.5,
+                  display: "flex", alignItems: "center", gap: 5,
+                  transition: "background 0.15s",
+                }}
+                onMouseEnter={e => { if (p && desglose45.length) e.currentTarget.style.background = "#2e8b57"; }}
+                onMouseLeave={e => { if (p && desglose45.length) e.currentTarget.style.background = "#1d7044"; }}
+                title="Descargar la nómina en Excel, con las mismas secciones que el PDF"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="19"/><line x1="16" y1="13" x2="8" y2="19"/></svg>
+                EXCEL
               </button>
               {/* PDF (rojo — exportación) */}
               <button
@@ -5760,6 +5970,22 @@ ${docHTML}
           }}
           title="Descargar nómina como CSV (Excel)"
         >⬇ Exportar CSV</button>
+        {/* v176: EXCEL — la misma nómina del PDF, en .xlsx */}
+        <button
+          onClick={exportarNominaExcel}
+          disabled={!p || desglose45.length === 0}
+          style={{
+            padding: "10px 24px", fontSize: 11, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+            letterSpacing: "0.15em", textTransform: "uppercase", borderRadius: 4,
+            cursor: (p && desglose45.length) ? "pointer" : "not-allowed", fontWeight: 700,
+            border: "1px solid #1d7044",
+            background: (p && desglose45.length) ? "#1d7044" : "transparent",
+            color: (p && desglose45.length) ? "#f2f5f7" : "#666",
+            opacity: (p && desglose45.length) ? 1 : 0.5,
+            transition: "all 0.15s",
+          }}
+          title="Descargar la nómina en Excel, con las mismas secciones que el PDF"
+        >⬇ Exportar Excel</button>
         <button
           onClick={exportarPDF45}
           disabled={!p || desglose45.length === 0}
